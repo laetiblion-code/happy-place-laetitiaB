@@ -372,6 +372,7 @@ export type Database = {
           status: Database["public"]["Enums"]["submission_status"]
           submitted_by_email: string | null
           team: string
+          visibility: Database["public"]["Enums"]["submission_visibility"]
         }
         Insert: {
           attachment_name?: string | null
@@ -388,6 +389,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["submission_status"]
           submitted_by_email?: string | null
           team: string
+          visibility?: Database["public"]["Enums"]["submission_visibility"]
         }
         Update: {
           attachment_name?: string | null
@@ -404,6 +406,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["submission_status"]
           submitted_by_email?: string | null
           team?: string
+          visibility?: Database["public"]["Enums"]["submission_visibility"]
         }
         Relationships: [
           {
@@ -479,6 +482,7 @@ export type Database = {
         | "doublon"
         | "autre"
       submission_status: "en attente" | "validée" | "refusée"
+      submission_visibility: "privée" | "équipe" | "entreprise"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -617,6 +621,7 @@ export const Constants = {
         "autre",
       ],
       submission_status: ["en attente", "validée", "refusée"],
+      submission_visibility: ["privée", "équipe", "entreprise"],
     },
   },
 } as const
