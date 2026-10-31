@@ -83,8 +83,13 @@ export function ChoiceGroup({
                 <span className={`font-label-sm text-label-sm uppercase text-[#28282D] ${o.labelClass ?? ""}`}>
                   {o.label}
                 </span>
-                {checked && (
-                  <Check aria-hidden="true" className="absolute right-xs top-xs h-4 w-4 text-[#28282D]" />
+                {layout === "cards" ? (
+                  checked && <Check aria-hidden="true" className="absolute right-xs top-xs h-4 w-4 text-[#28282D]" />
+                ) : (
+                  // Emplacement toujours réservé : la pilule garde la même largeur selon l'état
+                  <span aria-hidden="true" className={`flex h-4 w-4 shrink-0 items-center justify-center ${checked ? "" : "invisible"}`}>
+                    <Check className="h-4 w-4 text-[#28282D]" />
+                  </span>
                 )}
               </label>
             </div>
