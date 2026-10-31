@@ -8,6 +8,8 @@ export const newsSchema = z.object({
 });
 
 export const REJECTION_CATEGORY_VALUES = ["à clarifier", "en désaccord avec les process", "doublon", "autre"] as const;
+export const SUBMISSION_CATEGORY_VALUES = ["question", "idée", "problème", "amélioration de Happy Place"] as const;
+export const SUBMISSION_VISIBILITY_VALUES = ["privée", "équipe", "entreprise"] as const;
 
 const rejectionTooLong = (n: number) =>
   `La raison du refus dépasse 500 caractères (${n.toLocaleString("fr-FR")} saisis).`;
@@ -29,6 +31,8 @@ export const submissionSchema = z.object({
   status: z.enum(["en attente", "validée", "refusée"], {
     errorMap: () => ({ message: "Statut invalide" }),
   }),
+  category: z.enum(SUBMISSION_CATEGORY_VALUES, { errorMap: () => ({ message: "Type de demande invalide" }) }).nullable().optional(),
+  visibility: z.enum(SUBMISSION_VISIBILITY_VALUES, { errorMap: () => ({ message: "Visibilité invalide" }) }).optional(),
   rejection_category: z.string().nullable().optional(),
   rejection_note: z.string().nullable().optional(),
 }).superRefine((v, ctx) => {

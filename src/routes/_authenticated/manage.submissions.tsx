@@ -18,6 +18,7 @@ import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card
 import { Linkify } from "@/components/linkify";
 import { SubmissionReader } from "@/components/submission-reader";
 import { SubmissionHistory } from "@/components/manage/submission-history";
+import { SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS } from "@/components/submission-choices";
 import { submissionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import {
   REJECTION_CATEGORIES,
@@ -169,6 +170,8 @@ function ManageSubmissions() {
                   team: s.team,
                   content: s.content,
                   status: s.status,
+                  category: s.category ?? null,
+                  visibility: s.visibility ?? "privée",
                   rejection_category: s.rejection_category ?? "",
                   rejection_note: s.rejection_note ?? "",
                 });
@@ -213,6 +216,27 @@ function ManageSubmissions() {
                 onChange={(e) => setForm({ ...form, content: e.target.value })}
               />
               <CharCounter value={form.content} max={2000} min={5} />
+            </Field>
+            <Field label="Type de demande" error={errors.category}>
+              <Select
+                value={form.category ?? ""}
+                onChange={(e) => setForm({ ...form, category: e.target.value || null })}
+              >
+                <option value="">— Non renseigné (demande antérieure) —</option>
+                {SUBMISSION_CATEGORY_OPTIONS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Visibilité" error={errors.visibility}>
+              <Select
+                value={form.visibility ?? "privée"}
+                onChange={(e) => setForm({ ...form, visibility: e.target.value })}
+              >
+                {SUBMISSION_VISIBILITY_OPTIONS.map((v) => (
+                  <option key={v.value} value={v.value}>{v.label}</option>
+                ))}
+              </Select>
             </Field>
             <Field label="Statut" error={errors.status}>
               <Select

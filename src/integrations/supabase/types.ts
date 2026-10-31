@@ -361,6 +361,7 @@ export type Database = {
           attachment_name: string | null
           attachment_path: string | null
           author_name: string
+          category: Database["public"]["Enums"]["submission_category"] | null
           content: string
           created_at: string
           id: string
@@ -378,6 +379,7 @@ export type Database = {
           attachment_name?: string | null
           attachment_path?: string | null
           author_name: string
+          category?: Database["public"]["Enums"]["submission_category"] | null
           content: string
           created_at?: string
           id?: string
@@ -395,6 +397,7 @@ export type Database = {
           attachment_name?: string | null
           attachment_path?: string | null
           author_name?: string
+          category?: Database["public"]["Enums"]["submission_category"] | null
           content?: string
           created_at?: string
           id?: string
@@ -481,6 +484,11 @@ export type Database = {
         | "en désaccord avec les process"
         | "doublon"
         | "autre"
+      submission_category:
+        | "question"
+        | "idée"
+        | "problème"
+        | "amélioration de Happy Place"
       submission_status: "en attente" | "validée" | "refusée"
       submission_visibility: "privée" | "équipe" | "entreprise"
     }
@@ -619,6 +627,12 @@ export const Constants = {
         "en désaccord avec les process",
         "doublon",
         "autre",
+      ],
+      submission_category: [
+        "question",
+        "idée",
+        "problème",
+        "amélioration de Happy Place",
       ],
       submission_status: ["en attente", "validée", "refusée"],
       submission_visibility: ["privée", "équipe", "entreprise"],

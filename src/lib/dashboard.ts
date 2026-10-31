@@ -32,6 +32,8 @@ export type Submission = {
   submitted_by_email?: string | null;
   attachment_path?: string | null;
   attachment_name?: string | null;
+  category?: string | null;
+  visibility?: string | null;
 };
 
 export const REJECTION_CATEGORIES = [
@@ -311,6 +313,8 @@ export type SubmissionInput = {
   team: string;
   content: string;
   status: string;
+  category?: string | null;
+  visibility?: string | null;
   rejection_category?: string | null;
   rejection_note?: string | null;
 };
@@ -376,6 +380,8 @@ function submissionRow(input: SubmissionInput) {
     team: input.team,
     content: input.content,
     status: input.status as Enums["submission_status"],
+    category: (input.category || null) as Enums["submission_category"] | null,
+    visibility: input.visibility ? (input.visibility as Enums["submission_visibility"]) : undefined,
     rejection_category: rejected ? ((input.rejection_category || null) as Enums["rejection_category"] | null) : null,
     rejection_note: rejected ? input.rejection_note?.trim() || null : null,
   };
@@ -390,6 +396,7 @@ export const ATTACHMENT_BUCKET = "submission-attachments";
 export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
 export async function submitIdea(input: Omit<SubmissionInput, "status">, file?: File | null) {
+  if (!input.category) throw new Error("Choisis un type de demande.");
   let attachment_path: string | null = null;
   let attachment_name: string | null = null;
   if (file) {
@@ -406,6 +413,8 @@ export async function submitIdea(input: Omit<SubmissionInput, "status">, file?: 
   }
   const { error } = await db.from("submissions").insert({
     author_name: input.author_name, team: input.team, content: input.content, status: "en attente",
+    category: input.category as Enums["submission_category"],
+    visibility: (input.visibility ?? "privée") as Enums["submission_visibility"],
     attachment_path, attachment_name,
   });
   if (error) throw error;

@@ -11,6 +11,7 @@ import { AttachmentLink } from "@/components/attachment-link";
 import { CharCounter, SubmissionPreview, rejectionErrorMessage } from "@/components/expandable-card";
 import { Linkify } from "@/components/linkify";
 import { SubmissionReader } from "@/components/submission-reader";
+import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS, SubmissionTags } from "@/components/submission-choices";
 import { NewsReader } from "@/components/news-reader";
 import { DepartureNotices } from "@/components/departure-notices";
 import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
@@ -226,6 +227,8 @@ function ManagerSpace() {
       author_name: input.author_name,
       team: input.team,
       content: input.content,
+      category: input.category,
+      visibility: input.visibility,
     }, attachment),
     onSuccess: () => {
       setSubmissionForm(null);
@@ -265,8 +268,13 @@ function ManagerSpace() {
     // Admin: always the « Admin » team (set server-side); manager: one of their teams
     const team = role === "collaborateur" ? "auto" : role === "admin" ? "Admin" : submissionForm.team;
     const result = validate(submissionSchema, { ...submissionForm, team, status: "en attente" });
-    if (!result.ok) {
-      setSubmissionErrors(result.errors);
+    // Le type est obligatoire pour une nouvelle demande (les anciennes n'en ont pas)
+    const categoryError = submissionForm.category ? undefined : "Choisis un type de demande.";
+    if (!result.ok || categoryError) {
+      setSubmissionErrors({
+        ...(result.ok ? {} : result.errors),
+        ...(categoryError ? { category: categoryError } : {}),
+      });
       return;
     }
     setSubmissionErrors({});
@@ -288,7 +296,10 @@ function ManagerSpace() {
               onClick={() => {
                 setSubmissionErrors({});
                 const only = role === "manager" && myTeams.data?.length === 1 ? myTeams.data[0] : "";
-                setSubmissionForm({ author_name: "", team: only, content: "", status: "en attente" });
+                setSubmissionForm({
+                  author_name: "", team: only, content: "", status: "en attente",
+                  category: null, visibility: "privée",
+                });
               }}
               className="flex items-center gap-xs px-md py-xs bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-all shadow-sm"
             >
@@ -565,6 +576,7 @@ function ManagerSpace() {
                       {timeAgo(s.created_at)}
                     </span>
                   </div>
+                  <SubmissionTags category={s.category} visibility={s.visibility} />
                   <SubmissionPreview content={s.content} onOpen={() => setReading(s)} />
                   <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
                   {canReview && <div className="flex gap-xs pt-xs">
@@ -595,6 +607,7 @@ function ManagerSpace() {
               <div className="space-y-xs">
                 {mine.data.map((s) => (
                   <div key={s.id} className="p-sm border border-outline-variant bg-card min-w-0 overflow-hidden">
+                    <SubmissionTags category={s.category} visibility={s.visibility} />
                     <SubmissionPreview content={s.content} onOpen={() => setReading(s)} />
                     <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
                     <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
@@ -834,6 +847,15 @@ function ManagerSpace() {
         <Modal title="Soumettre une proposition" onClose={() => setSubmissionForm(null)}>
           <form onSubmit={sendSubmission} className="space-y-sm" noValidate>
             <ErrorSummary errors={submissionErrors} />
+            <ChoiceGroup
+              legend="Type de demande"
+              name="submission-category"
+              layout="cards"
+              options={SUBMISSION_CATEGORY_OPTIONS}
+              value={submissionForm.category}
+              error={submissionErrors.category}
+              onChange={(v) => setSubmissionForm({ ...submissionForm, category: v })}
+            />
             <Field label="Nom" error={submissionErrors.author_name}>
               <TextInput
                 value={submissionForm.author_name}
@@ -869,6 +891,15 @@ function ManagerSpace() {
               />
               <CharCounter value={submissionForm.content} max={2000} min={5} />
             </Field>
+            <ChoiceGroup
+              legend="Qui peut la voir ?"
+              name="submission-visibility"
+              layout="pills"
+              options={SUBMISSION_VISIBILITY_OPTIONS}
+              value={submissionForm.visibility}
+              error={submissionErrors.visibility}
+              onChange={(v) => setSubmissionForm({ ...submissionForm, visibility: v })}
+            />
             <Field label="Document PDF (optionnel, 20 Mo max)" error={submissionErrors.attachment}>
               <input
                 type="file"

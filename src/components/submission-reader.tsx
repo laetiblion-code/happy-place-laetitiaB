@@ -2,6 +2,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Linkify } from "@/components/linkify";
 import { AttachmentLink } from "@/components/attachment-link";
 import { formatExactDate } from "@/components/expandable-card";
+import { SubmissionTags } from "@/components/submission-choices";
 import type { Submission } from "@/lib/dashboard";
 
 /** Grande fenêtre de lecture d'une soumission (focus piégé, Échap, clic fond). */
@@ -45,6 +46,7 @@ export function SubmissionReader({
               </DialogPrimitive.Close>
             </div>
             <div className="flex-1 overflow-y-auto p-md space-y-md">
+              <SubmissionTags category={s.category} visibility={s.visibility} />
               <p className="font-body-md text-body-md text-on-surface whitespace-pre-line wrap-anywhere">
                 <Linkify text={s.content} />
               </p>
