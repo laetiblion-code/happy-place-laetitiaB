@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { signOut } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { ErrorSummary, Field, FormActions, Modal, TextArea, TextInput } from "@/components/manage/crud-ui";
 import { rejectionSchema, submissionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
@@ -131,6 +131,7 @@ function ManagerSpace() {
     },
   });
   const [attachment, setAttachment] = useState<File | null>(null);
+  const attachmentInput = useRef<HTMLInputElement>(null);
   const [rejecting, setRejecting] = useState<Submission | null>(null);
   const [reading, setReading] = useState<Submission | null>(null);
   const [readingNews, setReadingNews] = useState<News | null>(null);
@@ -545,7 +546,7 @@ function ManagerSpace() {
                 Soumissions en attente
               </h2>
               <div className="bg-tertiary-fixed text-on-tertiary-fixed px-xs py-1 rounded-full font-label-sm text-label-sm">
-                {submissions.data?.length ?? 0} NOUVELLES
+                {submissions.data?.length ?? 0} {submissions.data?.length === 1 ? "NOUVELLE" : "NOUVELLES"}
               </div>
             </div>
             <div className="space-y-sm flex-grow min-w-0">
@@ -844,7 +845,7 @@ function ManagerSpace() {
         </Modal>
       )}
       {submissionForm && (
-        <Modal title="Soumettre une proposition" onClose={() => setSubmissionForm(null)}>
+        <Modal title="Nouvelle demande" onClose={() => setSubmissionForm(null)}>
           <form onSubmit={sendSubmission} className="space-y-sm" noValidate>
             <ErrorSummary errors={submissionErrors} />
             <ChoiceGroup
@@ -882,11 +883,11 @@ function ManagerSpace() {
             {role === "admin" && (
               <p className="text-body-sm text-on-surface-variant">Équipe : Admin</p>
             )}
-            <Field label="Proposition" error={submissionErrors.content}>
+            <Field label="Ta demande" error={submissionErrors.content}>
               <TextArea
                 rows={5}
                 value={submissionForm.content}
-                placeholder="Décris l'amélioration proposée pour le cabinet…"
+                placeholder="Décris ta demande en quelques lignes."
                 onChange={(e) => setSubmissionForm({ ...submissionForm, content: e.target.value })}
               />
               <CharCounter value={submissionForm.content} max={2000} min={5} />
@@ -901,25 +902,62 @@ function ManagerSpace() {
               onChange={(v) => setSubmissionForm({ ...submissionForm, visibility: v })}
             />
             <Field label="Document PDF (optionnel, 20 Mo max)" error={submissionErrors.attachment}>
-              <input
-                type="file"
-                accept="application/pdf,.pdf"
-                className="block w-full text-body-sm"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
-                  if (f && f.type !== "application/pdf") {
-                    setSubmissionErrors({ ...submissionErrors, attachment: "Seuls les fichiers PDF sont acceptés." });
-                    e.target.value = ""; setAttachment(null); return;
-                  }
-                  if (f && f.size > 20 * 1024 * 1024) {
-                    setSubmissionErrors({ ...submissionErrors, attachment: "Le fichier dépasse 20 Mo." });
-                    e.target.value = ""; setAttachment(null); return;
-                  }
-                  const { attachment: _a, ...rest } = submissionErrors;
-                  setSubmissionErrors(rest);
-                  setAttachment(f);
-                }}
-              />
+              <div className="flex flex-wrap items-center gap-xs">
+                {/* Vrai champ fichier, masqué visuellement mais focusable : le bouton visible s'y rattache */}
+                <input
+                  ref={attachmentInput}
+                  id="submission-attachment"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  aria-label="Choisir un PDF"
+                  aria-describedby="submission-attachment-status"
+                  className="peer sr-only"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      attachmentInput.current?.click();
+                    }
+                  }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (f && f.type !== "application/pdf") {
+                      setSubmissionErrors({ ...submissionErrors, attachment: "Seuls les fichiers PDF sont acceptés." });
+                      e.target.value = ""; setAttachment(null); return;
+                    }
+                    if (f && f.size > 20 * 1024 * 1024) {
+                      setSubmissionErrors({ ...submissionErrors, attachment: "Le fichier dépasse 20 Mo." });
+                      e.target.value = ""; setAttachment(null); return;
+                    }
+                    const { attachment: _a, ...rest } = submissionErrors;
+                    setSubmissionErrors(rest);
+                    setAttachment(f);
+                  }}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  onClick={() => attachmentInput.current?.click()}
+                  className="px-md py-xs min-h-[44px] bg-white border border-[#28282D] text-[#28282D] font-label-md text-label-md peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#28282D] hover:bg-[#EDEBE6]"
+                >
+                  Choisir un PDF
+                </button>
+                <span id="submission-attachment-status" className="text-body-sm text-on-surface-variant wrap-anywhere">
+                  {attachment ? attachment.name : "Aucun fichier"}
+                </span>
+                {attachment && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAttachment(null);
+                      if (attachmentInput.current) attachmentInput.current.value = "";
+                    }}
+                    className="font-label-sm text-label-sm text-primary underline underline-offset-2 min-h-[44px] px-xs"
+                  >
+                    Retirer
+                  </button>
+                )}
+              </div>
             </Field>
             <FormActions
               pending={submit.isPending}
