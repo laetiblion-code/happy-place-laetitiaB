@@ -153,4 +153,7 @@ UPDATE public.submission_status_history h
   FROM public.submissions s
  WHERE h.submission_id = s.id;
 
+-- Demandes validées de démo : visibles de tous
+UPDATE public.submissions SET visibility = 'entreprise' WHERE status = 'validée';
+
 COMMIT;

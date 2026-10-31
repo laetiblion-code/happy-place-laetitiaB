@@ -9,3 +9,4 @@
 - Keep metric delta and value formatting in shared dashboard helpers so management rows and dashboard trends interpret numeric text consistently.
 
 - Les accès sont gérés uniquement par un admin via la liste blanche (allowed_users, allowed_user_roles) ; aucun auto-enrôlement.
+- Visibilité des demandes : Privée (auteur et manager, admin seulement si l'équipe n'a pas de manager), Équipe et Entreprise visibles des collègues une fois validées. Test : supabase/tests/rls_visibilite.sql.
