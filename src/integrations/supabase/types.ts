@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_requests: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          user_email: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          user_email: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          user_email?: string
+        }
+        Relationships: []
+      }
       allowed_user_roles: {
         Row: {
           allowed_user_id: string
@@ -472,6 +493,10 @@ export type Database = {
       mark_departure_notice_downloaded: {
         Args: { _id: string }
         Returns: undefined
+      }
+      reserver_appel_ia: {
+        Args: { _kind: string }
+        Returns: Json
       }
       admin_users_status: {
         Args: never

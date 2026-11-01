@@ -17,6 +17,7 @@ import { DepartureNotices } from "@/components/departure-notices";
 import { ManagerCards, MyChips } from "@/components/home-counters";
 import { fetchAlertCounts, fetchDraftCounts, fetchMyCounts, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
 import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
+import { NewsAiHelper } from "@/components/news-ai-helper";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
 import { Button } from "@/components/ui/button";
@@ -112,6 +113,8 @@ function ManagerSpace() {
     myEmail;
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  // Vrai tant que le titre et le texte viennent d'une proposition de l'IA non enregistrée
+  const [propositionIA, setPropositionIA] = useState(false);
   const [editingNewsId, setEditingNewsId] = useState<string | null>(null);
   const [media, setMedia] = useState<MediaDraft>(emptyMedia);
   const [showLinkErrs, setShowLinkErrs] = useState(false);
@@ -203,6 +206,7 @@ function ManagerSpace() {
     onSuccess: () => {
       setTitle("");
       setBody("");
+      setPropositionIA(false);
       setEditingNewsId(null);
       setMedia(emptyMedia());
       setShowLinkErrs(false);
@@ -397,6 +401,17 @@ function ManagerSpace() {
                 {drafts} brouillon{drafts > 1 ? "s" : ""} en attente
               </span>
             </div>
+            {canWriteNews && (
+              <NewsAiHelper
+                titre={title}
+                texte={body}
+                onProposition={(p) => {
+                  setTitle(p.titre);
+                  setBody(p.texte);
+                  setPropositionIA(true);
+                }}
+              />
+            )}
             {canWriteNews && <form
               className="space-y-md"
               onSubmit={(e) => {
@@ -418,6 +433,12 @@ function ManagerSpace() {
                 });
               }}
             >
+              {propositionIA && (
+                <p className="inline-flex items-center gap-xs px-sm py-xs bg-[#F0D0BC] text-on-surface font-label-sm text-label-sm">
+                  <span aria-hidden="true" className="material-symbols-outlined text-sm">auto_awesome</span>
+                  Proposition de l'IA, à relire
+                </p>
+              )}
               <div className="space-y-xs">
                 <label className="font-label-md text-label-md text-on-surface-variant block">
                   TITRE
@@ -459,6 +480,7 @@ function ManagerSpace() {
                         setEditingNewsId(null);
                         setTitle("");
                         setBody("");
+                        setPropositionIA(false);
                         setMedia(emptyMedia());
                         setShowLinkErrs(false);
                       }}

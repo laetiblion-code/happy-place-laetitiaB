@@ -14,3 +14,4 @@
 - Les demandes d'un manager ou d'un admin sont validées à l'envoi (trigger auto_validate_staff_submission) ; personne ne traite ses propres demandes. Test : supabase/tests/demandes_staff.sql.
 - Connexion par mot de passe ; lien e-mail (signInWithOtp) seulement pour la première connexion ou un mot de passe oublié, vers /mot-de-passe.
 - Lien de première connexion réservé à la liste blanche par le hook Supabase Before User Created (public.hook_before_user_created, à activer dans Authentication > Hooks). Statuts de connexion via public.admin_users_status(), réservée à l'admin. Test : supabase/tests/gestion_utilisateurs.sql.
+- Aide à la rédaction IA : Edge Function supabase/functions/aide-redaction (lien https ou PDF ≤ 5 Mo, texte seul envoyé au scénario Make, secret partagé), plafond via public.reserver_appel_ia (10 par personne et 40 au total par jour). La clé du modèle reste dans Make ; aucune clé service_role. Test : supabase/tests/aide_redaction_ia.sql.
