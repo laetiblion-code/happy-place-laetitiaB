@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Submission } from "@/lib/dashboard";
+import { formatNumberFr, type Submission } from "@/lib/dashboard";
 
 /**
  * Compteurs de la page d'accueil.
@@ -23,7 +23,7 @@ export function noun(n: number, singular: string, pluralForm: string) {
 
 /** Accord français avec le nombre : « 0 demande », « 2 demandes ». */
 export function plural(n: number, singular: string, pluralForm: string) {
-  return `${n} ${noun(n, singular, pluralForm)}`;
+  return `${formatNumberFr(n)} ${noun(n, singular, pluralForm)}`;
 }
 
 function unwrap(res: { count: number | null; error: unknown }) {
@@ -165,4 +165,62 @@ export async function fetchMyCounts(email: string): Promise<MyCounts> {
     mine(email).eq("status", "refusée").then(unwrap),
   ]);
   return { toComplete, pending, validated, refused: Math.max(0, refusedAll - toComplete) };
+}
+
+// --- Admin : écarts d'organisation -------------------------------------------
+
+export type AdminGaps = {
+  /** Équipes (hors réservée « Admin ») sans aucun manager. */
+  teamsWithoutManager: string[];
+  /** Collaborateurs de la liste blanche sans équipe. */
+  usersWithoutTeam: number;
+};
+
+/** Même normalisation que private.team_has_manager : casse et espaces de bord ignorées. */
+function teamKey(name: string) {
+  return name.trim().toLowerCase();
+}
+
+/**
+ * Calcul pur des écarts à partir des équipes et des utilisateurs lus par l'admin.
+ * Une équipe a un manager seulement si une personne au rôle « manager » lui est rattachée
+ * (règle de private.team_has_manager). Les rattachements d'une personne sans ce rôle ne comptent pas.
+ */
+export function computeAdminGaps(
+  teams: { name: string; is_reserved: boolean }[],
+  users: { team: string | null; role: string | null; managedTeams: string[] }[],
+): AdminGaps {
+  const managed = new Set(
+    users
+      .filter((u) => u.role === "manager")
+      .flatMap((u) => u.managedTeams.map(teamKey)),
+  );
+  const teamsWithoutManager = teams
+    .filter((t) => !t.is_reserved && teamKey(t.name) !== "admin" && !managed.has(teamKey(t.name)))
+    .map((t) => t.name)
+    .sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }));
+  const usersWithoutTeam = users.filter(
+    (u) => !u.team && (u.role ?? "collaborateur") === "collaborateur",
+  ).length;
+  return { teamsWithoutManager, usersWithoutTeam };
+}
+
+/** Lit les équipes et les utilisateurs déjà lisibles par l'admin (RLS admin) et calcule les écarts. */
+export async function fetchAdminGaps(): Promise<AdminGaps> {
+  const [teamsRes, usersRes] = await Promise.all([
+    supabase.from("teams").select("name, is_reserved"),
+    supabase
+      .from("allowed_users")
+      .select("team, allowed_user_roles(role), manager_teams(team)"),
+  ]);
+  if (teamsRes.error) throw teamsRes.error;
+  if (usersRes.error) throw usersRes.error;
+  return computeAdminGaps(
+    teamsRes.data ?? [],
+    (usersRes.data ?? []).map((u) => ({
+      team: u.team,
+      role: u.allowed_user_roles?.role ?? null,
+      managedTeams: (u.manager_teams ?? []).map((m) => m.team),
+    })),
+  );
 }

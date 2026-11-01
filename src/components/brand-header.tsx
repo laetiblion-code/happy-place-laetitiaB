@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import sharkLogo from "@/assets/bigger-boat-shark.png";
 
-export function BrandHeader() {
+export function BrandHeader({ actions }: { actions?: ReactNode }) {
   return (
     <header className="border-b border-outline-variant bg-surface-container-lowest">
       <div className="mx-auto flex min-h-16 w-full max-w-interface items-center justify-between gap-md px-sm py-xs md:px-md">
@@ -21,11 +22,15 @@ export function BrandHeader() {
             Bigger Boat
           </span>
         </Link>
-        <div className="flex items-center gap-md">
-          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-            Happy Place
-          </span>
-        </div>
+        {actions ? (
+          actions
+        ) : (
+          <div className="flex items-center gap-md">
+            <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+              Happy Place
+            </span>
+          </div>
+        )}
       </div>
     </header>
   );

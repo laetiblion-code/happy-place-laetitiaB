@@ -138,7 +138,7 @@ function ManageMetrics() {
                 {m.previous_value != null && (
                   <>
                     {deltaText(m) && ` · ${deltaText(m)}`}
-                    {` · avant : ${formatMetricValue(m.previous_value, m.unit).replace(/%$/, " %")}`}
+                    {` · avant : ${formatMetricValue(m.previous_value, m.unit)}`}
                   </>
                 )}
               </p>

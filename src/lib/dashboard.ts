@@ -70,22 +70,29 @@ export const TREND_LABELS: Record<Metric["trend"], string> = {
   stable: "■ Stable",
 };
 
+/** Nombre au format français (virgule décimale, espace fine pour les milliers). */
+export function formatNumberFr(value: number, options?: Intl.NumberFormatOptions): string {
+  return new Intl.NumberFormat("fr-FR", options).format(value);
+}
+
 export function deltaText(m: Pick<Metric, "delta" | "unit"> | undefined): string {
   if (!m || m.delta == null) return "";
   const delta = Number(m.delta);
   if (!Number.isFinite(delta) || delta === 0) return "";
-  const abs = Math.abs(delta).toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+  const abs = formatNumberFr(Math.abs(delta), { maximumFractionDigits: 1 });
   const sign = delta > 0 ? "+" : "−";
   const suffix = m.unit === "%" ? " pts" : m.unit ? ` ${m.unit.trim()}` : "";
   return `${sign}${abs}${suffix}`;
 }
 
+/** Valeur d'indicateur : « 40,6 % » (espace insécable avant le %), « 1 250 ». */
 export function formatMetricValue(value: number | string, unit: string | null): string {
-  const formatted = Number(value).toLocaleString("fr-FR", {
+  const formatted = formatNumberFr(Number(value), {
     minimumFractionDigits: unit === "%" ? 1 : 0,
     maximumFractionDigits: 1,
   });
-  return `${formatted}${unit ?? ""}`;
+  const suffix = unit === "%" ? "\u00a0%" : (unit ?? "");
+  return `${formatted}${suffix}`;
 }
 
 export async function fetchNews(): Promise<News[]> {
