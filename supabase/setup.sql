@@ -2,7 +2,7 @@
 -- Happy Place — installation complète de la base (version élèves)
 -- ============================================================
 -- À coller en entier dans Supabase > SQL Editor > New query, puis Run.
--- Contient les 44 migrations de l'app, dans l'ordre. Chacune est
+-- Contient les 45 migrations de l'app, dans l'ordre. Chacune est
 -- validée séparément (BEGIN/COMMIT) : certaines ajoutent des valeurs
 -- d'ENUM qui doivent être enregistrées avant d'être utilisées.
 -- Ensuite, exécuter seed.sql pour charger les données de démo.
@@ -2636,6 +2636,38 @@ BEGIN
   RETURN jsonb_build_object('dry_run', _dry_run, 'accepted', _ok, 'rejected', _ko, 'rows', _out);
 END;
 $function$;
+
+COMMIT;
+
+-- ---------- 20261101160000_statut_contenu_utilisateur.sql ----------
+-- ============================================================
+-- T26 : le statut de connexion indique aussi si l'utilisateur a déjà du
+-- contenu (demandes ou actualités). Le bouton « Supprimer » n'est proposé
+-- que pour un utilisateur jamais connecté ET sans contenu.
+-- ============================================================
+BEGIN;
+
+DROP FUNCTION IF EXISTS public.admin_users_status();
+CREATE FUNCTION public.admin_users_status()
+RETURNS TABLE (email text, a_un_compte boolean, mot_de_passe_cree boolean, derniere_connexion timestamptz, a_du_contenu boolean)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, private AS $$
+BEGIN
+  IF NOT private.is_admin() THEN
+    RAISE EXCEPTION 'Réservé aux admins.' USING ERRCODE = '42501';
+  END IF;
+  RETURN QUERY
+  SELECT au.email,
+         u.id IS NOT NULL,
+         coalesce(u.encrypted_password, '') <> '',
+         u.last_sign_in_at,
+         EXISTS (SELECT 1 FROM public.submissions s WHERE s.submitted_by_email = au.email)
+           OR EXISTS (SELECT 1 FROM public.news n WHERE n.author_email = au.email)
+  FROM public.allowed_users au
+  LEFT JOIN auth.users u ON lower(u.email) = au.email;
+END
+$$;
+REVOKE ALL ON FUNCTION public.admin_users_status() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_users_status() TO authenticated;
 
 COMMIT;
 

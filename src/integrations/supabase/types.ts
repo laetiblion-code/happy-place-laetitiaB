@@ -476,6 +476,7 @@ export type Database = {
       admin_users_status: {
         Args: never
         Returns: {
+          a_du_contenu: boolean
           a_un_compte: boolean
           derniere_connexion: string | null
           email: string
