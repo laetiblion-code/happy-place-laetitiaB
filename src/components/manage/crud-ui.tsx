@@ -129,21 +129,17 @@ export function RowActions({
   deleting?: boolean;
 }) {
   return (
-    <div className="flex gap-xs shrink-0">
-      <button
-        type="button"
-        onClick={onEdit}
-        className="px-sm py-1 border border-outline text-primary font-label-sm text-label-sm hover:bg-surface-container"
-      >
-        MODIFIER
+    <div className="flex flex-wrap gap-xs shrink-0">
+      <button type="button" onClick={onEdit} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+        <ManageIcon name="edit" /> Modifier
       </button>
       <button
         type="button"
         onClick={onDelete}
         disabled={deleting}
-        className="px-sm py-1 border border-error text-error font-label-sm text-label-sm hover:bg-error-container disabled:opacity-50"
+        className={buttonVariants({ variant: "destructive", size: "sm" })}
       >
-        SUPPRIMER
+        <ManageIcon name="delete" /> Supprimer
       </button>
     </div>
   );
@@ -167,20 +163,11 @@ export function ConfirmDelete({
         irréversible.
       </p>
       <div className="flex justify-end gap-xs pt-sm">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-md py-xs border border-outline text-primary font-label-md text-label-md hover:bg-surface-container"
-        >
-          ANNULER
+        <button type="button" onClick={onCancel} className={buttonVariants({ variant: "secondary" })}>
+          Annuler
         </button>
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={pending}
-          className="px-lg py-xs bg-error text-on-error font-label-md text-label-md disabled:opacity-50"
-        >
-          {pending ? "SUPPRESSION…" : "SUPPRIMER"}
+        <button type="button" onClick={onConfirm} disabled={pending} className={buttonVariants({ variant: "destructive" })}>
+          {pending ? "Suppression…" : "Supprimer"}
         </button>
       </div>
     </Modal>

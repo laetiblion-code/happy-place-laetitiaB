@@ -22,6 +22,7 @@ import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-ext
 import { Button, buttonVariants } from "@/components/ui/button";
 import { AccountBar } from "@/components/account-bar";
 import { AdminGapsBanner } from "@/components/admin-gaps-banner";
+import { ALERT_STATES, alertStatusOptions } from "@/lib/alert-states";
 import { RejectionNote, StatusBadge } from "@/components/status-badge";
 import {
   fetchBlockers,
@@ -79,14 +80,6 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
     </span>
   );
 }
-
-/** États d'une alerte : valeur en base, libellé en casse normale, icône et couleur (jamais la couleur seule). */
-const ALERT_STATES: Record<string, { label: string; icon: string; className: string }> = {
-  OUVERT: { label: "Ouverte", icon: "error_outline", className: "bg-[#FFDAD6] text-[#C2272D]" },
-  "EN COURS": { label: "En cours", icon: "autorenew", className: "bg-[#F0D0BC] text-[#28282D]" },
-  SURVEILLANCE: { label: "Sous surveillance", icon: "visibility", className: "bg-[#F5D5D4] text-[#28282D]" },
-  "RÉSOLU": { label: "Résolue", icon: "check_circle", className: "bg-[#DDF2E3] text-[#298646]" },
-};
 
 function trendText(m: Metric | undefined) {
   return m ? TREND_LABELS[m.trend] : "";
@@ -220,10 +213,10 @@ function ManagerSpace() {
     },
     onSuccess: (count) => {
       if (count === 0) {
-        toast.info("Aucune soumission en attente ou validée sur les 30 derniers jours.");
+        toast.info("Aucune demande en attente ou validée sur les 30 derniers jours.");
         return;
       }
-      toast.success(`${count} soumission${count > 1 ? "s" : ""} exportée${count > 1 ? "s" : ""} au format CSV.`);
+      toast.success(`${count} demande${count > 1 ? "s" : ""} exportée${count > 1 ? "s" : ""} au format CSV.`);
     },
     onError,
   });
@@ -269,7 +262,7 @@ function ManagerSpace() {
     onSuccess: (_d, vars) => {
       if (vars.status === "refusée") {
         setRejecting(null);
-        toast.success("Soumission refusée");
+        toast.success("Demande refusée");
       } else {
         setReading((r) => (r?.id === vars.id ? null : r));
       }
@@ -753,7 +746,7 @@ function ManagerSpace() {
             onRead={setReading}
           />
 
-          {/* Alertes opérationnelles (points bloquants) */}
+          {/* Alertes opérationnelles */}
           <section id="alertes" className="col-span-12 md:col-span-7 scroll-mt-4 rounded-lg bg-surface-container-lowest border border-outline-variant p-md">
             <div className="flex items-center justify-between mb-md">
               <div className="flex items-center gap-sm">
@@ -775,7 +768,7 @@ function ManagerSpace() {
             <div className="space-y-sm">
               {blockers.isError && (
                 <p className="text-body-sm text-error">
-                  Les points bloquants sont indisponibles.
+                  Les alertes sont indisponibles.
                 </p>
               )}
               {blockers.data?.length === 0 && (
@@ -813,10 +806,10 @@ function ManagerSpace() {
                       </div>
                     </div>
                     {(() => {
-                      const state = ALERT_STATES[b.status] ?? { label: b.status, icon: "help", className: "bg-surface-container-highest text-on-surface" };
+                      const state = ALERT_STATES[b.status as keyof typeof ALERT_STATES];
                       return (
-                        <span className={`inline-flex shrink-0 items-center gap-xs rounded-full px-sm py-[2px] font-label-sm text-label-sm font-semibold ${state.className}`}>
-                          <Icon name={state.icon} className="text-base" />
+                        <span className={`inline-flex shrink-0 items-center gap-xs rounded-full px-sm py-[2px] font-label-sm text-label-sm font-semibold ${state?.className ?? "bg-surface-container-highest text-on-surface"}`}>
+                          <Icon name={state?.icon ?? "help"} className="text-base" />
                           <select
                             aria-label={`Statut de ${b.title}`}
                             value={b.status}
@@ -824,14 +817,9 @@ function ManagerSpace() {
                             onChange={(e) => setBlocker.mutate({ id: b.id, status: e.target.value })}
                             className="cursor-pointer bg-transparent font-label-sm text-label-sm font-semibold text-[inherit] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-default"
                           >
-                            {Object.entries(ALERT_STATES).map(([value, opt]) => (
-                              <option
-                                key={value}
-                                value={value}
-                                disabled={value === "RÉSOLU" && b.status === "OUVERT"}
-                                title={value === "RÉSOLU" && b.status === "OUVERT" ? "Passe d'abord par En cours" : undefined}
-                              >
-                                {opt.label}
+                            {alertStatusOptions(b.status).map((value) => (
+                              <option key={value} value={value}>
+                                {ALERT_STATES[value].label}
                               </option>
                             ))}
                           </select>
@@ -935,7 +923,7 @@ function ManagerSpace() {
         approving={review.isPending}
       />
       {rejecting && (
-        <Modal title="Refuser la soumission" onClose={() => setRejecting(null)}>
+        <Modal title="Refuser la demande" onClose={() => setRejecting(null)}>
           <form
             noValidate
             className="space-y-sm"
@@ -965,7 +953,7 @@ function ManagerSpace() {
               <TextArea
                 rows={4}
                 value={rejectForm.rejection_note}
-                placeholder="Explique au collaborateur pourquoi sa soumission est refusée…"
+                placeholder="Explique au collaborateur pourquoi sa demande est refusée…"
                 onChange={(e) => setRejectForm({ ...rejectForm, rejection_note: e.target.value })}
               />
               <CharCounter value={rejectForm.rejection_note} max={500} />

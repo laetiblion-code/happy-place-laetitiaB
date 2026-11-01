@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BrandHeader } from "@/components/brand-header";
+import { buttonVariants } from "@/components/ui/button";
 import { processAttachmentDeletionQueue } from "@/lib/dashboard";
 
 export const Route = createFileRoute("/_authenticated/manage")({
@@ -29,12 +30,13 @@ export const Route = createFileRoute("/_authenticated/manage")({
   component: ManageLayout,
 });
 
+// Même vocabulaire que l'accueil (les noms de routes ne changent pas)
 const tabs = [
-  { to: "/manage/news", label: "ACTUALITÉS" },
-  { to: "/manage/submissions", label: "SOUMISSIONS" },
-  { to: "/manage/blockers", label: "POINTS BLOQUANTS" },
-  { to: "/manage/metrics", label: "INDICATEURS" },
-  { to: "/manage/users", label: "UTILISATEURS AUTORISÉS" },
+  { to: "/manage/news", label: "Actualités" },
+  { to: "/manage/submissions", label: "Demandes" },
+  { to: "/manage/blockers", label: "Alertes opérationnelles" },
+  { to: "/manage/metrics", label: "Indicateurs clés" },
+  { to: "/manage/users", label: "Utilisateurs et équipes" },
 ] as const;
 
 function ManageLayout() {
@@ -60,21 +62,18 @@ function ManageLayout() {
             </p>
             <h1 className="font-headline-lg text-headline-lg text-primary">Gestion des données</h1>
           </div>
-          <Link
-            to="/"
-            className="px-md py-xs border border-outline bg-surface text-primary font-label-md text-label-md hover:bg-surface-container"
-          >
-            ← RETOUR À LA VUE D'ENSEMBLE
+          <Link to="/" className={buttonVariants({ variant: "secondary" })}>
+            ← Retour à l'accueil
           </Link>
         </div>
 
-        <nav className="flex flex-wrap gap-xs border-b border-outline-variant pb-sm">
+        <nav aria-label="Gestion" className="flex flex-wrap gap-xs border-b border-outline-variant pb-sm">
           {tabs.map((t) => (
             <Link
               key={t.to}
               to={t.to}
-              className="px-md py-xs border border-outline-variant font-label-md text-label-md text-on-surface-variant hover:bg-surface-container"
-              activeProps={{ className: "bg-primary text-on-primary border-primary" }}
+              className="inline-flex min-h-11 items-center rounded-md border border-outline-variant px-md py-xs text-sm font-medium text-on-surface-variant hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              activeProps={{ className: "bg-primary text-on-primary border-primary hover:bg-primary" }}
             >
               {t.label}
             </Link>

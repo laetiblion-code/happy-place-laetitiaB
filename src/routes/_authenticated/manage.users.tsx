@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
-import { CheckCircle2, Circle, KeyRound, Pencil } from "lucide-react";
+import { CheckCircle2, Circle, KeyRound, Pencil, Trash2 } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { BulkImport } from "@/components/manage/bulk-import";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -12,9 +13,9 @@ import { countAttachmentDeletionQueue, processAttachmentDeletionQueue } from "@/
 export const Route = createFileRoute("/_authenticated/manage/users")({
   head: () => ({
     meta: [
-      { title: "Utilisateurs autorisés — Happy Place" },
+      { title: "Utilisateurs et équipes · Happy Place" },
       { name: "description", content: "Liste blanche des comptes Google autorisés à se connecter." },
-      { property: "og:title", content: "Utilisateurs autorisés — Happy Place" },
+      { property: "og:title", content: "Utilisateurs et équipes · Happy Place" },
       { property: "og:description", content: "Gérer qui peut accéder à Happy Place." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -398,8 +399,8 @@ function UsersPage() {
             {teamErr && <p className="text-error text-sm">{teamErr}</p>}
           </div>
         )}
-        <button disabled={add.isPending} className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md">
-          AJOUTER
+        <button disabled={add.isPending} className={buttonVariants({ variant: "default" })}>
+          Ajouter
         </button>
       </form>
 
@@ -515,10 +516,9 @@ function UsersPage() {
                     )
                       removeNeverLogged.mutate(u.id);
                   }}
-                  style={{ backgroundColor: "#FFFFFF", borderColor: "#C2272D", color: "#C2272D" }}
-                  className="px-sm py-xs border font-label-md text-label-md disabled:opacity-50"
+                  className={buttonVariants({ variant: "destructive", size: "sm" })}
                 >
-                  Supprimer
+                  <Trash2 aria-hidden="true" size={14} /> Supprimer
                 </button>
               )}
               </div>
@@ -572,7 +572,7 @@ function UsersPage() {
             })()}
             {u.role === "collaborateur" && (
               <div className="flex flex-wrap items-center gap-xs border-t border-outline-variant pt-sm">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">ÉQUIPE :</span>
+                <span className="font-label-sm text-label-sm text-on-surface-variant">Équipe :</span>
 <select
             value={memberTeams[u.id] ?? u.team ?? ""}
             onChange={(e) => setMemberTeams((c) => ({ ...c, [u.id]: e.target.value }))}
@@ -600,9 +600,9 @@ function UsersPage() {
                           },
                         )
                       }
-                      className="bg-primary text-on-primary px-sm py-1 font-label-sm text-label-sm disabled:opacity-50"
+                      className={buttonVariants({ variant: "default", size: "sm" })}
                     >
-                      {saving ? "…" : "ENREGISTRER"}
+                      {saving ? "…" : "Enregistrer"}
                     </button>
                   );
                 })()}
@@ -611,7 +611,7 @@ function UsersPage() {
             )}
             {u.role === "manager" && (
               <div className="flex flex-wrap items-center gap-xs border-t border-outline-variant pt-sm">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">ÉQUIPES :</span>
+                <span className="font-label-sm text-label-sm text-on-surface-variant">Équipes :</span>
                 {u.teams.map((team) => (
                   <button
                     key={team}
@@ -636,9 +636,9 @@ function UsersPage() {
                   type="button"
                   disabled={!teamInputs[u.id] || addTeam.isPending}
                   onClick={() => addTeam.mutate({ allowedUserId: u.id, team: teamInputs[u.id] ?? "" })}
-                  className="bg-primary text-on-primary px-sm py-1 font-label-sm text-label-sm disabled:opacity-50"
+                  className={buttonVariants({ variant: "default", size: "sm" })}
                 >
-                  {addTeam.isPending && addTeam.variables?.allowedUserId === u.id ? "…" : "AJOUTER"}
+                  {addTeam.isPending && addTeam.variables?.allowedUserId === u.id ? "…" : "Ajouter"}
                 </button>
               </div>
             )}
@@ -661,7 +661,7 @@ function UsersPage() {
             {selectableTeams.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
           <DialogFooter>
-            <button type="button" onClick={() => setRoleDialog(null)} className="px-md py-xs border border-outline text-primary font-label-md text-label-md">Annuler</button>
+            <button type="button" onClick={() => setRoleDialog(null)} className={buttonVariants({ variant: "secondary" })}>Annuler</button>
             <button
               type="button"
               disabled={!roleDialog?.team || update.isPending}
@@ -745,7 +745,7 @@ function TeamsSection({ users, teams, onChanged }: { users: Row[]; teams: { name
           />
           {err && <p className="text-error text-sm mt-1">{err}</p>}
         </div>
-        <button disabled={create.isPending} className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md">AJOUTER</button>
+        <button disabled={create.isPending} className={buttonVariants({ variant: "default" })}>Ajouter</button>
       </form>
       <ul className="divide-y divide-outline-variant border border-outline-variant">
         {teams.map((t) => (

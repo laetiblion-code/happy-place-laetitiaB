@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { AlertStateChip, SeverityChip } from "@/components/alert-chips";
+import { ALERT_STATES, NEW_ALERT_STATUSES, alertStatusOptions } from "@/lib/alert-states";
+import { buttonVariants } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
   ConfirmDelete,
@@ -27,9 +30,9 @@ import {
 export const Route = createFileRoute("/_authenticated/manage/blockers")({
   head: () => ({
     meta: [
-      { title: "Gestion des points bloquants — Happy Place" },
-      { name: "description", content: "Créez, modifiez et supprimez les points bloquants dans Happy Place." },
-      { property: "og:title", content: "Gestion des points bloquants — Happy Place" },
+      { title: "Alertes opérationnelles · Happy Place" },
+      { name: "description", content: "Créez, modifiez et supprimez les alertes opérationnelles dans Happy Place." },
+      { property: "og:title", content: "Alertes opérationnelles · Happy Place" },
       { property: "og:description", content: "Gérez les alertes opérationnelles des missions de recrutement dans Happy Place." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -37,12 +40,6 @@ export const Route = createFileRoute("/_authenticated/manage/blockers")({
   }),
   component: ManageBlockers,
 });
-
-const severityLabels: Record<string, string> = {
-  critical: "Critique",
-  warning: "Avertissement",
-  info: "Information",
-};
 
 const empty: BlockerInput = {
   title: "",
@@ -67,7 +64,7 @@ function ManageBlockers() {
     mutationFn: (input: BlockerInput) =>
       editing ? updateBlocker(editing.id, input) : createBlocker(input),
     onSuccess: () => {
-      toast.success(editing ? "Point bloquant modifié" : "Point bloquant créé");
+      toast.success(editing ? "Alerte modifiée" : "Alerte créée");
       close();
       invalidate();
     },
@@ -77,7 +74,7 @@ function ManageBlockers() {
   const remove = useMutation({
     mutationFn: (id: string) => deleteBlocker(id),
     onSuccess: () => {
-      toast.success("Point bloquant supprimé");
+      toast.success("Alerte supprimée");
       setToDelete(null);
       invalidate();
     },
@@ -106,23 +103,24 @@ function ManageBlockers() {
     <section className="space-y-md">
       <div className="flex items-center justify-between">
         <h2 className="font-headline-sm text-headline-sm text-primary">
-          Points bloquants ({list.data?.length ?? 0})
+          Alertes opérationnelles ({list.data?.length ?? 0})
         </h2>
         <button
+          type="button"
           onClick={() => {
             setEditing(null);
             setErrors({});
             setForm({ ...empty });
           }}
-          className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md"
+          className={buttonVariants({ variant: "default" })}
         >
-          + NOUVEAU POINT BLOQUANT
+          <span aria-hidden="true" className="material-symbols-outlined">add</span> Nouvelle alerte
         </button>
       </div>
 
       {list.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
       {list.isError && (
-        <p className="text-body-sm text-error">Impossible de charger les points bloquants.</p>
+        <p className="text-body-sm text-error">Impossible de charger les alertes.</p>
       )}
 
       <div className="space-y-xs">
@@ -134,9 +132,11 @@ function ManageBlockers() {
             <div>
               <p className="font-body-md text-primary font-bold">{b.title}</p>
               <p className="text-body-sm text-on-surface-variant">{b.description}</p>
-              <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
-                 {b.department} • {severityLabels[b.severity] ?? b.severity} • {b.status} • {timeAgo(b.updated_at)}
-              </p>
+              <div className="mt-xs flex flex-wrap items-center gap-xs text-body-sm text-[#68686D]">
+                <SeverityChip severity={b.severity} />
+                <AlertStateChip status={b.status} />
+                <span>{b.department} · {timeAgo(b.updated_at)}</span>
+              </div>
             </div>
             <RowActions
               onEdit={() => {
@@ -155,13 +155,13 @@ function ManageBlockers() {
           </article>
         ))}
         {list.data?.length === 0 && (
-          <p className="text-body-sm italic text-on-surface-variant">Aucun point bloquant.</p>
+          <p className="text-body-sm italic text-on-surface-variant">Aucune alerte opérationnelle.</p>
         )}
       </div>
 
       {form && (
         <Modal
-          title={editing ? "Modifier le point bloquant" : "Nouveau point bloquant"}
+          title={editing ? "Modifier l'alerte" : "Nouvelle alerte"}
           onClose={close}
         >
           <form onSubmit={submit} className="space-y-sm" noValidate>
@@ -204,18 +204,11 @@ function ManageBlockers() {
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
               >
-                <option value="OUVERT">OUVERT</option>
-                <option value="EN COURS">EN COURS</option>
-                <option value="SURVEILLANCE">SURVEILLANCE</option>
-                {editing && (
-                  <option
-                    value="RÉSOLU"
-                    disabled={form.status === "OUVERT"}
-                    title={form.status === "OUVERT" ? "Passe d'abord par EN COURS" : undefined}
-                  >
-                    RÉSOLU
+                {(editing ? alertStatusOptions(editing.status) : NEW_ALERT_STATUSES).map((value) => (
+                  <option key={value} value={value}>
+                    {ALERT_STATES[value].label}
                   </option>
-                )}
+                ))}
               </Select>
             </Field>
             <FormActions pending={save.isPending} onCancel={close} />

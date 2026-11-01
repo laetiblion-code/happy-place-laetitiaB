@@ -5,7 +5,7 @@ import { AttachmentLink } from "@/components/attachment-link";
 import { SubmissionPreview, formatExactDate } from "@/components/expandable-card";
 import { fetchResolvedBlockers, fetchValidatedSubmissions, type Submission } from "@/lib/dashboard";
 
-/** Fenêtre « Archive des points bloquants » (lecture seule, statut RÉSOLU). */
+/** Fenêtre « Archive des alertes opérationnelles » (lecture seule, statut RÉSOLU). */
 export function BlockerArchive({ open, onClose }: { open: boolean; onClose: () => void }) {
   const q = useQuery({ queryKey: ["blockers", "resolved"], queryFn: fetchResolvedBlockers, enabled: open, retry: false });
   return (

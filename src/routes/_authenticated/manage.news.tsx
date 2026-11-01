@@ -25,13 +25,14 @@ import {
 } from "@/lib/dashboard";
 import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
+import { buttonVariants } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/manage/news")({
   head: () => ({
     meta: [
-      { title: "Gestion des actualités — Happy Place" },
+      { title: "Actualités · Happy Place" },
       { name: "description", content: "Créez, modifiez et supprimez les actualités de Happy Place." },
-      { property: "og:title", content: "Gestion des actualités — Happy Place" },
+      { property: "og:title", content: "Actualités · Happy Place" },
       { property: "og:description", content: "Gérez les actualités du cabinet de recrutement dans Happy Place." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -117,9 +118,10 @@ function ManageNews() {
             setShowLinkErrs(false);
             setForm({ ...empty });
           }}
-          className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md"
+          type="button"
+          className={buttonVariants({ variant: "default" })}
         >
-          + NOUVELLE ACTUALITÉ
+          <span aria-hidden="true" className="material-symbols-outlined">add</span> Nouvelle actualité
         </button>
       </div>
 
@@ -139,8 +141,8 @@ function ManageNews() {
               <p className="font-body-md text-primary font-bold wrap-anywhere">{n.title}</p>
               <p className="text-body-sm text-on-surface-variant line-clamp-2 wrap-anywhere">{n.body}</p>
               <NewsLinks links={n.links} />
-              <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
-                 {newsStatusLabels[n.status] ?? n.status} • {n.author} • {timeAgo(n.created_at)}
+              <p className="text-body-sm text-[#68686D] mt-xs">
+                 {newsStatusLabels[n.status] ?? n.status} · {n.author} · {timeAgo(n.created_at)}
               </p>
             </div>
             <RowActions
