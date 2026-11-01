@@ -227,6 +227,9 @@ function UsersPage() {
     const s = statuses.data?.get(u.email);
     return connexionOf(s) === "jamais" && !s?.a_du_contenu;
   };
+  // Dernier admin : ni suppression, ni changement de rôle (la base refuse aussi)
+  const adminCount = (list.data ?? []).filter((u) => u.role === "admin").length;
+  const isLastAdmin = (u: Row) => u.role === "admin" && adminCount <= 1;
 
   const queue = useQuery({
     queryKey: ["attachment_deletion_queue"],
@@ -482,6 +485,7 @@ function UsersPage() {
               <div className="flex gap-xs">
               <select
                 value={u.role}
+                disabled={isLastAdmin(u)}
                 onChange={(e) => {
                   const next = e.target.value as AppRole;
                   if (next === "collaborateur") {
@@ -489,13 +493,14 @@ function UsersPage() {
                   } else update.mutate({ id: u.id, role: next }, { onSuccess: () => toast.success("Rôle modifié") });
                 }}
                 aria-label={`Rôle de ${u.email}`}
-                className="border border-outline-variant bg-surface px-sm py-xs font-body-md"
+                aria-describedby={isLastAdmin(u) ? `dernier-admin-${u.id}` : undefined}
+                className="border border-outline-variant bg-surface px-sm py-xs font-body-md disabled:opacity-50"
               >
                 <option value="collaborateur">Collaborateur</option>
                 <option value="manager">Manager</option>
                 <option value="admin">Admin</option>
               </select>
-              {canDelete(u) && (
+              {canDelete(u) && !isLastAdmin(u) && (
                 <button
                   type="button"
                   disabled={u.email === me || removeNeverLogged.isPending}
@@ -518,6 +523,11 @@ function UsersPage() {
               )}
               </div>
             </div>
+            {isLastAdmin(u) && (
+              <p id={`dernier-admin-${u.id}`} className="text-body-sm text-on-surface-variant">
+                Dernier admin : il faut au moins un admin.
+              </p>
+            )}
             {(!canDelete(u) || u.departure_date) && (() => {
               const dateValue = departureInputs[u.id] ?? u.departure_date ?? "";
               return (
@@ -678,8 +688,11 @@ function TeamsSection({ users, teams, onChanged }: { users: Row[]; teams: { name
   const [name, setName] = useState("");
   const [editing, setEditing] = useState<{ from: string; to: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // Les admins n'ont pas d'équipe enregistrée : l'équipe Admin compte les admins
   const count = (t: string) =>
-    users.filter((u) => (u.role === "collaborateur" && u.team === t) || (u.role === "manager" && u.teams.includes(t))).length;
+    t.toLowerCase() === "admin"
+      ? users.filter((u) => u.role === "admin").length
+      : users.filter((u) => (u.role === "collaborateur" && u.team === t) || (u.role === "manager" && u.teams.includes(t))).length;
   const onError = (e: unknown) => toast.error((e as Error).message);
 
   const create = useMutation({
