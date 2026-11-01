@@ -16,7 +16,7 @@ export function BlockerArchive({ open, onClose }: { open: boolean; onClose: () =
           <div className="flex items-start justify-between gap-sm border-b border-outline-variant p-md">
             <div className="min-w-0">
               <DialogPrimitive.Title className="font-headline-sm text-headline-sm text-primary">
-                Archive des points bloquants
+                Archive des alertes opérationnelles
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="font-label-sm text-label-sm text-on-surface-variant">
                 Points résolus, du plus récent au plus ancien

@@ -20,11 +20,14 @@ import { NewsAiHelper } from "@/components/news-ai-helper";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { AccountBar } from "@/components/account-bar";
+import { AdminGapsBanner } from "@/components/admin-gaps-banner";
 import { RejectionNote, StatusBadge } from "@/components/status-badge";
 import {
   fetchBlockers,
   fetchMetrics,
   deltaText,
+  formatMetricValue,
   fetchNews,
   fetchMySubmissions,
   exportMyRecentSubmissions,
@@ -77,6 +80,14 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
+/** États d'une alerte : valeur en base, libellé en casse normale, icône et couleur (jamais la couleur seule). */
+const ALERT_STATES: Record<string, { label: string; icon: string; className: string }> = {
+  OUVERT: { label: "Ouverte", icon: "error_outline", className: "bg-[#FFDAD6] text-[#C2272D]" },
+  "EN COURS": { label: "En cours", icon: "autorenew", className: "bg-[#F0D0BC] text-[#28282D]" },
+  SURVEILLANCE: { label: "Sous surveillance", icon: "visibility", className: "bg-[#F5D5D4] text-[#28282D]" },
+  "RÉSOLU": { label: "Résolue", icon: "check_circle", className: "bg-[#DDF2E3] text-[#298646]" },
+};
+
 function trendText(m: Metric | undefined) {
   return m ? TREND_LABELS[m.trend] : "";
 }
@@ -86,10 +97,7 @@ function metricOf(metrics: Metric[] | undefined, key: string) {
 }
 
 function formatMetric(m: Metric | undefined, fallback: string) {
-  if (!m) return fallback;
-  const v = Number(m.value);
-  const formatted = m.unit === "%" ? v.toFixed(1) : v.toLocaleString("fr-FR");
-  return `${formatted}${m.unit ?? ""}`;
+  return m ? formatMetricValue(m.value, m.unit) : fallback;
 }
 
 function metricLabel(metric: Metric | undefined, fallback: string) {
@@ -113,7 +121,7 @@ function ManagerSpace() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("allowed_users")
-        .select("first_name, last_name")
+        .select("first_name, last_name, team")
         .eq("email", myEmail)
         .maybeSingle();
       if (error) throw error;
@@ -122,11 +130,12 @@ function ManagerSpace() {
     retry: false,
   });
   const firstName = profile.data?.first_name?.trim() ?? "";
-  const myName =
-    [profile.data?.first_name, profile.data?.last_name]
-      .map((p) => p?.trim() ?? "")
-      .filter(Boolean)
-      .join(" ") || myEmail;
+  // Nom affiché et enregistré : prénom et nom de la ligne allowed_users ; sans nom, l'e-mail
+  const profileName = [profile.data?.first_name, profile.data?.last_name]
+    .map((p) => p?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ");
+  const myName = profileName || myEmail;
   const newsSection = useRef<HTMLElement>(null);
   const newsTitleInput = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
@@ -331,7 +340,7 @@ function ManagerSpace() {
     setSubmissionErrors({});
     const only = role === "manager" && myTeams.data?.length === 1 ? myTeams.data[0] : "";
     setSubmissionForm({
-      author_name: "", team: only, content: "", status: "en attente",
+      author_name: profileName, team: only, content: "", status: "en attente",
       category: null, visibility: "privée",
     });
   }
@@ -348,7 +357,9 @@ function ManagerSpace() {
     // Collaborators: team is set server-side from their account
     // Admin: always the « Admin » team (set server-side); manager: one of their teams
     const team = role === "collaborateur" ? "auto" : role === "admin" ? "Admin" : submissionForm.team;
-    const result = validate(submissionSchema, { ...submissionForm, team, status: "en attente" });
+    // Le nom vient du profil quand il existe : le champ n'est plus saisi
+    const author_name = profileName || submissionForm.author_name;
+    const result = validate(submissionSchema, { ...submissionForm, author_name, team, status: "en attente" });
     // Le type est obligatoire pour une nouvelle demande (les anciennes n'en ont pas)
     const categoryError = submissionForm.category ? undefined : "Choisis un type de demande.";
     if (!result.ok || categoryError) {
@@ -364,62 +375,35 @@ function ManagerSpace() {
 
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
-      <BrandHeader />
+      <BrandHeader
+        actions={
+          <AccountBar
+            firstName={firstName}
+            email={email ?? ""}
+            roleLabel={roleLabel}
+            isAdmin={isAdmin}
+            exporting={exportReport.isPending}
+            onExport={() => exportReport.mutate()}
+            onSignOut={() => void signOut()}
+          />
+        }
+      />
       <main className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
+        <AdminGapsBanner enabled={isAdmin} />
         <header className="flex flex-wrap items-end justify-between gap-md mb-lg">
-          <div className="flex min-w-0 flex-wrap items-end gap-md">
-            <div className="min-w-0 space-y-xs">
-              <h1 className="font-headline-lg text-headline-lg text-primary wrap-anywhere">{greeting}</h1>
-              <p className="font-body-md text-body-md text-on-surface-variant max-w-prose">{roleIntro}</p>
-            </div>
-            <div className="flex flex-wrap gap-xs">
-              <button type="button" onClick={openSubmissionForm} className={buttonVariants({ variant: "default" })}>
-                <Icon name="add" /> Nouvelle demande
-              </button>
-              {canWriteNews && (
-                <button type="button" onClick={goToNewsForm} className={buttonVariants({ variant: "secondary" })}>
-                  <Icon name="edit_note" /> Nouvelle actualité
-                </button>
-              )}
-            </div>
+          <div className="min-w-0 space-y-xs">
+            <h1 className="font-headline-lg text-headline-lg text-primary wrap-anywhere">{greeting}</h1>
+            <p className="font-body-md text-body-md text-on-surface-variant max-w-prose">{roleIntro}</p>
           </div>
-          <div className="ml-auto flex min-w-0 flex-col items-end gap-sm">
-            <div className="flex items-center gap-sm min-w-0">
-              <span
-                aria-hidden="true"
-                className="flex size-11 shrink-0 items-center justify-center rounded-[8px] bg-primary text-on-primary"
-              >
-                <Icon name="person" />
-              </span>
-              <div className="min-w-0 text-right">
-                <p className="font-body-md text-body-md font-semibold text-primary wrap-anywhere">
-                  {firstName || email}
-                </p>
-                <p className="font-label-sm text-label-sm text-on-surface-variant">{roleLabel}</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap justify-end gap-xs">
-              <Link to="/mot-de-passe" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-                <Icon name="key" /> Mot de passe
-              </Link>
-              {isAdmin && (
-                <Link to="/manage/news" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-                  <Icon name="database" /> Gérer les données
-                </Link>
-              )}
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={exportReport.isPending}
-                onClick={() => exportReport.mutate()}
-              >
-                <Icon name="file_download" /> {exportReport.isPending ? "Export en cours…" : "Exporter le rapport"}
-              </Button>
-              <Button type="button" variant="secondary" size="sm" onClick={() => signOut()}>
-                <Icon name="logout" /> Déconnexion
-              </Button>
-            </div>
+          <div className="flex flex-wrap gap-xs">
+            <button type="button" onClick={openSubmissionForm} className={buttonVariants({ variant: "default" })}>
+              <Icon name="add" /> Nouvelle demande
+            </button>
+            {canWriteNews && (
+              <button type="button" onClick={goToNewsForm} className={buttonVariants({ variant: "secondary" })}>
+                <Icon name="edit_note" /> Nouvelle actualité
+              </button>
+            )}
           </div>
         </header>
 
@@ -769,13 +753,14 @@ function ManagerSpace() {
             onRead={setReading}
           />
 
-          {/* Points Bloquants */}
+          {/* Alertes opérationnelles (points bloquants) */}
           <section id="alertes" className="col-span-12 md:col-span-7 scroll-mt-4 rounded-lg bg-surface-container-lowest border border-outline-variant p-md">
             <div className="flex items-center justify-between mb-md">
               <div className="flex items-center gap-sm">
-                <h2 className="font-headline-sm text-headline-sm text-primary">Points Bloquants</h2>
-                <span className="text-xs bg-error-container text-on-error-container px-xs py-1 font-label-sm">
-                  PRIORITÉ HAUTE
+                <h2 className="font-headline-sm text-headline-sm text-primary">Alertes opérationnelles</h2>
+                <span className="inline-flex items-center gap-xs rounded-full bg-error-container px-sm py-[2px] font-label-sm text-label-sm text-on-error-container">
+                  <Icon name="priority_high" className="text-base" />
+                  Priorité haute
                 </span>
               </div>
               <button
@@ -784,7 +769,7 @@ function ManagerSpace() {
                 onClick={() => setArchiveOpen(true)}
                 className="text-primary font-label-sm text-label-sm underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                 VOIR L'ARCHIVE
+                 Voir l'archive
               </button>
             </div>
             <div className="space-y-sm">
@@ -827,23 +812,32 @@ function ManagerSpace() {
                         </div>
                       </div>
                     </div>
-                    <select
-                      aria-label={`Statut de ${b.title}`}
-                      value={b.status}
-                      disabled={!isAdmin}
-                      onChange={(e) => setBlocker.mutate({ id: b.id, status: e.target.value })}
-                      className={`bg-transparent border-none text-xs font-label-sm focus:outline-none cursor-pointer ${critical ? "text-error" : "text-on-surface-variant"}`}
-                    >
-                      <option>OUVERT</option>
-                      <option>EN COURS</option>
-                      <option>SURVEILLANCE</option>
-                      <option
-                        disabled={b.status === "OUVERT"}
-                        title={b.status === "OUVERT" ? "Passe d'abord par EN COURS" : undefined}
-                      >
-                        RÉSOLU
-                      </option>
-                    </select>
+                    {(() => {
+                      const state = ALERT_STATES[b.status] ?? { label: b.status, icon: "help", className: "bg-surface-container-highest text-on-surface" };
+                      return (
+                        <span className={`inline-flex shrink-0 items-center gap-xs rounded-full px-sm py-[2px] font-label-sm text-label-sm font-semibold ${state.className}`}>
+                          <Icon name={state.icon} className="text-base" />
+                          <select
+                            aria-label={`Statut de ${b.title}`}
+                            value={b.status}
+                            disabled={!isAdmin}
+                            onChange={(e) => setBlocker.mutate({ id: b.id, status: e.target.value })}
+                            className="cursor-pointer bg-transparent font-label-sm text-label-sm font-semibold text-[inherit] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-default"
+                          >
+                            {Object.entries(ALERT_STATES).map(([value, opt]) => (
+                              <option
+                                key={value}
+                                value={value}
+                                disabled={value === "RÉSOLU" && b.status === "OUVERT"}
+                                title={value === "RÉSOLU" && b.status === "OUVERT" ? "Passe d'abord par En cours" : undefined}
+                              >
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </span>
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -853,7 +847,7 @@ function ManagerSpace() {
           {/* Performance Hub */}
           <section className="col-span-12 md:col-span-5 rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
             <div className="flex items-center justify-between mb-md">
-              <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs</h2>
+              <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs clés</h2>
               {isAdmin && <Icon name="settings" className="text-on-surface-variant cursor-pointer" />}
             </div>
             <div className="grid grid-cols-2 gap-sm mb-md">
@@ -993,14 +987,23 @@ function ManagerSpace() {
               error={submissionErrors.category}
               onChange={(v) => setSubmissionForm({ ...submissionForm, category: v })}
             />
-            <Field label="Nom" error={submissionErrors.author_name}>
-              <TextInput
-                value={submissionForm.author_name}
-                maxLength={80}
-                placeholder="Ton nom"
-                onChange={(e) => setSubmissionForm({ ...submissionForm, author_name: e.target.value })}
-              />
-            </Field>
+            {profileName ? (
+              <Field label="Nom">
+                <p className="font-body-md text-on-surface wrap-anywhere">
+                  {profileName}
+                  {profile.data?.team ? ` · ${profile.data.team}` : ""}
+                </p>
+              </Field>
+            ) : (
+              <Field label="Nom" error={submissionErrors.author_name}>
+                <TextInput
+                  value={submissionForm.author_name}
+                  maxLength={80}
+                  placeholder="Ton nom"
+                  onChange={(e) => setSubmissionForm({ ...submissionForm, author_name: e.target.value })}
+                />
+              </Field>
+            )}
             {role === "manager" && (
               <Field label="Équipe" error={submissionErrors.team}>
                 <select
@@ -1096,7 +1099,7 @@ function ManagerSpace() {
               </div>
             </Field>
             <FormActions
-              pending={submit.isPending}
+              pending={submit.isPending || profile.isPending}
               submitLabel="Envoyer"
               onCancel={() => setSubmissionForm(null)}
             />

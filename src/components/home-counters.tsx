@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { formatNumberFr } from "@/lib/dashboard";
 import {
   noun,
   plural,
@@ -96,8 +97,8 @@ export function ManagerCards({
   const alertTotal = alerts?.open ?? 0;
   const parts = [
     alerts?.ouverte ? plural(alerts.ouverte, "ouverte", "ouvertes") : null,
-    alerts?.enCours ? `${alerts.enCours} en cours` : null,
-    alerts?.surveillance ? `${alerts.surveillance} en surveillance` : null,
+    alerts?.enCours ? `${formatNumberFr(alerts.enCours)} en cours` : null,
+    alerts?.surveillance ? `${formatNumberFr(alerts.surveillance)} en surveillance` : null,
   ].filter((p): p is string => p !== null);
 
   return (
@@ -108,14 +109,14 @@ export function ManagerCards({
         ariaLabel={plural(pending, "demande à valider", "demandes à valider")}
       >
         <BigNumber
-          value={String(pending)}
+          value={formatNumberFr(pending)}
           label={noun(pending, "demande à valider", "demandes à valider")}
         />
         {old > 0 && (
           <div className="flex flex-wrap gap-xs">
             <Chip
               icon="hourglass_empty"
-              label={`${old} en attente depuis plus de 3 jours`}
+              label={`${formatNumberFr(old)} en attente depuis plus de 3 jours`}
               className={SAND}
             />
           </div>
@@ -137,7 +138,7 @@ export function ManagerCards({
         ariaLabel={plural(draftCount, "brouillon à finaliser", "brouillons à finaliser")}
       >
         <BigNumber
-          value={String(draftCount)}
+          value={formatNumberFr(draftCount)}
           label={noun(draftCount, "brouillon à finaliser", "brouillons à finaliser")}
         />
         {isAdmin && draftsMine > 0 && (
@@ -160,7 +161,7 @@ export function ManagerCards({
           </a>
         }
       >
-        <BigNumber value={String(alertTotal)} label={noun(alertTotal, "alerte", "alertes")} />
+        <BigNumber value={formatNumberFr(alertTotal)} label={noun(alertTotal, "alerte", "alertes")} />
         {parts.length > 0 && (
           <div className="flex flex-wrap gap-xs">
             <Chip icon="warning" label={parts.join(", ")} className={ROSE} />
@@ -181,8 +182,8 @@ export function MyChips({ counts }: { counts: MyCounts | undefined }) {
   const c = counts ?? { toComplete: 0, pending: 0, validated: 0, refused: 0 };
   return (
     <div className="flex flex-wrap gap-xs">
-      <Chip icon="help" label={`${c.toComplete} à compléter`} className={ROSE} />
-      <Chip icon="hourglass_empty" label={`${c.pending} en attente`} className={SAND} />
+      <Chip icon="help" label={`${formatNumberFr(c.toComplete)} à compléter`} className={ROSE} />
+      <Chip icon="hourglass_empty" label={`${formatNumberFr(c.pending)} en attente`} className={SAND} />
       <Chip icon="check" label={plural(c.validated, "validée", "validées")} className={GREEN} />
       <Chip icon="close" label={plural(c.refused, "refusée", "refusées")} className={RED} />
     </div>
