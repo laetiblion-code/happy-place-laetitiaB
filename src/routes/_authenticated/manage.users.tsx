@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
+import { CheckCircle2, Circle, KeyRound, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BulkImport } from "@/components/manage/bulk-import";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -34,9 +35,17 @@ type Row = {
   first_name: string | null;
   last_name: string | null;
 };
+type LoginStatus = { email: string; a_un_compte: boolean; mot_de_passe_cree: boolean; derniere_connexion: string | null };
+type Connexion = "jamais" | "lien" | "mdp";
 const nameSchema = z.string().trim().max(100, "100 caractères maximum");
 const emailSchema = z.string().trim().toLowerCase().email("Adresse email invalide").max(255);
 const teamSchema = z.string().trim().min(2, "Nom d'équipe trop court").max(60, "60 caractères maximum");
+
+function connexionOf(s: LoginStatus | undefined): Connexion {
+  if (!s || !s.a_un_compte || !s.derniere_connexion) return "jamais";
+  return s.mot_de_passe_cree ? "mdp" : "lien";
+}
+const formatDateFr = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 function UsersPage() {
   const qc = useQueryClient();
@@ -46,6 +55,9 @@ function UsersPage() {
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<AppRole>("collaborateur");
   const [newTeam, setNewTeam] = useState("");
+  const [newTeams, setNewTeams] = useState<string[]>([]);
+  const [teamErr, setTeamErr] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<{ id: string; first: string; last: string } | null>(null);
   const [memberTeams, setMemberTeams] = useState<Record<string, string>>({});
   const [teamInputs, setTeamInputs] = useState<Record<string, string>>({});
   const [err, setErr] = useState<string | null>(null);
@@ -71,6 +83,14 @@ function UsersPage() {
       })) as Row[];
     },
   });
+  const statuses = useQuery({
+    queryKey: ["admin_users_status"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_users_status");
+      if (error) throw error;
+      return new Map((data ?? []).map((s) => [s.email, s as LoginStatus]));
+    },
+  });
   const teamsQuery = useQuery({
     queryKey: ["teams"],
     queryFn: async () => {
@@ -83,15 +103,21 @@ function UsersPage() {
   const [roleDialog, setRoleDialog] = useState<{ id: string; email: string; team: string } | null>(null);
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["allowed_users"] });
+    qc.invalidateQueries({ queryKey: ["admin_users_status"] });
     qc.invalidateQueries({ queryKey: ["teams"] });
   };
   const onError = (e: unknown) => toast.error((e as Error).message);
 
   const add = useMutation({
-    mutationFn: async (v: { email: string; role: AppRole; team: string | null; first_name: string | null; last_name: string | null }) => {
+    mutationFn: async (v: { email: string; role: AppRole; teams: string[]; first_name: string | null; last_name: string | null }) => {
       const { data, error } = await supabase
         .from("allowed_users")
-        .insert({ email: v.email, team: v.team, first_name: v.first_name, last_name: v.last_name })
+        .insert({
+          email: v.email,
+          team: v.role === "collaborateur" ? v.teams[0] : null,
+          first_name: v.first_name,
+          last_name: v.last_name,
+        })
         .select("id")
         .single();
       if (error) throw new Error(error.code === "23505" ? "Cet email est déjà dans la liste" : error.message);
@@ -102,8 +128,46 @@ function UsersPage() {
         await supabase.from("allowed_users").delete().eq("id", data.id);
         throw roleError;
       }
+      if (v.role === "manager") {
+        const { error: teamError } = await supabase
+          .from("manager_teams")
+          .insert(v.teams.map((team) => ({ allowed_user_id: data.id, team })));
+        if (teamError) {
+          await supabase.from("allowed_users").delete().eq("id", data.id);
+          throw new Error(teamError.message);
+        }
+      }
     },
-    onSuccess: () => { setEmail(""); setNewTeam(""); setFirstName(""); setLastName(""); toast.success("Utilisateur ajouté"); refresh(); },
+    onSuccess: () => {
+      setEmail(""); setNewTeam(""); setNewTeams([]); setFirstName(""); setLastName("");
+      toast.success("Utilisateur ajouté"); refresh();
+    },
+    onError,
+  });
+  const saveName = useMutation({
+    mutationFn: async (v: { id: string; first: string; last: string }) => {
+      const first = nameSchema.safeParse(v.first);
+      if (!first.success) throw new Error("Prénom : " + first.error.issues[0].message);
+      const last = nameSchema.safeParse(v.last);
+      if (!last.success) throw new Error("Nom : " + last.error.issues[0].message);
+      const { data, error } = await supabase
+        .from("allowed_users")
+        .update({ first_name: first.data || null, last_name: last.data || null })
+        .eq("id", v.id)
+        .select("id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("Modification refusée : vérifie que tu es admin");
+    },
+    onSuccess: () => { setEditingName(null); toast.success("Nom enregistré"); refresh(); },
+    onError,
+  });
+  const removeNeverLogged = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.from("allowed_users").delete().eq("id", id).select("id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("Suppression refusée : vérifie que tu es admin");
+    },
+    onSuccess: () => { toast.success("Utilisateur supprimé de la liste"); refresh(); },
     onError,
   });
   const update = useMutation({
@@ -149,17 +213,13 @@ function UsersPage() {
     d.setDate(d.getDate() + 7);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   })();
-  const scheduleRemoval = (u: Row) => {
-    if (u.departure_date && u.departure_date <= minDeparture) {
-      toast.info(`Départ déjà programmé le ${formatDate(u.departure_date)}`);
-      return;
-    }
+  const programDeparture = (u: Row, date: string) => {
     if (
       confirm(
-        `Retirer l'accès de ${u.email} ? Son accès sera supprimé le ${formatDate(minDeparture)}, dans 7 jours. Son manager et les admins sont prévenus dès maintenant et pourront télécharger ses documents d'ici là. Tu peux annuler avec « Annuler le départ ».`,
+        `Programmer le départ de ${u.email} le ${formatDate(date)} ? Son accès sera supprimé à cette date. Son manager et les admins sont prévenus dès maintenant et pourront télécharger ses documents d'ici là. Tu peux annuler avec « Annuler le départ ».`,
       )
     )
-      setDeparture.mutate({ id: u.id, date: minDeparture });
+      setDeparture.mutate({ id: u.id, date });
   };
   const [departureInputs, setDepartureInputs] = useState<Record<string, string>>({});
 
@@ -223,18 +283,21 @@ function UsersPage() {
     e.preventDefault();
     const parsed = emailSchema.safeParse(email);
     if (!parsed.success) return setErr(parsed.error.issues[0].message);
-    let team: string | null = null;
+    let teams: string[] = [];
     if (role === "collaborateur") {
-      const t = teamSchema.safeParse(newTeam);
-      if (!t.success) return setErr("Équipe requise : " + t.error.issues[0].message);
-      team = t.data;
+      if (!newTeam) return setTeamErr("Choisis une équipe.");
+      teams = [newTeam];
+    } else if (role === "manager") {
+      if (!newTeams.length) return setTeamErr("Choisis au moins une équipe.");
+      teams = newTeams;
     }
     const fn = nameSchema.safeParse(firstName);
     if (!fn.success) return setErr("Prénom : " + fn.error.issues[0].message);
     const ln = nameSchema.safeParse(lastName);
     if (!ln.success) return setErr("Nom : " + ln.error.issues[0].message);
     setErr(null);
-    add.mutate({ email: parsed.data, role, team, first_name: fn.data || null, last_name: ln.data || null });
+    setTeamErr(null);
+    add.mutate({ email: parsed.data, role, teams, first_name: fn.data || null, last_name: ln.data || null });
   }
 
   return (
@@ -283,7 +346,7 @@ function UsersPage() {
         </div>
         <select
           value={role}
-          onChange={(e) => setRole(e.target.value as Row["role"])}
+          onChange={(e) => { setRole(e.target.value as Row["role"]); setTeamErr(null); }}
           aria-label="Rôle"
           className="border border-outline-variant bg-surface px-sm py-xs font-body-md"
         >
@@ -291,16 +354,41 @@ function UsersPage() {
           <option value="manager">Manager</option>
           <option value="admin">Admin</option>
         </select>
-        {role === "collaborateur" && (
-<select
-            value={newTeam}
-            onChange={(e) => setNewTeam(e.target.value)}
-            aria-label="Équipe du collaborateur"
-            className="border border-outline-variant bg-surface px-sm py-xs font-body-md"
-          >
-            <option value="">Choisir une équipe</option>
-            {selectableTeams.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+        {role !== "admin" && (
+          <div className="flex flex-col gap-xs">
+            {role === "collaborateur" ? (
+              <select
+                value={newTeam}
+                onChange={(e) => setNewTeam(e.target.value)}
+                aria-label="Équipe du collaborateur"
+                className="border border-outline-variant bg-surface px-sm py-xs font-body-md"
+              >
+                <option value="">Choisir une équipe</option>
+                {selectableTeams.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            ) : (
+              <details className="relative">
+                <summary className="cursor-pointer list-none border border-outline-variant bg-surface px-sm py-xs font-body-md">
+                  {newTeams.length ? `Équipes : ${newTeams.length} choisie(s)` : "Choisir les équipes"}
+                </summary>
+                <div className="absolute z-10 mt-xs max-h-64 min-w-56 overflow-y-auto border border-outline-variant bg-surface p-xs">
+                  {selectableTeams.map((t) => (
+                    <label key={t} className="flex items-center gap-xs px-xs py-1 font-body-md">
+                      <input
+                        type="checkbox"
+                        checked={newTeams.includes(t)}
+                        onChange={(e) =>
+                          setNewTeams((c) => (e.target.checked ? [...c, t] : c.filter((x) => x !== t)))
+                        }
+                      />
+                      {t}
+                    </label>
+                  ))}
+                </div>
+              </details>
+            )}
+            {teamErr && <p className="text-error text-sm">{teamErr}</p>}
+          </div>
         )}
         <button disabled={add.isPending} className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md">
           AJOUTER
@@ -310,16 +398,82 @@ function UsersPage() {
       <div className="border border-outline-variant divide-y divide-outline-variant bg-surface-container-lowest">
         {list.data?.map((u) => (
           <div key={u.id} className="space-y-sm p-sm">
-            <div className="flex flex-wrap items-center justify-between gap-sm">
-              <span className="font-body-md text-primary">
-                {(u.first_name || u.last_name) && <span className="mr-xs">{[u.first_name, u.last_name].filter(Boolean).join(" ")} ·</span>}
-                {u.email}{u.email === me && " (toi)"}
-                {u.departure_date && (
-                  <span className="ml-xs px-xs py-[1px] border border-error text-error font-label-sm text-label-sm">
-                    Part le {u.departure_date.split("-").reverse().join("/")}
-                  </span>
+            <div className="flex flex-wrap items-start justify-between gap-sm">
+              <div className="space-y-xs">
+                {editingName?.id === u.id ? (
+                  <div className="flex flex-wrap items-center gap-xs">
+                    <input
+                      value={editingName.first}
+                      onChange={(e) => setEditingName({ ...editingName, first: e.target.value })}
+                      placeholder="Prénom (facultatif)"
+                      aria-label={`Prénom de ${u.email}`}
+                      maxLength={100}
+                      className="border border-outline-variant bg-surface px-sm py-1 font-body-md"
+                    />
+                    <input
+                      value={editingName.last}
+                      onChange={(e) => setEditingName({ ...editingName, last: e.target.value })}
+                      placeholder="Nom (facultatif)"
+                      aria-label={`Nom de ${u.email}`}
+                      maxLength={100}
+                      className="border border-outline-variant bg-surface px-sm py-1 font-body-md"
+                    />
+                    <button
+                      type="button"
+                      disabled={saveName.isPending}
+                      onClick={() => saveName.mutate(editingName)}
+                      className="bg-primary text-on-primary px-sm py-1 font-label-sm text-label-sm disabled:opacity-50"
+                    >
+                      Enregistrer
+                    </button>
+                    <button type="button" onClick={() => setEditingName(null)} className="px-sm py-1 border border-outline text-primary font-label-sm text-label-sm">
+                      Annuler
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-xs">
+                    <span className="font-body-md text-primary">
+                      {[u.first_name, u.last_name].filter(Boolean).length > 0 && (
+                        <span className="mr-xs">{[u.first_name, u.last_name].filter(Boolean).join(" ")} ·</span>
+                      )}
+                      {u.email}{u.email === me && " (toi)"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEditingName({ id: u.id, first: u.first_name ?? "", last: u.last_name ?? "" })}
+                      className="inline-flex items-center gap-xs px-sm py-1 border border-outline text-primary font-label-sm text-label-sm"
+                    >
+                      <Pencil aria-hidden="true" size={14} />
+                      Modifier
+                    </button>
+                    {u.departure_date && (
+                      <span className="ml-xs px-xs py-[1px] border border-error text-error font-label-sm text-label-sm">
+                        Part le {u.departure_date.split("-").reverse().join("/")}
+                      </span>
+                    )}
+                  </div>
                 )}
-              </span>
+                <div className="flex flex-wrap items-center gap-sm font-label-sm text-label-sm text-on-surface-variant">
+                  <span>Ajouté le {formatDateFr(u.created_at)}</span>
+                  {(() => {
+                    const k = connexionOf(statuses.data?.get(u.email));
+                    const libelle = { jamais: "Jamais connecté", lien: "Mot de passe à créer", mdp: "Mot de passe créé" }[k];
+                    const Icone = { jamais: Circle, lien: KeyRound, mdp: CheckCircle2 }[k];
+                    const style =
+                      k === "jamais"
+                        ? { backgroundColor: "#EDEBE6" }
+                        : k === "lien"
+                          ? { backgroundColor: "#F0D0BC" }
+                          : { backgroundColor: "#E4F3E9", color: "#298646" };
+                    return (
+                      <span className="inline-flex items-center gap-xs px-xs py-[1px] font-label-sm text-label-sm text-primary" style={style}>
+                        <Icone aria-hidden="true" size={14} />
+                        {libelle}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </div>
               <div className="flex gap-xs">
               <select
                 value={u.role}
@@ -336,16 +490,28 @@ function UsersPage() {
                 <option value="manager">Manager</option>
                 <option value="admin">Admin</option>
               </select>
-              <button
-                onClick={() => scheduleRemoval(u)}
-                disabled={u.email === me || setDeparture.isPending}
-                title={u.email === me ? "Tu ne peux pas programmer ton propre départ" : undefined}
-                className="px-sm py-xs border border-outline text-error font-label-md text-label-md disabled:opacity-50"
-              >
-                RETIRER (J+7)
-              </button>
+              {connexionOf(statuses.data?.get(u.email)) === "jamais" && (
+                <button
+                  type="button"
+                  disabled={u.email === me || removeNeverLogged.isPending}
+                  title={u.email === me ? "Tu ne peux pas supprimer ton propre compte" : undefined}
+                  onClick={() => {
+                    if (
+                      confirm(`Supprimer ${u.email} de la liste blanche ? Il n'a jamais été connecté : rien n'est à conserver.`)
+                    )
+                      removeNeverLogged.mutate(u.id);
+                  }}
+                  style={{ backgroundColor: "#FFFFFF", borderColor: "#C2272D", color: "#C2272D" }}
+                  className="px-sm py-xs border font-label-md text-label-md disabled:opacity-50"
+                >
+                  Supprimer
+                </button>
+              )}
               </div>
             </div>
+            {(connexionOf(statuses.data?.get(u.email)) !== "jamais" || u.departure_date) && (() => {
+              const dateValue = departureInputs[u.id] ?? u.departure_date ?? "";
+              return (
             <div className="flex flex-wrap items-center gap-xs border-t border-outline-variant pt-sm">
               <label className="font-label-sm text-label-sm text-on-surface-variant" htmlFor={`dep-${u.id}`}>
                 Départ prévu le
@@ -354,17 +520,17 @@ function UsersPage() {
                 id={`dep-${u.id}`}
                 type="date"
                 min={minDeparture}
-                value={departureInputs[u.id] ?? u.departure_date ?? ""}
+                value={dateValue}
                 onChange={(e) => setDepartureInputs((c) => ({ ...c, [u.id]: e.target.value }))}
                 className="border border-outline-variant bg-surface px-sm py-1 font-body-md"
               />
               <button
                 type="button"
-                disabled={setDeparture.isPending || !(departureInputs[u.id] ?? u.departure_date)}
-                onClick={() => setDeparture.mutate({ id: u.id, date: departureInputs[u.id] ?? u.departure_date ?? null })}
+                disabled={setDeparture.isPending || !dateValue || dateValue < minDeparture}
+                onClick={() => programDeparture(u, dateValue)}
                 className="bg-primary text-on-primary px-sm py-1 font-label-sm text-label-sm disabled:opacity-50"
               >
-                Enregistrer
+                Programmer le départ
               </button>
               {u.departure_date && (
                 <button
@@ -379,7 +545,12 @@ function UsersPage() {
                   Annuler le départ
                 </button>
               )}
+              <p className="basis-full font-label-sm text-label-sm text-on-surface-variant">
+                7 jours minimum, pour laisser le temps de télécharger ses documents avant l'anonymisation.
+              </p>
             </div>
+              );
+            })()}
             {u.role === "collaborateur" && (
               <div className="flex flex-wrap items-center gap-xs border-t border-outline-variant pt-sm">
                 <span className="font-label-sm text-label-sm text-on-surface-variant">ÉQUIPE :</span>
