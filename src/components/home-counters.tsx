@@ -51,13 +51,13 @@ function StatCard({
   return (
     <section
       aria-label={ariaLabel}
-      className="flex flex-col gap-sm rounded-[6px] border border-[#CDCDD1] bg-white p-md"
+      className="flex flex-col gap-sm rounded-lg border border-[#CDCDD1] bg-white p-md"
     >
       <div className="flex items-start justify-between gap-sm">
         <h2 className="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant">
           {title}
         </h2>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-[#F5D5D4] text-primary">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#F5D5D4] text-primary">
           <Icon name={icon} />
         </span>
       </div>
@@ -70,7 +70,7 @@ function StatCard({
 function BigNumber({ value, label }: { value: string; label: string }) {
   return (
     <p className="flex flex-wrap items-baseline gap-x-xs font-body-md text-on-surface">
-      <span className="text-[40px] font-semibold leading-none">{value}</span>
+      <span className="text-[40px] font-semibold leading-none tabular-nums">{value}</span>
       <span className="text-body-md">{label}</span>
     </p>
   );
@@ -154,7 +154,7 @@ export function ManagerCards({
         footer={
           <a
             href="#alertes"
-            className="font-label-sm text-label-sm text-primary underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="font-label-sm text-label-sm text-primary underline focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             {isAdmin ? "Gérer les alertes" : "Voir les alertes"}
           </a>

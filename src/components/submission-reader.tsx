@@ -4,18 +4,18 @@ import { AttachmentLink } from "@/components/attachment-link";
 import { formatExactDate } from "@/components/expandable-card";
 import { SubmissionTags } from "@/components/submission-choices";
 import type { Submission } from "@/lib/dashboard";
+import { RejectionNote, StatusBadge } from "@/components/status-badge";
+import { buttonVariants } from "@/components/ui/button";
 
 /** Grande fenêtre de lecture d'une soumission (focus piégé, Échap, clic fond). */
 export function SubmissionReader({
   submission: s,
-  statusLabel,
   onClose,
   onReject,
   onApprove,
   approving,
 }: {
   submission: Submission | null;
-  statusLabel?: string;
   onClose: () => void;
   onReject?: () => void;
   onApprove?: () => void;
@@ -27,7 +27,7 @@ export function SubmissionReader({
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
         {s && (
           <DialogPrimitive.Content
-            className="fixed z-50 inset-0 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[min(48rem,calc(100vw-2rem))] h-dvh md:h-auto md:max-h-[85vh] flex flex-col bg-surface-container-lowest border border-outline shadow-lg focus:outline-none"
+            className="fixed z-50 inset-0 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[min(48rem,calc(100vw-2rem))] h-dvh md:h-auto md:max-h-[85vh] flex flex-col rounded-lg bg-surface-container-lowest border border-outline shadow-lg focus:outline-none"
           >
             <div className="flex items-start justify-between gap-sm border-b border-outline-variant p-md">
               <div className="min-w-0">
@@ -35,7 +35,11 @@ export function SubmissionReader({
                   {s.author_name}
                 </DialogPrimitive.Title>
                 <DialogPrimitive.Description className="font-label-sm text-label-sm text-on-surface-variant">
-                  {s.team} • {(statusLabel ?? s.status).toUpperCase()} • Soumise le {formatExactDate(s.created_at)}
+                  <span className="inline-flex flex-wrap items-center gap-xs">
+                    <span>{s.team}</span>
+                    <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
+                    <span>Soumise le {formatExactDate(s.created_at)}</span>
+                  </span>
                 </DialogPrimitive.Description>
               </div>
               <DialogPrimitive.Close
@@ -52,10 +56,7 @@ export function SubmissionReader({
               </p>
               <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
               {s.status === "refusée" && s.rejection_category && (
-                <div className="p-sm bg-error-container text-on-error-container text-body-sm wrap-anywhere">
-                  <p className="font-bold">Motif : {s.rejection_category}</p>
-                  <p className="whitespace-pre-line">Raison : <Linkify text={s.rejection_note ?? ""} /></p>
-                </div>
+                <RejectionNote category={s.rejection_category} note={s.rejection_note} />
               )}
             </div>
             {(onReject || onApprove) && (
@@ -64,9 +65,9 @@ export function SubmissionReader({
                   <button
                     type="button"
                     onClick={onReject}
-                    className="flex-1 py-sm border border-outline text-primary font-label-sm text-label-sm hover:bg-surface-container transition-colors"
+                    className={`${buttonVariants({ variant: "destructive" })} flex-1`}
                   >
-                    REFUSER
+                    Refuser
                   </button>
                 )}
                 {onApprove && (
@@ -74,9 +75,9 @@ export function SubmissionReader({
                     type="button"
                     disabled={approving}
                     onClick={onApprove}
-                    className="flex-1 py-sm bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-colors disabled:opacity-60"
+                    className={`${buttonVariants({ variant: "default" })} flex-1`}
                   >
-                    VALIDER
+                    Valider
                   </button>
                 )}
               </div>

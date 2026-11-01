@@ -9,7 +9,6 @@ import { rejectionSchema, submissionSchema, validate, type FieldErrors } from "@
 import { BrandHeader } from "@/components/brand-header";
 import { AttachmentLink } from "@/components/attachment-link";
 import { CharCounter, SubmissionPreview, rejectionErrorMessage } from "@/components/expandable-card";
-import { Linkify } from "@/components/linkify";
 import { SubmissionReader } from "@/components/submission-reader";
 import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS, SubmissionTags } from "@/components/submission-choices";
 import { NewsReader } from "@/components/news-reader";
@@ -20,7 +19,8 @@ import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
 import { NewsAiHelper } from "@/components/news-ai-helper";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { RejectionNote, StatusBadge } from "@/components/status-badge";
 import {
   fetchBlockers,
   fetchMetrics,
@@ -101,16 +101,34 @@ function metricLabel(metric: Metric | undefined, fallback: string) {
 
 function ManagerSpace() {
   const qc = useQueryClient();
-  const { role, email, user } = Route.useRouteContext();
+  const { role, email } = Route.useRouteContext();
   const isAdmin = role === "admin";
   const canReview = role === "admin" || role === "manager";
   const canWriteNews = canReview;
   const myEmail = (email ?? "").toLowerCase();
-  const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
+  // Prénom et nom viennent de la ligne de la personne connectée (lisible par RLS) ; sans nom, l'e-mail
+  const profile = useQuery({
+    queryKey: ["allowed_user_profile", myEmail],
+    enabled: !!myEmail,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("allowed_users")
+        .select("first_name, last_name")
+        .eq("email", myEmail)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    retry: false,
+  });
+  const firstName = profile.data?.first_name?.trim() ?? "";
   const myName =
-    (typeof meta.full_name === "string" && meta.full_name) ||
-    (typeof meta.name === "string" && meta.name) ||
-    myEmail;
+    [profile.data?.first_name, profile.data?.last_name]
+      .map((p) => p?.trim() ?? "")
+      .filter(Boolean)
+      .join(" ") || myEmail;
+  const newsSection = useRef<HTMLElement>(null);
+  const newsTitleInput = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   // Vrai tant que le titre et le texte viennent d'une proposition de l'IA non enregistrée
@@ -300,7 +318,29 @@ function ManagerSpace() {
   const drafts = visibleDrafts.length;
   const published = news.data?.filter((n) => n.status === "publiée") ?? [];
   const npsMetric = metricOf(metrics.data, "nps");
-  const roleLabel = role === "admin" ? "ADMIN" : role === "manager" ? "MANAGER" : "COLLABORATEUR";
+  const roleLabel = role === "admin" ? "Admin" : role === "manager" ? "Manager" : "Collaborateur";
+  const roleIntro =
+    role === "manager"
+      ? "Gère les validations prioritaires de ton équipe et consulte les actualités du cabinet."
+      : role === "admin"
+        ? "Suis ce qui attend une action dans tout le cabinet."
+        : "Suis tes demandes et retrouve les actualités du cabinet.";
+  const greeting = firstName ? `Bonjour ${firstName}` : "Bonjour";
+
+  function openSubmissionForm() {
+    setSubmissionErrors({});
+    const only = role === "manager" && myTeams.data?.length === 1 ? myTeams.data[0] : "";
+    setSubmissionForm({
+      author_name: "", team: only, content: "", status: "en attente",
+      category: null, visibility: "privée",
+    });
+  }
+
+  // Fait défiler jusqu'au formulaire d'actualité et place le focus sur le titre
+  function goToNewsForm() {
+    newsSection.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    newsTitleInput.current?.focus({ preventScroll: true });
+  }
 
   function sendSubmission(e: React.FormEvent) {
     e.preventDefault();
@@ -326,59 +366,62 @@ function ManagerSpace() {
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
       <BrandHeader />
       <main className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-sm mb-lg">
-          <div className="space-y-sm">
-            <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">
-              Vue d'ensemble
-            </p>
-            <h1 className="font-headline-lg text-headline-lg text-primary">Happy Place</h1>
-            <button
-              onClick={() => {
-                setSubmissionErrors({});
-                const only = role === "manager" && myTeams.data?.length === 1 ? myTeams.data[0] : "";
-                setSubmissionForm({
-                  author_name: "", team: only, content: "", status: "en attente",
-                  category: null, visibility: "privée",
-                });
-              }}
-              className="flex items-center gap-xs px-md py-xs bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-all shadow-sm"
-            >
-              <Icon name="add" /> Nouvelle demande
-            </button>
+        <header className="flex flex-wrap items-end justify-between gap-md mb-lg">
+          <div className="flex min-w-0 flex-wrap items-end gap-md">
+            <div className="min-w-0 space-y-xs">
+              <h1 className="font-headline-lg text-headline-lg text-primary wrap-anywhere">{greeting}</h1>
+              <p className="font-body-md text-body-md text-on-surface-variant max-w-prose">{roleIntro}</p>
+            </div>
+            <div className="flex flex-wrap gap-xs">
+              <button type="button" onClick={openSubmissionForm} className={buttonVariants({ variant: "default" })}>
+                <Icon name="add" /> Nouvelle demande
+              </button>
+              {canWriteNews && (
+                <button type="button" onClick={goToNewsForm} className={buttonVariants({ variant: "secondary" })}>
+                  <Icon name="edit_note" /> Nouvelle actualité
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-xs items-center md:items-end md:justify-end">
-            <span className="font-label-sm text-label-sm text-on-surface-variant">
-              {email} · {roleLabel}
-            </span>
-            <Link
-              to="/mot-de-passe"
-              className="flex items-center gap-xs px-md py-xs border border-outline bg-surface text-primary font-label-md text-label-md hover:bg-surface-container transition-all"
-            >
-              <Icon name="key" /> MOT DE PASSE
-            </Link>
-            <button
-              onClick={() => signOut()}
-              className="flex items-center gap-xs px-md py-xs border border-outline bg-surface text-primary font-label-md text-label-md hover:bg-surface-container"
-            >
-              <Icon name="logout" /> DÉCONNEXION
-            </button>
-            {isAdmin && (<Link
-              to="/manage/news"
-              className="flex items-center gap-xs px-md py-xs border border-outline bg-surface text-primary font-label-md text-label-md hover:bg-surface-container transition-all"
-            >
-              <Icon name="database" /> GÉRER LES DONNÉES
-            </Link>)}
-            <Button
-              type="button"
-              variant="outline"
-              disabled={exportReport.isPending}
-              onClick={() => exportReport.mutate()}
-              className="h-auto rounded-none border-outline bg-surface px-md py-xs font-label-md text-label-md text-primary shadow-none hover:bg-surface-container"
-            >
-              <Icon name="file_download" /> {exportReport.isPending ? "EXPORT EN COURS…" : "EXPORTER LE RAPPORT"}
-            </Button>
+          <div className="ml-auto flex min-w-0 flex-col items-end gap-sm">
+            <div className="flex items-center gap-sm min-w-0">
+              <span
+                aria-hidden="true"
+                className="flex size-11 shrink-0 items-center justify-center rounded-[8px] bg-primary text-on-primary"
+              >
+                <Icon name="person" />
+              </span>
+              <div className="min-w-0 text-right">
+                <p className="font-body-md text-body-md font-semibold text-primary wrap-anywhere">
+                  {firstName || email}
+                </p>
+                <p className="font-label-sm text-label-sm text-on-surface-variant">{roleLabel}</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap justify-end gap-xs">
+              <Link to="/mot-de-passe" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                <Icon name="key" /> Mot de passe
+              </Link>
+              {isAdmin && (
+                <Link to="/manage/news" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                  <Icon name="database" /> Gérer les données
+                </Link>
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={exportReport.isPending}
+                onClick={() => exportReport.mutate()}
+              >
+                <Icon name="file_download" /> {exportReport.isPending ? "Export en cours…" : "Exporter le rapport"}
+              </Button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => signOut()}>
+                <Icon name="logout" /> Déconnexion
+              </Button>
+            </div>
           </div>
-        </div>
+        </header>
 
         {canReview && (
           <ManagerCards
@@ -392,14 +435,19 @@ function ManagerSpace() {
 
         <div className="bento-grid">
           {/* News Management & Input */}
-          <section className="col-span-12 lg:col-span-8 bg-surface-container-lowest border border-outline-variant p-md flex flex-col gap-md">
+          <section
+            ref={newsSection}
+            className="col-span-12 lg:col-span-8 scroll-mt-4 rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col gap-md"
+          >
             <div className="flex items-center justify-between border-b border-outline-variant pb-sm">
               <h2 className="font-headline-sm text-headline-sm text-primary">
                 Actualités du cabinet
               </h2>
-              <span className="font-label-sm text-label-sm text-on-surface-variant">
-                {drafts} brouillon{drafts > 1 ? "s" : ""} en attente
-              </span>
+              {canWriteNews && (
+                <span className="font-label-sm text-label-sm text-on-surface-variant">
+                  {drafts} brouillon{drafts > 1 ? "s" : ""} en attente
+                </span>
+              )}
             </div>
             {canWriteNews && (
               <NewsAiHelper
@@ -444,7 +492,8 @@ function ManagerSpace() {
                   TITRE
                 </label>
                 <input
-                  className="w-full bg-transparent border-b border-outline-variant focus:border-primary focus:outline-none transition-colors font-headline-sm text-headline-sm px-0 py-xs"
+                  ref={newsTitleInput}
+                  className="w-full bg-transparent border-b border-outline-variant focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-colors font-headline-sm text-headline-sm px-0 py-xs"
                    placeholder="Saisis un titre…"
                   type="text"
                   value={title}
@@ -456,7 +505,7 @@ function ManagerSpace() {
                   CONTENU
                 </label>
                 <textarea
-                  className="w-full bg-card border border-outline-variant focus:border-primary focus:outline-none p-sm font-body-md"
+                  className="w-full rounded-md bg-card border border-outline-variant focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary p-sm font-body-md"
                    placeholder="Rédige l'actualité…"
                   rows={4}
                   value={body}
@@ -490,15 +539,15 @@ function ManagerSpace() {
                   )}
                   <button
                     type="submit"
-                    disabled={saveDraft.isPending}
-                    className="px-lg py-xs bg-primary text-on-primary font-label-md text-label-md disabled:opacity-50"
+                    disabled={saveDraft.isPending || profile.isPending}
+                    className={buttonVariants({ variant: "default" })}
                   >
                     {saveDraft.isPending ? "Enregistrement…" : "Enregistrer le brouillon"}
                   </button>
                 </div>
               </div>
             </form>}
-            <div className="mt-md pt-md border-t border-outline-variant">
+            <div className={canWriteNews ? "mt-md pt-md border-t border-outline-variant" : ""}>
               {canWriteNews && visibleDrafts.length > 0 && (
                 <>
                   <h3 className="font-label-md text-label-md text-on-surface-variant mb-sm">
@@ -511,7 +560,7 @@ function ManagerSpace() {
                       return (
                         <div
                           key={n.id}
-                          className="flex items-center justify-between gap-sm p-sm bg-surface-container"
+                          className="flex items-center justify-between gap-sm rounded-md p-sm bg-surface-container"
                         >
                           <div className="flex items-center gap-md min-w-0">
                             <Icon name="draft" className="text-on-surface-variant" />
@@ -555,8 +604,8 @@ function ManagerSpace() {
                               </button>
                               <button
                                 type="button"
-                                className="px-sm py-1 bg-primary text-on-primary font-label-sm text-label-sm disabled:opacity-50"
-                                disabled={publishDraft.isPending}
+                                className={`${buttonVariants({ variant: "default", size: "sm" })} disabled:opacity-50`}
+                                disabled={publishDraft.isPending || profile.isPending}
                                 onClick={() => {
                                   if (window.confirm(`Publier l'actualité « ${n.title} » ? Elle sera visible par tous.`))
                                     publishDraft.mutate(n.id);
@@ -590,7 +639,7 @@ function ManagerSpace() {
                     key={n.id}
                     onClick={() => setReadingNews(n)}
                     aria-haspopup="dialog"
-                    className="w-full text-left p-sm bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer group min-w-0 overflow-hidden space-y-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="w-full rounded-md text-left p-sm bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer group min-w-0 overflow-hidden space-y-xs focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
                     {n.image_path && <NewsImage path={n.image_path} alt={n.title} />}
                     <div className="flex items-center justify-between gap-sm min-w-0">
@@ -614,13 +663,13 @@ function ManagerSpace() {
 
           {/* Demandes à traiter (manager et admin) */}
           {canReview && (
-          <section className="col-span-12 lg:col-span-4 min-w-0 bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
+          <section className="col-span-12 lg:col-span-4 min-w-0 rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
             <div className="flex items-center justify-between border-b border-outline-variant pb-sm mb-md">
               <h2 className="font-headline-sm text-headline-sm text-primary">
                 Demandes à traiter
               </h2>
               {(homeReview.data?.pending ?? 0) > 0 && (
-                <div className="bg-tertiary-fixed text-on-tertiary-fixed px-xs py-1 rounded-full font-label-sm text-label-sm">
+                <div className="bg-tertiary-fixed text-on-tertiary-fixed px-xs py-1 rounded-full font-label-sm text-label-sm tabular-nums">
                   {`${homeReview.data?.pending} à valider`}
                 </div>
               )}
@@ -639,7 +688,7 @@ function ManagerSpace() {
               {toReview.data?.map((s) => (
                 <div
                   key={s.id}
-                  className="p-sm border border-outline-variant bg-card space-y-sm min-w-0 overflow-hidden"
+                  className="p-sm rounded-md border border-outline-variant bg-card space-y-sm min-w-0 overflow-hidden"
                 >
                   <div className="flex items-center gap-sm">
                     <div className="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center">
@@ -659,15 +708,15 @@ function ManagerSpace() {
                   {canReview && <div className="flex gap-xs pt-xs">
                     <button
                       onClick={() => startReject(s)}
-                      className="flex-1 py-1 border border-outline text-primary font-label-sm text-label-sm hover:bg-surface-container transition-colors"
+                      className={`${buttonVariants({ variant: "destructive" })} flex-1`}
                     >
-                      REFUSER
+                      Refuser
                     </button>
                     <button
                       onClick={() => review.mutate({ id: s.id, status: "validée" })}
-                      className="flex-1 py-1 bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-colors"
+                      className={`${buttonVariants({ variant: "default" })} flex-1`}
                     >
-                      VALIDER
+                      Valider
                     </button>
                   </div>}
                 </div>
@@ -678,7 +727,7 @@ function ManagerSpace() {
 
           {/* Mes demandes : toujours affiché pour un collaborateur (même vide) */}
           {(!canReview || (mine.data && mine.data.length > 0)) && (
-            <section className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md">
+            <section className="col-span-12 min-w-0 rounded-lg bg-surface-container-lowest border border-outline-variant p-md">
               <h2 className="font-headline-sm text-headline-sm text-primary border-b border-outline-variant pb-sm mb-md">
                 Mes demandes
               </h2>
@@ -694,17 +743,17 @@ function ManagerSpace() {
               )}
               <div className="space-y-xs">
                 {mine.data?.map((s) => (
-                  <div key={s.id} className="p-sm border border-outline-variant bg-card min-w-0 overflow-hidden">
+                  <div key={s.id} className="p-sm rounded-md border border-outline-variant bg-card min-w-0 overflow-hidden">
                     <SubmissionTags category={s.category} visibility={s.visibility} />
                     <SubmissionPreview content={s.content} onOpen={() => setReading(s)} />
                     <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-                    <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
-                      {s.status} • {s.team} • {timeAgo(s.created_at)}
-                    </p>
+                    <div className="mt-xs flex flex-wrap items-center gap-xs text-body-sm text-[#68686D]">
+                      <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
+                      <span>{s.team} · {timeAgo(s.created_at)}</span>
+                    </div>
                     {s.status === "refusée" && s.rejection_category && (
-                      <div className="mt-xs p-xs bg-error-container text-on-error-container text-body-sm wrap-anywhere">
-                        <p className="font-bold">Motif : {s.rejection_category}</p>
-                        <p className="whitespace-pre-line">Raison : <Linkify text={s.rejection_note ?? ""} /></p>
+                      <div className="mt-xs">
+                        <RejectionNote category={s.rejection_category} note={s.rejection_note} />
                       </div>
                     )}
                   </div>
@@ -721,7 +770,7 @@ function ManagerSpace() {
           />
 
           {/* Points Bloquants */}
-          <section id="alertes" className="col-span-12 md:col-span-7 scroll-mt-4 bg-surface-container-lowest border border-outline-variant p-md">
+          <section id="alertes" className="col-span-12 md:col-span-7 scroll-mt-4 rounded-lg bg-surface-container-lowest border border-outline-variant p-md">
             <div className="flex items-center justify-between mb-md">
               <div className="flex items-center gap-sm">
                 <h2 className="font-headline-sm text-headline-sm text-primary">Points Bloquants</h2>
@@ -754,7 +803,7 @@ function ManagerSpace() {
                 return (
                   <div
                     key={b.id}
-                    className={`${critical ? "accent-bar " : ""}bg-card border border-outline-variant p-sm flex items-start justify-between`}
+                    className={`${critical ? "accent-bar " : ""}rounded-md bg-card border border-outline-variant p-sm flex items-start justify-between`}
                   >
                     <div className="flex gap-md">
                       <Icon
@@ -802,17 +851,17 @@ function ManagerSpace() {
           </section>
 
           {/* Performance Hub */}
-          <section className="col-span-12 md:col-span-5 bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
+          <section className="col-span-12 md:col-span-5 rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
             <div className="flex items-center justify-between mb-md">
               <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs</h2>
               {isAdmin && <Icon name="settings" className="text-on-surface-variant cursor-pointer" />}
             </div>
             <div className="grid grid-cols-2 gap-sm mb-md">
-              <div className="p-sm bg-card border border-outline-variant text-center">
+              <div className="p-sm rounded-md bg-card border border-outline-variant text-center">
                 <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
                   {metricLabel(metricOf(metrics.data, "training_kpi"), "Taux de placement")}
                 </p>
-                <p className="font-display text-[32px] text-primary">
+                <p className="font-body-md text-[32px] font-semibold leading-tight tabular-nums text-primary">
                   {formatMetric(metricOf(metrics.data, "training_kpi"), "—")}
                 </p>
                 <p className="text-[10px] text-on-surface-variant font-label-sm">
@@ -821,11 +870,11 @@ function ManagerSpace() {
                     ` · ${deltaText(metricOf(metrics.data, "training_kpi"))}`}
                 </p>
               </div>
-              <div className="p-sm bg-card border border-outline-variant text-center">
+              <div className="p-sm rounded-md bg-card border border-outline-variant text-center">
                 <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
                   {metricLabel(metricOf(metrics.data, "active_users"), "Missions actives")}
                 </p>
-                <p className="font-display text-[32px] text-primary">
+                <p className="font-body-md text-[32px] font-semibold leading-tight tabular-nums text-primary">
                   {formatMetric(metricOf(metrics.data, "active_users"), "—")}
                 </p>
                 <p className="text-[10px] text-on-surface-variant font-label-sm">
@@ -841,7 +890,7 @@ function ManagerSpace() {
               </label>
               <div className="flex gap-xs">
                 <input
-                  className="flex-grow bg-card border border-outline-variant p-xs font-label-md focus:outline-none focus:border-primary"
+                  className="flex-grow rounded-md bg-card border border-outline-variant p-xs font-label-md focus:outline-none focus:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   type="number"
                   value={nps !== "" ? nps : (npsMetric?.value ?? "")}
                   onChange={(e) => setNps(e.target.value)}
@@ -854,9 +903,9 @@ function ManagerSpace() {
                     })
                   }
                   disabled={saveMetric.isPending}
-                  className="bg-primary text-on-primary px-sm font-label-md text-label-md disabled:opacity-50"
+                  className={buttonVariants({ variant: "default" })}
                 >
-                  METTRE À JOUR
+                  Mettre à jour
                 </button>
               </div>
               <p className="text-[10px] text-on-surface-variant italic">
@@ -872,7 +921,7 @@ function ManagerSpace() {
                 src={PERF_IMAGE}
                  alt="Graphiques minimalistes à barres et à lignes dans un tableau de bord anthracite et blanc"
                 loading="lazy"
-                className="w-full h-24 object-cover border border-outline-variant"
+                className="w-full h-24 rounded-md object-cover border border-outline-variant"
               />
             </div>
           </section>
@@ -1025,7 +1074,7 @@ function ManagerSpace() {
                   tabIndex={-1}
                   aria-hidden="true"
                   onClick={() => attachmentInput.current?.click()}
-                  className="px-md py-xs min-h-[44px] bg-white border border-[#28282D] text-[#28282D] font-label-md text-label-md peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#28282D] hover:bg-[#EDEBE6]"
+                  className={`${buttonVariants({ variant: "secondary" })} peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2`}
                 >
                   Choisir un PDF
                 </button>
@@ -1039,7 +1088,7 @@ function ManagerSpace() {
                       setAttachment(null);
                       if (attachmentInput.current) attachmentInput.current.value = "";
                     }}
-                    className="font-label-sm text-label-sm text-primary underline underline-offset-2 min-h-[44px] px-xs"
+                    className="font-label-sm text-label-sm text-primary underline underline-offset-2 min-h-11 px-xs"
                   >
                     Retirer
                   </button>
@@ -1048,7 +1097,7 @@ function ManagerSpace() {
             </Field>
             <FormActions
               pending={submit.isPending}
-              submitLabel="ENVOYER"
+              submitLabel="Envoyer"
               onCancel={() => setSubmissionForm(null)}
             />
           </form>

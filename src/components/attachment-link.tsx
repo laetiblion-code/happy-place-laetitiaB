@@ -32,7 +32,7 @@ export function AttachmentLink({ path, name }: { path?: string | null; name?: st
           e.preventDefault();
           void openAttachment(path);
         }}
-        className="inline-flex min-w-0 items-center gap-xs text-primary underline font-label-sm text-label-sm"
+        className="inline-flex min-h-11 min-w-0 items-center gap-xs text-[#7E5353] underline font-label-sm text-label-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         title={`Ouvrir ${label} dans un nouvel onglet`}
       >
         <span aria-hidden="true" className="material-symbols-outlined text-sm">picture_as_pdf</span>
@@ -43,7 +43,7 @@ export function AttachmentLink({ path, name }: { path?: string | null; name?: st
         aria-label={`Télécharger ${label}`}
         title="Télécharger"
         onClick={() => downloadAttachment(path, name ?? null).catch((e) => toast.error((e as Error).message))}
-        className="inline-flex items-center text-on-surface-variant hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center text-on-surface-variant hover:text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         <span aria-hidden="true" className="material-symbols-outlined text-sm">download</span>
       </button>
