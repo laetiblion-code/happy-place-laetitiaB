@@ -31,13 +31,14 @@ import {
   type Submission,
   type SubmissionInput,
 } from "@/lib/dashboard";
+import { buttonVariants } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/manage/submissions")({
   head: () => ({
     meta: [
-      { title: "Gestion des soumissions — Happy Place" },
-      { name: "description", content: "Créez, modifiez et supprimez les soumissions dans Happy Place." },
-      { property: "og:title", content: "Gestion des soumissions — Happy Place" },
+      { title: "Demandes · Happy Place" },
+      { name: "description", content: "Créez, modifiez et supprimez les demandes dans Happy Place." },
+      { property: "og:title", content: "Demandes · Happy Place" },
       { property: "og:description", content: "Gérez les propositions des pôles du cabinet dans Happy Place." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -68,7 +69,7 @@ function ManageSubmissions() {
     mutationFn: (input: SubmissionInput) =>
       editing ? updateSubmission(editing.id, input) : createSubmission(input),
     onSuccess: () => {
-      toast.success(editing ? "Soumission modifiée" : "Soumission créée");
+      toast.success(editing ? "Demande modifiée" : "Demande créée");
       close();
       invalidate();
     },
@@ -78,7 +79,7 @@ function ManageSubmissions() {
   const remove = useMutation({
     mutationFn: (id: string) => deleteSubmission(id),
     onSuccess: () => {
-      toast.success("Soumission supprimée");
+      toast.success("Demande supprimée");
       setToDelete(null);
       invalidate();
     },
@@ -107,7 +108,7 @@ function ManageSubmissions() {
     <section className="space-y-md">
       <div className="flex items-center justify-between">
         <h2 className="font-headline-sm text-headline-sm text-primary">
-          Soumissions ({list.data?.length ?? 0})
+          Demandes ({list.data?.length ?? 0})
         </h2>
         <button
           onClick={() => {
@@ -115,15 +116,16 @@ function ManageSubmissions() {
             setErrors({});
             setForm({ ...empty });
           }}
-          className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md"
+          type="button"
+          className={buttonVariants({ variant: "default" })}
         >
-          + NOUVELLE SOUMISSION
+          <span aria-hidden="true" className="material-symbols-outlined">add</span> Nouvelle demande
         </button>
       </div>
 
       {list.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
       {list.isError && (
-        <p className="text-body-sm text-error">Impossible de charger les soumissions.</p>
+        <p className="text-body-sm text-error">Impossible de charger les demandes.</p>
       )}
 
       <div className="space-y-xs">
@@ -177,7 +179,7 @@ function ManageSubmissions() {
           </article>
         ))}
         {list.data?.length === 0 && (
-          <p className="text-body-sm italic text-on-surface-variant">Aucune soumission.</p>
+          <p className="text-body-sm italic text-on-surface-variant">Aucune demande.</p>
         )}
       </div>
 
@@ -186,7 +188,7 @@ function ManageSubmissions() {
         onClose={() => setReading(null)}
       />
       {form && (
-        <Modal title={editing ? "Modifier la soumission" : "Nouvelle soumission"} onClose={close}>
+        <Modal title={editing ? "Modifier la demande" : "Nouvelle demande"} onClose={close}>
           <form onSubmit={submit} className="space-y-sm" noValidate>
             <ErrorSummary errors={errors} />
             <Field label="Auteur" error={errors.author_name}>

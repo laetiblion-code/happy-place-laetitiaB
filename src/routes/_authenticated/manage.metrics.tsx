@@ -24,13 +24,14 @@ import {
   type Metric,
   type MetricInput,
 } from "@/lib/dashboard";
+import { buttonVariants } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/manage/metrics")({
   head: () => ({
     meta: [
-      { title: "Gestion des indicateurs — Happy Place" },
+      { title: "Indicateurs clés · Happy Place" },
       { name: "description", content: "Créez, modifiez et supprimez les indicateurs de Happy Place." },
-      { property: "og:title", content: "Gestion des indicateurs — Happy Place" },
+      { property: "og:title", content: "Indicateurs clés · Happy Place" },
       { property: "og:description", content: "Gérez les indicateurs de performance dans Happy Place." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -104,7 +105,7 @@ function ManageMetrics() {
     <section className="space-y-md">
       <div className="flex items-center justify-between">
         <h2 className="font-headline-sm text-headline-sm text-primary">
-          Indicateurs ({list.data?.length ?? 0})
+          Indicateurs clés ({list.data?.length ?? 0})
         </h2>
         <button
           onClick={() => {
@@ -112,9 +113,10 @@ function ManageMetrics() {
             setErrors({});
             setForm({ ...empty });
           }}
-          className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md"
+          type="button"
+          className={buttonVariants({ variant: "default" })}
         >
-          + NOUVEL INDICATEUR
+          <span aria-hidden="true" className="material-symbols-outlined">add</span> Nouvel indicateur
         </button>
       </div>
 

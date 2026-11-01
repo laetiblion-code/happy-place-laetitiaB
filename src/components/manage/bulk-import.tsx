@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { buttonVariants } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { loadBrowserLib } from "@/lib/browser-lib";
 
@@ -100,8 +101,8 @@ async function downloadTemplate() {
     "4. Une adresse mail ne peut apparaître qu'une fois : une adresse = un rôle.",
     "5. Collaborateur : une seule équipe, obligatoire. Manager : au moins une équipe ; pour plusieurs, sépare-les par « ; » (exemple : Product; Marketing). Admin : équipe vide ou Admin.",
     "6. Exporte l'onglet Utilisateurs en CSV (Google Sheets : Fichier > Télécharger > CSV).",
-    "7. Dans Happy Place : Gérer > Utilisateurs autorisés > Importer une liste, vérifie l'aperçu puis confirme.",
-    "8. L'équipe doit exister dans Happy Place : un admin peut en créer une dans Gérer > Utilisateurs autorisés > Équipes.",
+    "7. Dans Happy Place : Gérer > Utilisateurs et équipes > Importer une liste, vérifie l'aperçu puis confirme.",
+    "8. L'équipe doit exister dans Happy Place : un admin peut en créer une dans Gérer > Utilisateurs et équipes > Équipes.",
   ].forEach((t, i) => (help.getCell(`A${i + 1}`).value = t));
   const buf = await wb.xlsx.writeBuffer();
   download(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "happy-place-import-utilisateurs.xlsx");
@@ -120,6 +121,7 @@ export function BulkImport({ onImported }: { onImported: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [inputKey, setInputKey] = useState(0);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   async function onFile(file: File | undefined) {
     setError(null); setResult(null);
@@ -164,9 +166,9 @@ export function BulkImport({ onImported }: { onImported: () => void }) {
     onImported();
   }
 
-  function cancel() { setResult(null); setSent([]); setError(null); setInputKey((k) => k + 1); }
+  function cancel() { setResult(null); setSent([]); setError(null); setFileName(null); setInputKey((k) => k + 1); }
 
-  const btn = "px-md py-xs border border-outline text-primary font-label-md text-label-md hover:bg-surface-container disabled:opacity-50";
+  const btn = buttonVariants({ variant: "secondary" });
   const validCount = result?.rows.filter((r) => r.status === "valide").length ?? 0;
 
   return (
@@ -176,16 +178,33 @@ export function BulkImport({ onImported }: { onImported: () => void }) {
         <button type="button" className={btn} onClick={() => downloadTemplate().catch((e) => toast.error((e as Error).message))}>
           Télécharger le modèle (.xlsx)
         </button>
+        {/* Vrai champ fichier, masqué mais focusable au clavier ; le bouton visible est son <label> */}
         <input
           key={inputKey}
+          id="import-file"
           type="file"
           accept=".csv,text/csv"
-          aria-label="Fichier CSV à importer"
+          aria-describedby="import-file-status import-file-help"
           disabled={busy}
-          onChange={(e) => onFile(e.target.files?.[0])}
-          className="text-body-sm"
+          className="peer sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            setFileName(f?.name ?? null);
+            void onFile(f);
+          }}
         />
-        {busy && <span className="text-body-sm">…</span>}
+        <label
+          htmlFor="import-file"
+          className={`${btn} cursor-pointer peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary ${busy ? "pointer-events-none opacity-50" : ""}`}
+        >
+          Choisir un fichier (.csv)
+        </label>
+        <span id="import-file-status" className="text-body-sm text-on-surface-variant wrap-anywhere">
+          {busy ? "Analyse du fichier…" : fileName ?? "Aucun fichier"}
+        </span>
+        <p id="import-file-help" className="basis-full text-body-sm text-on-surface-variant">
+          Remplis le modèle Excel, puis enregistre-le au format CSV (Fichier &gt; Enregistrer sous &gt; CSV) avant de l'importer.
+        </p>
       </div>
       {error && <p className="text-error text-sm">{error}</p>}
       {result && (
@@ -197,7 +216,7 @@ export function BulkImport({ onImported }: { onImported: () => void }) {
           </p>
           <div className="flex flex-wrap gap-sm">
             {result.dry_run && (
-              <button type="button" className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md disabled:opacity-50" disabled={validCount === 0 || busy} onClick={confirmImport}>
+              <button type="button" className={buttonVariants({ variant: "default" })} disabled={validCount === 0 || busy} onClick={confirmImport}>
                 Importer les {validCount} lignes valides
               </button>
             )}
