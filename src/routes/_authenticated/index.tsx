@@ -346,6 +346,12 @@ function ManagerSpace() {
             <span className="font-label-sm text-label-sm text-on-surface-variant">
               {email} · {roleLabel}
             </span>
+            <Link
+              to="/mot-de-passe"
+              className="flex items-center gap-xs px-md py-xs border border-outline bg-surface text-primary font-label-md text-label-md hover:bg-surface-container transition-all"
+            >
+              <Icon name="key" /> MOT DE PASSE
+            </Link>
             <button
               onClick={() => signOut()}
               className="flex items-center gap-xs px-md py-xs border border-outline bg-surface text-primary font-label-md text-label-md hover:bg-surface-container"

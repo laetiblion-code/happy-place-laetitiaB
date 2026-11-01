@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as MotDePasseRouteImport } from './routes/mot-de-passe'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedManageRouteImport } from './routes/_authenticated/manage'
@@ -28,6 +29,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MotDePasseRoute = MotDePasseRouteImport.update({
+  id: '/mot-de-passe',
+  path: '/mot-de-passe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -84,6 +90,7 @@ const AuthenticatedManageUsersRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
+  '/mot-de-passe': typeof MotDePasseRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/manage': typeof AuthenticatedManageRouteWithChildren
   '/manage/blockers': typeof AuthenticatedManageBlockersRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
+  '/mot-de-passe': typeof MotDePasseRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/': typeof AuthenticatedIndexRoute
   '/manage/blockers': typeof AuthenticatedManageBlockersRoute
@@ -108,6 +116,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/mot-de-passe': typeof MotDePasseRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/manage': typeof AuthenticatedManageRouteWithChildren
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -123,6 +132,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/mot-de-passe'
     | '/sitemap.xml'
     | '/manage'
     | '/manage/blockers'
@@ -134,6 +144,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
+    | '/mot-de-passe'
     | '/sitemap.xml'
     | '/'
     | '/manage/blockers'
@@ -146,6 +157,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/auth'
+    | '/mot-de-passe'
     | '/sitemap.xml'
     | '/_authenticated/manage'
     | '/_authenticated/'
@@ -160,6 +172,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  MotDePasseRoute: typeof MotDePasseRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
 }
 
@@ -177,6 +190,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mot-de-passe': {
+      id: '/mot-de-passe'
+      path: '/mot-de-passe'
+      fullPath: '/mot-de-passe'
+      preLoaderRoute: typeof MotDePasseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -282,6 +302,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  MotDePasseRoute: MotDePasseRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
 }
 export const routeTree = rootRouteImport
