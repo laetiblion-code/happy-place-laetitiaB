@@ -14,6 +14,8 @@ import { SubmissionReader } from "@/components/submission-reader";
 import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS, SubmissionTags } from "@/components/submission-choices";
 import { NewsReader } from "@/components/news-reader";
 import { DepartureNotices } from "@/components/departure-notices";
+import { ManagerCards, MyChips } from "@/components/home-counters";
+import { fetchAlertCounts, fetchDraftCounts, fetchMyCounts, fetchReviewCounts } from "@/lib/home-counts";
 import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
@@ -153,6 +155,31 @@ function ManagerSpace() {
   });
   const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
   const metrics = useQuery({ queryKey: ["metrics"], queryFn: fetchMetrics, retry: false });
+  // Compteurs de l'accueil : invalidés par toutes les mutations qui changent un statut, un brouillon ou une alerte
+  const homeReview = useQuery({
+    queryKey: ["home-counts", "review", role, myEmail, myTeams.data],
+    enabled: canReview && !!email && (isAdmin || myTeams.isSuccess),
+    queryFn: () => fetchReviewCounts(myEmail, isAdmin ? null : (myTeams.data ?? [])),
+    retry: false,
+  });
+  const homeDrafts = useQuery({
+    queryKey: ["home-counts", "drafts", role, myEmail],
+    enabled: canReview && !!email,
+    queryFn: () => fetchDraftCounts(myEmail, isAdmin),
+    retry: false,
+  });
+  const homeAlerts = useQuery({
+    queryKey: ["home-counts", "alerts", role],
+    enabled: canReview,
+    queryFn: () => fetchAlertCounts(isAdmin),
+    retry: false,
+  });
+  const homeMine = useQuery({
+    queryKey: ["home-counts", "mine", myEmail],
+    enabled: !canReview && !!email,
+    queryFn: () => fetchMyCounts(myEmail),
+    retry: false,
+  });
   const onError = (e: unknown) => toast.error((e as Error).message);
 
   const exportReport = useMutation({
@@ -180,6 +207,7 @@ function ManagerSpace() {
       setShowLinkErrs(false);
       toast.success("Brouillon enregistré");
       qc.invalidateQueries({ queryKey: ["news"] });
+      qc.invalidateQueries({ queryKey: ["home-counts"] });
     },
     onError,
   });
@@ -189,6 +217,7 @@ function ManagerSpace() {
     onSuccess: () => {
       toast.success("Actualité publiée");
       qc.invalidateQueries({ queryKey: ["news"] });
+      qc.invalidateQueries({ queryKey: ["home-counts"] });
     },
     onError,
   });
@@ -198,6 +227,7 @@ function ManagerSpace() {
     onSuccess: () => {
       toast.success("Brouillon supprimé");
       qc.invalidateQueries({ queryKey: ["news"] });
+      qc.invalidateQueries({ queryKey: ["home-counts"] });
     },
     onError,
   });
@@ -212,6 +242,7 @@ function ManagerSpace() {
         setReading((r) => (r?.id === vars.id ? null : r));
       }
       qc.invalidateQueries({ queryKey: ["submissions"] });
+      qc.invalidateQueries({ queryKey: ["home-counts"] });
     },
     onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
   });
@@ -237,13 +268,17 @@ function ManagerSpace() {
       setSubmissionErrors({});
       toast.success("Soumission envoyée");
       qc.invalidateQueries({ queryKey: ["submissions"] });
+      qc.invalidateQueries({ queryKey: ["home-counts"] });
     },
     onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
   });
 
   const setBlocker = useMutation({
     mutationFn: updateBlockerStatus,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["blockers"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["blockers"] });
+      qc.invalidateQueries({ queryKey: ["home-counts"] });
+    },
     onError,
   });
 
@@ -286,7 +321,6 @@ function ManagerSpace() {
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
       <BrandHeader />
       <main className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
-        {email && <DepartureNotices email={email} />}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-sm mb-lg">
           <div className="space-y-sm">
             <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">
@@ -334,6 +368,16 @@ function ManagerSpace() {
             </Button>
           </div>
         </div>
+
+        {canReview && (
+          <ManagerCards
+            isAdmin={isAdmin}
+            review={homeReview.data}
+            drafts={homeDrafts.data}
+            alerts={homeAlerts.data}
+          />
+        )}
+        {email && <DepartureNotices email={email} />}
 
         <div className="bento-grid">
           {/* News Management & Input */}
@@ -599,14 +643,24 @@ function ManagerSpace() {
             </div>
           </section>
 
-          {/* Mes soumissions */}
-          {mine.data && mine.data.length > 0 && (
+          {/* Mes demandes : toujours affiché pour un collaborateur (même vide) */}
+          {(!canReview || (mine.data && mine.data.length > 0)) && (
             <section className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md">
               <h2 className="font-headline-sm text-headline-sm text-primary border-b border-outline-variant pb-sm mb-md">
-                Mes soumissions
+                Mes demandes
               </h2>
+              {!canReview && (
+                <div className="mb-md">
+                  <MyChips counts={homeMine.data} />
+                </div>
+              )}
+              {!canReview && mine.isSuccess && mine.data.length === 0 && (
+                <p className="text-body-sm text-on-surface-variant italic">
+                  Tu n'as pas encore envoyé de demande.
+                </p>
+              )}
               <div className="space-y-xs">
-                {mine.data.map((s) => (
+                {mine.data?.map((s) => (
                   <div key={s.id} className="p-sm border border-outline-variant bg-card min-w-0 overflow-hidden">
                     <SubmissionTags category={s.category} visibility={s.visibility} />
                     <SubmissionPreview content={s.content} onOpen={() => setReading(s)} />
@@ -634,7 +688,7 @@ function ManagerSpace() {
           />
 
           {/* Points Bloquants */}
-          <section className="col-span-12 md:col-span-7 bg-surface-container-lowest border border-outline-variant p-md">
+          <section id="alertes" className="col-span-12 md:col-span-7 scroll-mt-4 bg-surface-container-lowest border border-outline-variant p-md">
             <div className="flex items-center justify-between mb-md">
               <div className="flex items-center gap-sm">
                 <h2 className="font-headline-sm text-headline-sm text-primary">Points Bloquants</h2>
