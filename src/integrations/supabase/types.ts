@@ -473,6 +473,15 @@ export type Database = {
         Args: { _id: string }
         Returns: undefined
       }
+      admin_users_status: {
+        Args: never
+        Returns: {
+          a_un_compte: boolean
+          derniere_connexion: string | null
+          email: string
+          mot_de_passe_cree: boolean
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "collaborateur"

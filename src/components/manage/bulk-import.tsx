@@ -78,9 +78,11 @@ async function downloadTemplate() {
       type: "list", allowBlank: true, formulae: ["Listes!$A$2:$A$4"],
       showErrorMessage: true, errorTitle: "Valeur invalide", error: "Choisis un rôle dans la liste.",
     };
+    // Avertissement, pas erreur : on peut saisir plusieurs équipes (« Product; Marketing »)
     ws.getCell(`E${r}`).dataValidation = {
       type: "list", allowBlank: true, formulae: [teamRange],
-      showErrorMessage: true, errorTitle: "Valeur invalide", error: "Choisis une équipe dans la liste.",
+      showErrorMessage: true, errorStyle: "warning", errorTitle: "Équipe absente de la liste",
+      error: "Vérifie l'orthographe de l'équipe. Pour un manager, sépare plusieurs équipes par « ; ».",
     };
   }
   const lists = wb.addWorksheet("Listes");
@@ -96,7 +98,7 @@ async function downloadTemplate() {
     "2. Remplis une ligne par personne dans l'onglet Utilisateurs.",
     "3. Choisis le rôle et l'équipe dans les menus déroulants.",
     "4. Une adresse mail ne peut apparaître qu'une fois : une adresse = un rôle.",
-    "5. Collaborateur : équipe obligatoire. Manager : équipe facultative, une équipe peut avoir plusieurs managers. Admin : équipe vide ou Admin.",
+    "5. Collaborateur : une seule équipe, obligatoire. Manager : au moins une équipe ; pour plusieurs, sépare-les par « ; » (exemple : Product; Marketing). Admin : équipe vide ou Admin.",
     "6. Exporte l'onglet Utilisateurs en CSV (Google Sheets : Fichier > Télécharger > CSV).",
     "7. Dans Happy Place : Gérer > Utilisateurs autorisés > Importer une liste, vérifie l'aperçu puis confirme.",
     "8. L'équipe doit exister dans Happy Place : un admin peut en créer une dans Gérer > Utilisateurs autorisés > Équipes.",
