@@ -35,7 +35,7 @@ type Row = {
   first_name: string | null;
   last_name: string | null;
 };
-type LoginStatus = { email: string; a_un_compte: boolean; mot_de_passe_cree: boolean; derniere_connexion: string | null };
+type LoginStatus = { email: string; a_un_compte: boolean; mot_de_passe_cree: boolean; derniere_connexion: string | null; a_du_contenu: boolean };
 type Connexion = "jamais" | "lien" | "mdp";
 const nameSchema = z.string().trim().max(100, "100 caractères maximum");
 const emailSchema = z.string().trim().toLowerCase().email("Adresse email invalide").max(255);
@@ -222,6 +222,11 @@ function UsersPage() {
       setDeparture.mutate({ id: u.id, date });
   };
   const [departureInputs, setDepartureInputs] = useState<Record<string, string>>({});
+  // Suppression seulement pour un utilisateur jamais connecté ET sans contenu
+  const canDelete = (u: Row) => {
+    const s = statuses.data?.get(u.email);
+    return connexionOf(s) === "jamais" && !s?.a_du_contenu;
+  };
 
   const queue = useQuery({
     queryKey: ["attachment_deletion_queue"],
@@ -490,14 +495,18 @@ function UsersPage() {
                 <option value="manager">Manager</option>
                 <option value="admin">Admin</option>
               </select>
-              {connexionOf(statuses.data?.get(u.email)) === "jamais" && (
+              {canDelete(u) && (
                 <button
                   type="button"
                   disabled={u.email === me || removeNeverLogged.isPending}
                   title={u.email === me ? "Tu ne peux pas supprimer ton propre compte" : undefined}
                   onClick={() => {
+                    const teamsNote =
+                      u.role === "manager" && u.teams.length
+                        ? ` Ses équipes (${u.teams.join(", ")}) n'auront plus de manager : leurs demandes privées arriveront chez l'admin.`
+                        : "";
                     if (
-                      confirm(`Supprimer ${u.email} de la liste blanche ? Il n'a jamais été connecté : rien n'est à conserver.`)
+                      confirm(`Supprimer ${u.email} de la liste blanche ? Il n'a jamais été connecté : rien n'est à conserver.${teamsNote}`)
                     )
                       removeNeverLogged.mutate(u.id);
                   }}
@@ -509,7 +518,7 @@ function UsersPage() {
               )}
               </div>
             </div>
-            {(connexionOf(statuses.data?.get(u.email)) !== "jamais" || u.departure_date) && (() => {
+            {(!canDelete(u) || u.departure_date) && (() => {
               const dateValue = departureInputs[u.id] ?? u.departure_date ?? "";
               return (
             <div className="flex flex-wrap items-center gap-xs border-t border-outline-variant pt-sm">
