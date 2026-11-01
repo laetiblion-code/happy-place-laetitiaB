@@ -15,7 +15,7 @@ import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS
 import { NewsReader } from "@/components/news-reader";
 import { DepartureNotices } from "@/components/departure-notices";
 import { ManagerCards, MyChips } from "@/components/home-counters";
-import { fetchAlertCounts, fetchDraftCounts, fetchMyCounts, fetchReviewCounts } from "@/lib/home-counts";
+import { fetchAlertCounts, fetchDraftCounts, fetchMyCounts, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
 import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
@@ -25,7 +25,6 @@ import {
   fetchMetrics,
   deltaText,
   fetchNews,
-  fetchSubmissions,
   fetchMySubmissions,
   exportMyRecentSubmissions,
   REJECTION_CATEGORIES,
@@ -142,9 +141,11 @@ function ManagerSpace() {
   const [rejectErrors, setRejectErrors] = useState<FieldErrors>({});
 
   const news = useQuery({ queryKey: ["news"], queryFn: fetchNews, retry: false });
-  const submissions = useQuery({
-    queryKey: ["submissions"],
-    queryFn: fetchSubmissions,
+  // Demandes à traiter : mêmes filtres que la carte « Demandes en attente » (hors ses propres demandes, équipes gérées)
+  const toReview = useQuery({
+    queryKey: ["submissions", "to-review", role, myEmail, myTeams.data],
+    enabled: canReview && !!email && (isAdmin || myTeams.isSuccess),
+    queryFn: () => fetchReviewList(myEmail, isAdmin ? null : (myTeams.data ?? [])),
     retry: false,
   });
   const mine = useQuery({
@@ -266,7 +267,7 @@ function ManagerSpace() {
       setSubmissionForm(null);
       setAttachment(null);
       setSubmissionErrors({});
-      toast.success("Soumission envoyée");
+      toast.success(canReview ? "Demande publiée" : "Demande envoyée");
       qc.invalidateQueries({ queryKey: ["submissions"] });
       qc.invalidateQueries({ queryKey: ["home-counts"] });
     },
@@ -338,7 +339,7 @@ function ManagerSpace() {
               }}
               className="flex items-center gap-xs px-md py-xs bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-all shadow-sm"
             >
-              <Icon name="add" /> SOUMETTRE UNE IDÉE
+              <Icon name="add" /> Nouvelle demande
             </button>
           </div>
           <div className="flex flex-wrap gap-xs items-center md:items-end md:justify-end">
@@ -583,28 +584,31 @@ function ManagerSpace() {
             </div>
           </section>
 
-          {/* Pending Submissions */}
+          {/* Demandes à traiter (manager et admin) */}
+          {canReview && (
           <section className="col-span-12 lg:col-span-4 min-w-0 bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
             <div className="flex items-center justify-between border-b border-outline-variant pb-sm mb-md">
               <h2 className="font-headline-sm text-headline-sm text-primary">
-                Soumissions en attente
+                Demandes à traiter
               </h2>
-              <div className="bg-tertiary-fixed text-on-tertiary-fixed px-xs py-1 rounded-full font-label-sm text-label-sm">
-                {submissions.data?.length ?? 0} {submissions.data?.length === 1 ? "NOUVELLE" : "NOUVELLES"}
-              </div>
+              {(homeReview.data?.pending ?? 0) > 0 && (
+                <div className="bg-tertiary-fixed text-on-tertiary-fixed px-xs py-1 rounded-full font-label-sm text-label-sm">
+                  {`${homeReview.data?.pending} à valider`}
+                </div>
+              )}
             </div>
             <div className="space-y-sm flex-grow min-w-0">
-              {submissions.isError && (
+              {toReview.isError && (
                 <p className="text-body-sm text-error">
-                  Les soumissions sont indisponibles.
+                  Les demandes sont indisponibles.
                 </p>
               )}
-              {submissions.data?.length === 0 && (
+              {toReview.isSuccess && toReview.data.length === 0 && (
                 <p className="text-body-sm text-on-surface-variant italic">
-                  Aucune soumission en attente.
+                  Aucune demande à traiter.
                 </p>
               )}
-              {submissions.data?.map((s) => (
+              {toReview.data?.map((s) => (
                 <div
                   key={s.id}
                   className="p-sm border border-outline-variant bg-card space-y-sm min-w-0 overflow-hidden"
@@ -642,6 +646,7 @@ function ManagerSpace() {
               ))}
             </div>
           </section>
+          )}
 
           {/* Mes demandes : toujours affiché pour un collaborateur (même vide) */}
           {(!canReview || (mine.data && mine.data.length > 0)) && (
