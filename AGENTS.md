@@ -12,3 +12,4 @@
 - Visibilité des demandes : Privée (auteur et manager, admin seulement si l'équipe n'a pas de manager), Équipe et Entreprise visibles des collègues une fois validées. Test : supabase/tests/rls_visibilite.sql.
 - Catégories de demande : question, idée, problème, amélioration de Happy Place ; obligatoires dans le formulaire, vides pour les demandes antérieures au 2026-10-31 ; le manager ne peut pas les changer. Test : supabase/tests/categories.sql.
 - Les demandes d'un manager ou d'un admin sont validées à l'envoi (trigger auto_validate_staff_submission) ; personne ne traite ses propres demandes. Test : supabase/tests/demandes_staff.sql.
+- Connexion par mot de passe ; lien e-mail (signInWithOtp) seulement pour la première connexion ou un mot de passe oublié, vers /mot-de-passe.
