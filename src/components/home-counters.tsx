@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  noun,
   plural,
   type AlertCounts,
   type DraftCounts,
@@ -108,7 +109,7 @@ export function ManagerCards({
       >
         <BigNumber
           value={String(pending)}
-          label={plural(pending, "demande à valider", "demandes à valider")}
+          label={noun(pending, "demande à valider", "demandes à valider")}
         />
         {old > 0 && (
           <div className="flex flex-wrap gap-xs">
@@ -137,7 +138,7 @@ export function ManagerCards({
       >
         <BigNumber
           value={String(draftCount)}
-          label={plural(draftCount, "brouillon à finaliser", "brouillons à finaliser")}
+          label={noun(draftCount, "brouillon à finaliser", "brouillons à finaliser")}
         />
         {isAdmin && draftsMine > 0 && (
           <div className="flex flex-wrap gap-xs">
@@ -159,7 +160,7 @@ export function ManagerCards({
           </a>
         }
       >
-        <BigNumber value={String(alertTotal)} label={plural(alertTotal, "alerte", "alertes")} />
+        <BigNumber value={String(alertTotal)} label={noun(alertTotal, "alerte", "alertes")} />
         {parts.length > 0 && (
           <div className="flex flex-wrap gap-xs">
             <Chip icon="warning" label={parts.join(", ")} className={ROSE} />

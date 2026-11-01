@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Submission } from "@/lib/dashboard";
 
 /**
  * Compteurs de la page d'accueil.
@@ -15,9 +16,14 @@ function escapeLike(value: string) {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
-/** Accord français : 0 et 1 au singulier, à partir de 2 au pluriel. Renvoie « N libellé ». */
+/** Accord français : 0 et 1 au singulier, à partir de 2 au pluriel. Renvoie le libellé seul. */
+export function noun(n: number, singular: string, pluralForm: string) {
+  return n > 1 ? pluralForm : singular;
+}
+
+/** Accord français avec le nombre : « 0 demande », « 2 demandes ». */
 export function plural(n: number, singular: string, pluralForm: string) {
-  return `${n} ${n > 1 ? pluralForm : singular}`;
+  return `${n} ${noun(n, singular, pluralForm)}`;
 }
 
 function unwrap(res: { count: number | null; error: unknown }) {
@@ -36,6 +42,23 @@ function reviewable(email: string, teams: string[] | null) {
   // Manager : seulement les équipes gérées (manager_teams). Admin (teams = null) : tout ce que RLS laisse lire.
   if (teams) q = q.in("team", teams);
   return q;
+}
+
+/** Liste « Demandes à traiter » : mêmes filtres que `reviewable`, pour que le badge et la carte restent égaux. */
+export async function fetchReviewList(
+  email: string,
+  teams: string[] | null,
+): Promise<Submission[]> {
+  if (teams && teams.length === 0) return [];
+  let q = supabase
+    .from("submissions")
+    .select("*")
+    .eq("status", "en attente")
+    .or(`submitted_by_email.is.null,submitted_by_email.not.ilike.${escapeLike(email)}`);
+  if (teams) q = q.in("team", teams);
+  const { data, error } = await q.order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Submission[];
 }
 
 export type ReviewCounts = {
