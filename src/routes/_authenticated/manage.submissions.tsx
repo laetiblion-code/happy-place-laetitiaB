@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { RejectionNote, StatusBadge } from "@/components/status-badge";
 import { toast } from "sonner";
 import {
   ConfirmDelete,
@@ -44,12 +45,6 @@ export const Route = createFileRoute("/_authenticated/manage/submissions")({
   }),
   component: ManageSubmissions,
 });
-
-const submissionStatusLabels: Record<string, string> = {
-  "en attente": "En attente",
-  validée: "Validée",
-  refusée: "Refusée",
-};
 
 const empty: SubmissionInput = { author_name: "", team: "", content: "", status: "en attente" };
 
@@ -151,13 +146,14 @@ function ManageSubmissions() {
                 Ouvrir
               </button>
               <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-              <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
-                 {submissionStatusLabels[s.status] ?? s.status} • {timeAgo(s.created_at)}
-              </p>
+              <div className="mt-xs flex flex-wrap items-center gap-xs text-body-sm text-[#68686D]">
+                <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
+                <span>{timeAgo(s.created_at)}</span>
+              </div>
               {s.status === "refusée" && s.rejection_category && (
-                <p className="text-body-sm text-error mt-xs wrap-anywhere">
-                  Motif : {s.rejection_category} — <Linkify text={s.rejection_note ?? ""} />
-                </p>
+                <div className="mt-xs">
+                  <RejectionNote category={s.rejection_category} note={s.rejection_note} />
+                </div>
               )}
               <SubmissionHistory submissionId={s.id} />
             </div>
@@ -187,7 +183,6 @@ function ManageSubmissions() {
 
       <SubmissionReader
         submission={reading}
-        statusLabel={reading ? submissionStatusLabels[reading.status] ?? reading.status : undefined}
         onClose={() => setReading(null)}
       />
       {form && (

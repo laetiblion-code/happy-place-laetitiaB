@@ -12,7 +12,7 @@ export function BlockerArchive({ open, onClose }: { open: boolean; onClose: () =
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
-        <DialogPrimitive.Content className="fixed z-50 inset-0 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[min(48rem,calc(100vw-2rem))] h-dvh md:h-auto md:max-h-[85vh] flex flex-col bg-surface-container-lowest border border-outline shadow-lg focus:outline-none">
+        <DialogPrimitive.Content className="fixed z-50 inset-0 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[min(48rem,calc(100vw-2rem))] h-dvh md:h-auto md:max-h-[85vh] flex flex-col rounded-lg bg-surface-container-lowest border border-outline shadow-lg focus:outline-none">
           <div className="flex items-start justify-between gap-sm border-b border-outline-variant p-md">
             <div className="min-w-0">
               <DialogPrimitive.Title className="font-headline-sm text-headline-sm text-primary">
@@ -33,7 +33,7 @@ export function BlockerArchive({ open, onClose }: { open: boolean; onClose: () =
               <p className="text-body-sm text-on-surface-variant italic">Aucun point bloquant résolu.</p>
             )}
             {q.data?.map((b) => (
-              <div key={b.id} className="bg-card border border-outline-variant p-sm min-w-0">
+              <div key={b.id} className="rounded-lg bg-card border border-outline-variant p-sm min-w-0">
                 <p className="font-body-md text-primary font-bold wrap-anywhere">{b.title}</p>
                 {b.description && (
                   <p className="text-body-sm text-on-surface-variant whitespace-pre-line wrap-anywhere">{b.description}</p>
@@ -86,7 +86,7 @@ export function ValidatedSubmissions({
   const shown = filtered.slice(0, limit);
 
   return (
-    <section className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md">
+    <section className="col-span-12 min-w-0 rounded-lg bg-surface-container-lowest border border-outline-variant p-md">
       <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm mb-md">
         <h2 className="font-headline-sm text-headline-sm text-primary">Demandes validées</h2>
         <label className="flex items-center gap-xs font-label-sm text-label-sm text-on-surface-variant min-w-0">
@@ -109,7 +109,7 @@ export function ValidatedSubmissions({
       )}
       <div className="grid gap-xs md:grid-cols-2">
         {shown.map((s) => (
-          <div key={s.id} className="p-sm border border-outline-variant bg-card min-w-0 overflow-hidden space-y-xs">
+          <div key={s.id} className="p-sm rounded-lg border border-outline-variant bg-card min-w-0 overflow-hidden space-y-xs">
             <p className="text-[11px] font-label-sm text-on-surface-variant uppercase wrap-anywhere">
               <span className="text-primary font-bold">{s.author_name}</span> • {s.team} •{" "}
               {s.validated_at ? `Validée le ${formatExactDate(s.validated_at)}` : `Soumise le ${formatExactDate(s.created_at)}`}
