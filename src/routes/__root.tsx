@@ -3,6 +3,7 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
+  ErrorComponent,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -10,6 +11,8 @@ import type { ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
+import { ChunkErrorNotice } from "@/components/chunk-error-notice";
+import { isChunkLoadError } from "@/lib/chunk-reload";
 
 function NotFoundComponent() {
   return (
@@ -64,7 +67,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
-  errorComponent: false,
+  errorComponent: ({ error }) =>
+    isChunkLoadError(error) ? <ChunkErrorNotice /> : <ErrorComponent error={error} />,
 });
 
 function RootShell({ children }: { children: ReactNode }) {

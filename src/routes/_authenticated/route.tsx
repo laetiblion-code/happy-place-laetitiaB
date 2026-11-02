@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchOwnRole, signOut } from "@/lib/auth";
 import { BrandHeader } from "@/components/brand-header";
 import { Button } from "@/components/ui/button";
+import { ChunkErrorNotice } from "@/components/chunk-error-notice";
+import { isChunkLoadError } from "@/lib/chunk-reload";
 
 // Accès réservé à la liste blanche (allowed_users + allowed_user_roles) gérée par un admin.
 // Un compte connecté sans rôle voit un écran « Accès non autorisé » au lieu de l'application.
@@ -38,6 +40,8 @@ export const Route = createFileRoute("/_authenticated")({
   errorComponent: ({ error }) =>
     error instanceof UnauthorizedError ? (
       <AccesNonAutorise email={error.email} />
+    ) : isChunkLoadError(error) ? (
+      <ChunkErrorNotice />
     ) : (
       <ErrorComponent error={error} />
     ),

@@ -508,6 +508,10 @@ export type Database = {
           mot_de_passe_cree: boolean
         }[]
       }
+      noms_affiches: {
+        Args: { _emails: string[] }
+        Returns: { email: string; nom: string }[]
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "collaborateur"

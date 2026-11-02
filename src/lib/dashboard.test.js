@@ -18,9 +18,9 @@ describe("metric numeric formatting", () => {
       expect(deltaText({ delta, unit: "%" })).toBe("");
     }
   });
-  test("metric percentages use exactly one decimal with attached unit", () => {
-    expect(formatMetricValue(38.6, "%")).toBe("38,6%");
-    expect(formatMetricValue(40, "%")).toBe("40,0%");
+  test("metric percentages use exactly one decimal with a space before the unit", () => {
+    expect(formatMetricValue(38.6, "%")).toBe("38,6\u00a0%");
+    expect(formatMetricValue(40, "%")).toBe("40,0\u00a0%");
   });
   test("metric values use at most one decimal with attached units", () => {
     expect(formatMetricValue(3, "j")).toBe("3j");
