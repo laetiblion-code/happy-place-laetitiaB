@@ -217,10 +217,13 @@ function UsersPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   })();
   const programDeparture = async (u: Row, date: string) => {
+    // Prénom et nom ; l'e-mail seulement s'ils sont vides (même règle que nomAffiche)
+    const nomComplet = [u.first_name, u.last_name].map((p) => p?.trim() ?? "").filter(Boolean).join(" ");
+    const personne = nomComplet || u.email;
     if (
       !(await demander({
         titre: "Programmer le départ",
-        message: `Programmer le départ de ${u.email} le ${formatDate(date)} ? Son accès sera supprimé à cette date. Son manager et les admins sont prévenus dès maintenant et pourront télécharger ses documents d'ici là. Tu peux annuler avec « Annuler le départ ».`,
+        message: `Programmer le départ de ${personne} le ${formatDate(date)} ? Son accès sera supprimé à cette date. Son manager et les admins sont prévenus dès maintenant et pourront télécharger ses documents d'ici là. Tu peux annuler avec « Annuler le départ ».`,
         libelleConfirmer: "Programmer le départ",
       }))
     )

@@ -106,7 +106,12 @@ export function Modal({
           'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
         ) ?? [],
       );
-    focusables()[0]?.focus();
+    // Focus initial : premier champ du formulaire, sinon premier bouton du corps (pas « Fermer »), sinon la fenêtre elle-même.
+    const corps = boite.current?.querySelector<HTMLElement>("[data-corps-modale]") ?? null;
+    const dansCorps = (sel: string) => Array.from(corps?.querySelectorAll<HTMLElement>(sel) ?? []);
+    const champ = dansCorps('input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])')[0];
+    const bouton = dansCorps("button:not([disabled]), a[href]")[0];
+    (champ ?? bouton ?? boite.current)?.focus();
     function surTouche(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -141,6 +146,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titreId}
+        tabIndex={-1}
         className="w-full max-w-2xl rounded-lg bg-surface-container-lowest border border-outline p-md space-y-md"
       >
         <div className="flex items-center justify-between border-b border-outline-variant pb-sm">
@@ -154,7 +160,7 @@ export function Modal({
             <ManageIcon name="close" />
           </button>
         </div>
-        {children}
+        <div data-corps-modale className="space-y-md">{children}</div>
       </div>
     </div>
   );

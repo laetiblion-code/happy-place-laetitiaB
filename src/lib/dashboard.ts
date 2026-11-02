@@ -168,6 +168,21 @@ export async function fetchMySubmissions(email: string): Promise<Submission[]> {
   return (data ?? []) as Submission[];
 }
 
+// Même règle que la badge de statut : une demande refusée « à clarifier » est une clarification demandée.
+const CATEGORIE_CLARIFICATION = "à clarifier";
+
+const LIBELLES_STATUT: Record<string, string> = {
+  "en attente": "En attente",
+  validée: "Validée",
+  refusée: "Refusée",
+  clarification: "Clarification demandée",
+};
+
+export function libelleStatutExport(status: string, rejectionCategory: string | null | undefined) {
+  if (status === "refusée" && rejectionCategory === CATEGORIE_CLARIFICATION) return "Clarification demandée";
+  return LIBELLES_STATUT[status] ?? status;
+}
+
 function csvCell(value: string) {
   return `"${value.replaceAll('"', '""')}"`;
 }
@@ -178,7 +193,7 @@ export async function exportMyRecentSubmissions(email: string): Promise<number> 
 
   const { data, error } = await db
     .from("submissions")
-    .select("created_at,author_name,submitted_by_email,team,content,status")
+    .select("created_at,author_name,submitted_by_email,team,content,status,rejection_category")
     .ilike("submitted_by_email", email)
     .gte("created_at", since.toISOString())
     .order("created_at", { ascending: false });
@@ -197,7 +212,7 @@ export async function exportMyRecentSubmissions(email: string): Promise<number> 
         row.submitted_by_email ?? "",
         row.team,
         row.content,
-        row.status,
+        libelleStatutExport(row.status, row.rejection_category),
       ].map((value) => csvCell(String(value))).join(";"),
     ),
   ].join("\r\n");

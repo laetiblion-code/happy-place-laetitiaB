@@ -874,12 +874,12 @@ function ManagerSpace() {
                   <p className="font-body-md text-[32px] font-semibold leading-tight tabular-nums text-primary">
                     {formatMetricValue(m.value, m.unit)}
                   </p>
-                  <p className="text-[10px] text-on-surface-variant font-label-sm">
+                  <p className="text-xs text-on-surface-variant font-label-sm">
                     {TREND_LABELS[m.trend]}
                     {deltaText(m) && ` · ${deltaText(m)}`}
                   </p>
                   {m.updated_at && (
-                    <p className="text-[10px] text-on-surface-variant font-label-sm">
+                    <p className="text-xs text-on-surface-variant font-label-sm">
                       Mis à jour {timeAgo(m.updated_at)}
                     </p>
                   )}
