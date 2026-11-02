@@ -8,6 +8,7 @@ import {
   markDepartureNoticeDownloaded,
   type DepartureNotice,
 } from "@/lib/dashboard";
+import { nomAffiche, useNomsAffiches } from "@/lib/noms";
 
 const frDate = (iso: string) => new Intl.DateTimeFormat("fr-FR").format(new Date(iso));
 const frDay = (ymd: string) => ymd.split("-").reverse().join("/");
@@ -17,17 +18,31 @@ export function DepartureNotices({ email }: { email: string }) {
     queryKey: ["departure_notices", email.toLowerCase()],
     queryFn: () => fetchMyDepartureNotices(email),
   });
+  const noms = useNomsAffiches(q.data?.map((n) => n.departing_label) ?? []).data;
   if (!q.data?.length) return null;
   return (
     <div className="space-y-xs">
       {q.data.map((n) => (
-        <NoticeBanner key={n.id} notice={n} email={email} />
+        <NoticeBanner
+          key={n.id}
+          notice={n}
+          email={email}
+          nomDepart={nomAffiche(n.departing_label, noms)}
+        />
       ))}
     </div>
   );
 }
 
-function NoticeBanner({ notice: n, email }: { notice: DepartureNotice; email: string }) {
+function NoticeBanner({
+  notice: n,
+  email,
+  nomDepart,
+}: {
+  notice: DepartureNotice;
+  email: string;
+  nomDepart: string;
+}) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [zipping, setZipping] = useState(false);
@@ -37,11 +52,11 @@ function NoticeBanner({ notice: n, email }: { notice: DepartureNotice; email: st
   const text =
     count === 0
       ? n.kind === "préavis"
-        ? `${n.departing_label} quitte Happy Place le ${frDay(n.departure_date)}. Aucun document à télécharger.`
-        : `${n.departing_label} a quitté Happy Place. Aucun document à télécharger.`
+        ? `${nomDepart} quitte Happy Place le ${frDay(n.departure_date)}. Aucun document PDF à télécharger.`
+        : `${nomDepart} a quitté Happy Place. Aucun document PDF à télécharger.`
       : n.kind === "préavis"
-        ? `${n.departing_label} quitte Happy Place le ${frDay(n.departure_date)} : ${count} document(s) joint(s) à ses demandes seront alors supprimés.`
-        : `${n.departing_label} a quitté Happy Place : ${count} document(s) joint(s) à ses demandes seront supprimés le ${frDate(deleteOn)}`;
+        ? `${nomDepart} quitte Happy Place le ${frDay(n.departure_date)} : ${count} document(s) joint(s) à ses demandes seront alors supprimés.`
+        : `${nomDepart} a quitté Happy Place : ${count} document(s) joint(s) à ses demandes seront supprimés le ${frDate(deleteOn)}`;
 
   const mark = useMutation({
     mutationFn: () => markDepartureNoticeDownloaded(n.id),

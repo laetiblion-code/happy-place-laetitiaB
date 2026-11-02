@@ -12,6 +12,7 @@ import { CharCounter, SubmissionPreview, rejectionErrorMessage } from "@/compone
 import { SubmissionReader } from "@/components/submission-reader";
 import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS, SubmissionTags } from "@/components/submission-choices";
 import { NewsReader } from "@/components/news-reader";
+import { nomAffiche, useNomsAffiches } from "@/lib/noms";
 import { DepartureNotices } from "@/components/departure-notices";
 import { ManagerCards, MyChips } from "@/components/home-counters";
 import { fetchAlertCounts, fetchDraftCounts, fetchMyCounts, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
@@ -319,6 +320,7 @@ function ManagerSpace() {
   const visibleDrafts = news.data?.filter((n) => n.status === "brouillon") ?? [];
   const drafts = visibleDrafts.length;
   const published = news.data?.filter((n) => n.status === "publiée") ?? [];
+  const nomsAuteurs = useNomsAffiches((news.data ?? []).map((n) => n.author ?? "")).data;
   const npsMetric = metricOf(metrics.data, "nps");
   const roleLabel = role === "admin" ? "Admin" : role === "manager" ? "Manager" : "Collaborateur";
   const roleIntro =
@@ -549,7 +551,7 @@ function ManagerSpace() {
                                 </span>
                               </p>
                               <p className="text-xs text-on-surface-variant uppercase font-label-sm">
-                                Créé {timeAgo(n.created_at)} • Par {n.author}
+                                Créé {timeAgo(n.created_at)} • Par {nomAffiche(n.author ?? "", nomsAuteurs)}
                               </p>
                             </div>
                           </div>
@@ -625,7 +627,7 @@ function ManagerSpace() {
                       <div className="min-w-0">
                         <p className="font-body-md text-primary group-hover:underline wrap-anywhere">{n.title}</p>
                         <p className="text-xs text-on-surface-variant uppercase font-label-sm">
-                          Publiée {timeAgo(n.created_at)} • Par {n.author}
+                          Publiée {timeAgo(n.created_at)} • Par {nomAffiche(n.author ?? "", nomsAuteurs)}
                         </p>
                       </div>
                     </div>

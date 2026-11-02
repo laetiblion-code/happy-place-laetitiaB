@@ -25,6 +25,7 @@ import {
 } from "@/lib/dashboard";
 import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
+import { nomAffiche, useNomsAffiches } from "@/lib/noms";
 import { buttonVariants } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/manage/news")({
@@ -58,6 +59,7 @@ function ManageNews() {
   const [showLinkErrs, setShowLinkErrs] = useState(false);
 
   const list = useQuery({ queryKey: ["news", "all"], queryFn: fetchAllNews, retry: false });
+  const noms = useNomsAffiches((list.data ?? []).map((n) => n.author ?? "")).data;
   const invalidate = () => qc.invalidateQueries({ queryKey: ["news"] });
   const onError = (e: unknown) => toast.error((e as Error).message);
 
@@ -142,7 +144,7 @@ function ManageNews() {
               <p className="text-body-sm text-on-surface-variant line-clamp-2 wrap-anywhere">{n.body}</p>
               <NewsLinks links={n.links} />
               <p className="text-body-sm text-[#68686D] mt-xs">
-                 {newsStatusLabels[n.status] ?? n.status} · {n.author} · {timeAgo(n.created_at)}
+                 {newsStatusLabels[n.status] ?? n.status} · {nomAffiche(n.author ?? "", noms)} · {timeAgo(n.created_at)}
               </p>
             </div>
             <RowActions
