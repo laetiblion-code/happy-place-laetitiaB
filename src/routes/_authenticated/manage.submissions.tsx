@@ -31,7 +31,6 @@ import {
   type Submission,
   type SubmissionInput,
 } from "@/lib/dashboard";
-import { buttonVariants } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/manage/submissions")({
   head: () => ({

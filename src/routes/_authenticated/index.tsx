@@ -14,6 +14,8 @@ import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS
 import { NewsReader } from "@/components/news-reader";
 import { nomAffiche, useNomsAffiches } from "@/lib/noms";
 import { useConfirm } from "@/components/confirm-dialog";
+import { DelaiStatut } from "@/components/delai-statut";
+import { SubmissionHistory } from "@/components/manage/submission-history";
 import { DepartureNotices } from "@/components/departure-notices";
 import { ManagerCards, MyChips } from "@/components/home-counters";
 import { fetchAlertCounts, fetchDraftCounts, fetchMyCounts, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
@@ -21,14 +23,15 @@ import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
 import { NewsAiHelper } from "@/components/news-ai-helper";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { AccountBar } from "@/components/account-bar";
 import { AdminGapsBanner } from "@/components/admin-gaps-banner";
 import { ALERT_STATES, alertStatusOptions } from "@/lib/alert-states";
 import { RejectionNote, StatusBadge } from "@/components/status-badge";
 import {
   fetchBlockers,
-  fetchMetrics,
+  fetchDashboardMetrics,
+  fetchLastStatusChanges,
   deltaText,
   formatMetricValue,
   fetchNews,
@@ -44,9 +47,7 @@ import {
   submitIdea,
   timeAgo,
   updateBlockerStatus,
-  updateMetric,
   TREND_LABELS,
-  type Metric,
   type SubmissionInput,
 } from "@/lib/dashboard";
 
@@ -83,24 +84,7 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
-function trendText(m: Metric | undefined) {
-  return m ? TREND_LABELS[m.trend] : "";
-}
-
-function metricOf(metrics: Metric[] | undefined, key: string) {
-  return metrics?.find((m) => m.key === key);
-}
-
-function formatMetric(m: Metric | undefined, fallback: string) {
-  return m ? formatMetricValue(m.value, m.unit) : fallback;
-}
-
-function metricLabel(metric: Metric | undefined, fallback: string) {
-  if (!metric) return fallback;
-  if (metric.key === "training_kpi") return "Taux de placement";
-  if (metric.key === "active_users") return "Missions actives";
-  return metric.label;
-}
+const SANS_CHANGEMENT = new Map<string, { new_status: string; changed_at: string }>();
 
 function ManagerSpace() {
   const [demander, dialogueConfirm] = useConfirm();
@@ -142,7 +126,6 @@ function ManagerSpace() {
   const [media, setMedia] = useState<MediaDraft>(emptyMedia);
   const [showLinkErrs, setShowLinkErrs] = useState(false);
   const newsLinkErrs = showLinkErrs ? linkErrors(media.links) : {};
-  const [nps, setNps] = useState<string>("");
   const [submissionForm, setSubmissionForm] = useState<SubmissionInput | null>(null);
   const [submissionErrors, setSubmissionErrors] = useState<FieldErrors>({});
   const myTeams = useQuery({
@@ -180,8 +163,25 @@ function ManagerSpace() {
     enabled: !!email,
     retry: false,
   });
+  // Dernier changement de statut de chaque demande affichée (délais « depuis »)
+  const reviewIds = (toReview.data ?? []).map((s) => s.id);
+  const reviewChanges =
+    useQuery({
+      queryKey: ["submissions", "last-changes", reviewIds],
+      enabled: reviewIds.length > 0,
+      queryFn: () => fetchLastStatusChanges(reviewIds),
+      retry: false,
+    }).data ?? SANS_CHANGEMENT;
+  const mineIds = (mine.data ?? []).map((s) => s.id);
+  const mineChanges =
+    useQuery({
+      queryKey: ["submissions", "last-changes", mineIds],
+      enabled: mineIds.length > 0,
+      queryFn: () => fetchLastStatusChanges(mineIds),
+      retry: false,
+    }).data ?? SANS_CHANGEMENT;
   const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
-  const metrics = useQuery({ queryKey: ["metrics"], queryFn: fetchMetrics, retry: false });
+  const dashMetrics = useQuery({ queryKey: ["metrics", "dashboard"], queryFn: fetchDashboardMetrics, retry: false });
   // Compteurs de l'accueil : invalidés par toutes les mutations qui changent un statut, un brouillon ou une alerte
   const homeReview = useQuery({
     queryKey: ["home-counts", "review", role, myEmail, myTeams.data],
@@ -310,20 +310,10 @@ function ManagerSpace() {
     onError,
   });
 
-  const saveMetric = useMutation({
-    mutationFn: updateMetric,
-    onSuccess: () => {
-      toast.success("KPI mis à jour");
-      qc.invalidateQueries({ queryKey: ["metrics"] });
-    },
-    onError,
-  });
-
   const visibleDrafts = news.data?.filter((n) => n.status === "brouillon") ?? [];
   const drafts = visibleDrafts.length;
   const published = news.data?.filter((n) => n.status === "publiée") ?? [];
   const nomsAuteurs = useNomsAffiches((news.data ?? []).map((n) => n.author ?? "")).data;
-  const npsMetric = metricOf(metrics.data, "nps");
   const roleLabel = role === "admin" ? "Admin" : role === "manager" ? "Manager" : "Collaborateur";
   const roleIntro =
     role === "manager"
@@ -652,6 +642,14 @@ function ManagerSpace() {
                   </button>
                 ))}
               </div>
+              {published.length > 0 && (
+                <Link
+                  to="/actualites"
+                  className="font-label-md text-label-md text-primary underline underline-offset-4 min-h-11 inline-flex items-center"
+                >
+                  Voir toutes les actualités
+                </Link>
+              )}
             </div>
           </section>
 
@@ -693,7 +691,7 @@ function ManagerSpace() {
                       <p className="text-[10px] text-on-surface-variant font-label-sm wrap-anywhere">{s.team}</p>
                     </div>
                     <span className="text-[10px] text-on-surface-variant font-label-sm whitespace-nowrap">
-                      {timeAgo(s.created_at)}
+                      <DelaiStatut status="en attente" depuis={reviewChanges.get(s.id)?.changed_at ?? s.created_at} />
                     </span>
                   </div>
                   <SubmissionTags category={s.category} visibility={s.visibility} />
@@ -743,8 +741,10 @@ function ManagerSpace() {
                     <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
                     <div className="mt-xs flex flex-wrap items-center gap-xs text-body-sm text-[#68686D]">
                       <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
-                      <span>{s.team} · {timeAgo(s.created_at)}</span>
+                      <span>{s.team} · </span>
+                      <DelaiStatut status={s.status} depuis={mineChanges.get(s.id)?.changed_at ?? s.created_at} />
                     </div>
+                    <SubmissionHistory submissionId={s.id} />
                     {s.status === "refusée" && s.rejection_category && (
                       <div className="mt-xs">
                         <RejectionNote category={s.rejection_category} note={s.rejection_note} />
@@ -858,76 +858,39 @@ function ManagerSpace() {
               <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs clés</h2>
               {isAdmin && <Icon name="settings" className="text-on-surface-variant cursor-pointer" />}
             </div>
-            <div className="grid grid-cols-2 gap-sm mb-md">
-              <div className="p-sm rounded-md bg-card border border-outline-variant text-center">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-                  {metricLabel(metricOf(metrics.data, "training_kpi"), "Taux de placement")}
-                </p>
-                <p className="font-body-md text-[32px] font-semibold leading-tight tabular-nums text-primary">
-                  {formatMetric(metricOf(metrics.data, "training_kpi"), "n.d.")}
-                </p>
-                <p className="text-[10px] text-on-surface-variant font-label-sm">
-                  {trendText(metricOf(metrics.data, "training_kpi"))}
-                  {deltaText(metricOf(metrics.data, "training_kpi")) &&
-                    ` · ${deltaText(metricOf(metrics.data, "training_kpi"))}`}
-                </p>
-                {metricOf(metrics.data, "training_kpi")?.updated_at && (
-                  <p className="text-[10px] text-on-surface-variant font-label-sm">
-                    Mis à jour {timeAgo(metricOf(metrics.data, "training_kpi")!.updated_at!)}
-                  </p>
-                )}
-              </div>
-              <div className="p-sm rounded-md bg-card border border-outline-variant text-center">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-                  {metricLabel(metricOf(metrics.data, "active_users"), "Missions actives")}
-                </p>
-                <p className="font-body-md text-[32px] font-semibold leading-tight tabular-nums text-primary">
-                  {formatMetric(metricOf(metrics.data, "active_users"), "n.d.")}
-                </p>
-                <p className="text-[10px] text-on-surface-variant font-label-sm">
-                  {trendText(metricOf(metrics.data, "active_users"))}
-                  {deltaText(metricOf(metrics.data, "active_users")) &&
-                    ` · ${deltaText(metricOf(metrics.data, "active_users"))}`}
-                </p>
-                {metricOf(metrics.data, "active_users")?.updated_at && (
-                  <p className="text-[10px] text-on-surface-variant font-label-sm">
-                    Mis à jour {timeAgo(metricOf(metrics.data, "active_users")!.updated_at!)}
-                  </p>
-                )}
-              </div>
-            </div>
-            {isAdmin && <div className="space-y-xs">
-              <label className="font-label-sm text-label-sm text-on-surface-variant block">
-                MODIFIER LE NPS CANDIDATS
-              </label>
-              <div className="flex gap-xs">
-                <input
-                  className="flex-grow rounded-md bg-card border border-[#8A8A90] p-xs font-label-md focus:outline-none focus:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  type="number"
-                  value={nps !== "" ? nps : (npsMetric?.value ?? "")}
-                  onChange={(e) => setNps(e.target.value)}
-                />
-                <button
-                  onClick={() =>
-                    saveMetric.mutate({
-                      key: "nps",
-                      value: Number(nps !== "" ? nps : (npsMetric?.value ?? 0)),
-                    })
-                  }
-                  disabled={saveMetric.isPending}
-                  className={buttonVariants({ variant: "default" })}
-                >
-                  Mettre à jour
-                </button>
-              </div>
-              <p className="text-[10px] text-on-surface-variant italic">
-                {npsMetric
-                  ? `Tendance : ${trendText(npsMetric)}${
-                      deltaText(npsMetric) ? ` · ${deltaText(npsMetric)}` : ""
-                    }`
-                  : "Mis à jour à partir des retours candidats."}
+            {dashMetrics.isError && (
+              <p className="text-body-sm text-error mb-md">Les indicateurs sont indisponibles.</p>
+            )}
+            {dashMetrics.isSuccess && dashMetrics.data.length === 0 && (
+              <p className="text-body-sm italic text-on-surface-variant mb-md">
+                Aucun indicateur affiché sur l'accueil.
+                {isAdmin ? " Choisis-en jusqu'à quatre dans la gestion des indicateurs." : ""}
               </p>
-            </div>}
+            )}
+            <div className="grid grid-cols-2 gap-sm mb-md">
+              {dashMetrics.data?.map((m) => (
+                <div key={m.key} className="p-sm rounded-md bg-card border border-outline-variant text-center">
+                  <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">{m.label}</p>
+                  <p className="font-body-md text-[32px] font-semibold leading-tight tabular-nums text-primary">
+                    {formatMetricValue(m.value, m.unit)}
+                  </p>
+                  <p className="text-[10px] text-on-surface-variant font-label-sm">
+                    {TREND_LABELS[m.trend]}
+                    {deltaText(m) && ` · ${deltaText(m)}`}
+                  </p>
+                  {m.updated_at && (
+                    <p className="text-[10px] text-on-surface-variant font-label-sm">
+                      Mis à jour {timeAgo(m.updated_at)}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            {isAdmin && (
+              <Link to="/manage/metrics" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                Gérer les indicateurs
+              </Link>
+            )}
             <div className="mt-auto pt-md">
               <img
                 src={PERF_IMAGE}
@@ -1008,10 +971,7 @@ function ManagerSpace() {
             />
             {profileName ? (
               <Field label="Nom">
-                <p className="font-body-md text-on-surface wrap-anywhere">
-                  {profileName}
-                  {profile.data?.team ? ` · ${profile.data.team}` : ""}
-                </p>
+                <p className="font-body-md text-on-surface wrap-anywhere">{profileName}</p>
               </Field>
             ) : (
               <Field label="Nom" error={submissionErrors.author_name}>
@@ -1036,6 +996,13 @@ function ManagerSpace() {
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
+              </Field>
+            )}
+            {role === "collaborateur" && (
+              <Field label="Équipe">
+                <p className="font-body-md text-on-surface wrap-anywhere">
+                  {profile.data?.team ?? "Aucune équipe renseignée. Demande à un admin de t'en affecter une."}
+                </p>
               </Field>
             )}
             {role === "admin" && (

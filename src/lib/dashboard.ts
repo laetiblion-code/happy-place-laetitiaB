@@ -291,12 +291,69 @@ export async function fetchMetrics(): Promise<Metric[]> {
   return (data ?? []) as Metric[];
 }
 
+/** Indicateurs affichés sur l'accueil (au plus 4), triés par libellé. Même liste pour tous les rôles. */
+export async function fetchDashboardMetrics(): Promise<Metric[]> {
+  const [flags, rows] = await Promise.all([
+    db.from("metrics").select("key").eq("on_dashboard", true),
+    db.from("metrics_with_trend").select("*"),
+  ]);
+  if (flags.error) throw flags.error;
+  if (rows.error) throw rows.error;
+  const cles = new Set((flags.data ?? []).map((f) => f.key));
+  return ((rows.data ?? []) as Metric[])
+    .filter((m) => cles.has(m.key))
+    .sort((a, b) => a.label.localeCompare(b.label, "fr"));
+}
+
+/** Indicateur affiché sur l'accueil (true/false) par clé, pour la gestion. */
+export async function fetchMetricFlags(): Promise<Map<string, boolean>> {
+  const { data, error } = await db.from("metrics").select("key, on_dashboard");
+  if (error) throw error;
+  return new Map((data ?? []).map((m) => [m.key, m.on_dashboard]));
+}
+
+/** Change l'affichage sur l'accueil. La base refuse un 5e indicateur : son message est remonté tel quel. */
+export async function setMetricOnDashboard(key: string, onDashboard: boolean) {
+  const { error } = await db.from("metrics").update({ on_dashboard: onDashboard }).eq("key", key);
+  if (error) throw error;
+}
+
 export async function updateMetric(input: { key: string; value: number }) {
   const { error } = await db
     .from("metrics")
     .update({ value: input.value, updated_at: new Date().toISOString() })
     .eq("key", input.key);
   if (error) throw error;
+}
+
+/** Durée écoulée depuis une date, sans préfixe : « 5 jours », « 2 heures », « moins d'une minute ». */
+export function delaiTexte(iso: string): string {
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return "moins d'une minute";
+  if (min < 60) return `${min} minute${min > 1 ? "s" : ""}`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} heure${h > 1 ? "s" : ""}`;
+  const jours = Math.round(h / 24);
+  return `${jours} jour${jours > 1 ? "s" : ""}`;
+}
+
+/** Dernier changement de statut de chaque demande (historique), par identifiant de demande. */
+export async function fetchLastStatusChanges(
+  ids: string[],
+): Promise<Map<string, { new_status: string; changed_at: string }>> {
+  const derniers = new Map<string, { new_status: string; changed_at: string }>();
+  if (ids.length === 0) return derniers;
+  const { data, error } = await db
+    .from("submission_status_history")
+    .select("submission_id, new_status, changed_at")
+    .in("submission_id", ids)
+    .order("changed_at", { ascending: false });
+  if (error) throw error;
+  for (const h of data ?? []) {
+    if (!derniers.has(h.submission_id))
+      derniers.set(h.submission_id, { new_status: h.new_status, changed_at: h.changed_at });
+  }
+  return derniers;
 }
 
 export function timeAgo(iso: string): string {

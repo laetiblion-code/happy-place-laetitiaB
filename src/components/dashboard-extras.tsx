@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AttachmentLink } from "@/components/attachment-link";
 import { SubmissionPreview, formatExactDate } from "@/components/expandable-card";
+import { DelaiStatut } from "@/components/delai-statut";
 import { fetchResolvedBlockers, fetchValidatedSubmissions, type Submission } from "@/lib/dashboard";
 
 /** Fenêtre « Archive des alertes opérationnelles » (lecture seule, statut RÉSOLU). */
@@ -112,7 +113,11 @@ export function ValidatedSubmissions({
           <div key={s.id} className="p-sm rounded-lg border border-outline-variant bg-card min-w-0 overflow-hidden space-y-xs">
             <p className="text-[11px] font-label-sm text-on-surface-variant uppercase wrap-anywhere">
               <span className="text-primary font-bold">{s.author_name}</span> • {s.team} •{" "}
-              {s.validated_at ? `Validée le ${formatExactDate(s.validated_at)}` : `Envoyée le ${formatExactDate(s.created_at)}`}
+              {s.validated_at ? (
+                <DelaiStatut status="validée" depuis={s.validated_at} />
+              ) : (
+                `Envoyée le ${formatExactDate(s.created_at)}`
+              )}
             </p>
             <SubmissionPreview content={s.content} onOpen={() => onRead(s)} />
             {s.attachment_path &&

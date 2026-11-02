@@ -32,7 +32,11 @@ export function useConfirm() {
     <Modal title={demande.titre} onClose={() => repondre(false)}>
       <div className="font-body-md text-on-surface">{demande.message}</div>
       <div className="flex justify-end gap-xs pt-sm">
-        <button type="button" onClick={() => repondre(false)} className={buttonVariants({ variant: "secondary" })}>
+        <button
+          type="button"
+          onClick={() => repondre(false)}
+          className={buttonVariants({ variant: "secondary" })}
+        >
           Annuler
         </button>
         <button

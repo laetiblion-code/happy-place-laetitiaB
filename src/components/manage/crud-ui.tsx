@@ -1,4 +1,13 @@
-import type { ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import type { FieldErrors } from "@/lib/manage-schemas";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -13,23 +22,48 @@ export function ManageIcon({ name, className = "" }: { name: string; className?:
 const inputBase =
   "w-full rounded-md bg-card border border-[#8A8A90] focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary p-sm font-body-md text-on-surface";
 
+/** Champ de formulaire : libellé relié au contrôle, erreur annoncée (aria-invalid, aria-describedby). */
 export function Field({
   label,
   error,
+  required,
   children,
 }: {
   label: string;
   error?: string;
+  required?: boolean;
   children: ReactNode;
 }) {
+  const id = useId();
+  const erreurId = `${id}-erreur`;
+  const premier = Children.toArray(children).find(isValidElement) as ReactElement<{ id?: string; required?: boolean; "aria-describedby"?: string }> | undefined;
+  const estControle =
+    !!premier && (["input", "select", "textarea"].includes(premier.type as string) || premier.type === TextInput || premier.type === TextArea || premier.type === Select);
+  const cibleId = estControle ? (premier!.props.id ?? id) : undefined;
+  const rendu = estControle
+    ? Children.map(children, (enfant) =>
+        enfant === premier
+          ? cloneElement(enfant as ReactElement<Record<string, unknown>>, {
+              id: cibleId,
+              required: required || premier!.props.required,
+              "aria-invalid": error ? true : undefined,
+              "aria-describedby": error ? erreurId : premier!.props["aria-describedby"],
+            })
+          : enfant,
+      )
+    : children;
   return (
     <div className="space-y-xs">
-      <label className="font-label-sm text-label-sm text-on-surface-variant uppercase block">
+      <label
+        htmlFor={cibleId}
+        className="font-label-sm text-label-sm text-on-surface-variant uppercase block"
+      >
         {label}
+        {required ? " (obligatoire)" : null}
       </label>
-      {children}
+      {rendu}
       {error ? (
-        <p role="alert" className="text-body-sm text-error">
+        <p id={erreurId} role="alert" className="text-body-sm text-error">
           {error}
         </p>
       ) : null}
@@ -58,16 +92,59 @@ export function Modal({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const titreId = useId();
+  const boite = useRef<HTMLDivElement>(null);
+  const fermer = useRef(onClose);
+  fermer.current = onClose;
+
+  // Focus placé dans la fenêtre, piégé pendant qu'elle est ouverte, rendu au bouton d'origine, Échap ferme.
+  useEffect(() => {
+    const origine = document.activeElement as HTMLElement | null;
+    const focusables = () =>
+      Array.from(
+        boite.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+    focusables()[0]?.focus();
+    function surTouche(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        fermer.current();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const premier = items[0];
+      const dernier = items[items.length - 1];
+      const actif = document.activeElement;
+      if (e.shiftKey && (actif === premier || !boite.current?.contains(actif))) {
+        e.preventDefault();
+        dernier.focus();
+      } else if (!e.shiftKey && (actif === dernier || !boite.current?.contains(actif))) {
+        e.preventDefault();
+        premier.focus();
+      }
+    }
+    document.addEventListener("keydown", surTouche);
+    return () => {
+      document.removeEventListener("keydown", surTouche);
+      origine?.focus?.();
+    };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-sm md:p-lg">
       <div
+        ref={boite}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titreId}
         className="w-full max-w-2xl rounded-lg bg-surface-container-lowest border border-outline p-md space-y-md"
       >
         <div className="flex items-center justify-between border-b border-outline-variant pb-sm">
-          <h2 className="font-headline-sm text-headline-sm text-primary">{title}</h2>
+          <h2 id={titreId} className="font-headline-sm text-headline-sm text-primary">{title}</h2>
           <button
             type="button"
             aria-label="Fermer"
