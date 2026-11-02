@@ -171,6 +171,7 @@ export function NewsAiHelper({
           <div className="flex flex-col sm:flex-row gap-xs">
             <input
               id="aide-ia-url"
+              name="aide-ia-url"
               type="url"
               placeholder="https://…"
               value={url}

@@ -1,6 +1,6 @@
 import { Building2, Check, CircleHelp, Lightbulb, Lock, Sparkles, TriangleAlert, Users, type LucideIcon } from "lucide-react";
 
-type Choice = { value: string; label: string; help: string; icon: LucideIcon; labelClass?: string };
+type Choice = { value: string; label: string; help: string; icon: LucideIcon; labelClass?: string; libelleCourt?: string };
 
 export const SUBMISSION_CATEGORY_OPTIONS: Choice[] = [
   { value: "question", label: "Question", help: "Tu cherches une information ou une réponse.", icon: CircleHelp },
@@ -9,6 +9,7 @@ export const SUBMISSION_CATEGORY_OPTIONS: Choice[] = [
   {
     value: "amélioration de Happy Place",
     label: "Amélioration de Happy Place",
+    libelleCourt: "Amélioration Happy Place",
     help: "Tu proposes un changement de l'outil Happy Place.",
     icon: Sparkles,
   },
@@ -132,7 +133,7 @@ export function CategoryChip({ category }: { category?: string | null }) {
   return (
     <span className="inline-flex min-h-7 items-center gap-xs bg-[#EDEBE6] px-sm py-xs font-label-sm text-sm uppercase text-[#28282D]">
       <cat.icon aria-hidden="true" className="h-3.5 w-3.5" />
-      {cat.label}
+      {cat.libelleCourt ?? cat.label}
     </span>
   );
 }

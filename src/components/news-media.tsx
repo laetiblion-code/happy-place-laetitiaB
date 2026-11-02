@@ -122,7 +122,7 @@ export function NewsMediaEditor({
 
   return (
     <div className="space-y-sm min-w-0">
-      <input
+      <input name="image-actualite"
         ref={input}
         type="file"
         accept={NEWS_IMAGE_TYPES.join(",")}
@@ -189,7 +189,7 @@ export function NewsMediaEditor({
       {value.links.map((l, i) => (
         <div key={i} className="space-y-1 min-w-0">
           <div className="flex flex-col sm:flex-row gap-xs min-w-0">
-            <input
+            <input name="lien-adresse"
               aria-label={`Adresse du lien ${i + 1}`}
               placeholder="https://…"
               maxLength={2000}
@@ -204,7 +204,7 @@ export function NewsMediaEditor({
               className="min-w-0 flex-[2] bg-card border border-[#8A8A90] p-xs font-body-sm focus:outline-none focus:border-primary"
             />
             <div className="flex gap-xs min-w-0 flex-1">
-              <input
+              <input name="lien-libelle"
                 aria-label={`Libellé du lien ${i + 1} (facultatif)`}
                 placeholder="Libellé (facultatif)"
                 maxLength={80}

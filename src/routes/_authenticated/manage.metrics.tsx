@@ -379,7 +379,7 @@ function ManageMetrics() {
               </div>
             )}
             <label className="flex min-h-11 items-center gap-sm font-label-sm text-sm text-on-surface">
-              <input
+              <input name="objectif-bas-est-mieux"
                 type="checkbox"
                 checked={form.plusBas}
                 onChange={(e) => setForm({ ...form, plusBas: e.target.checked })}

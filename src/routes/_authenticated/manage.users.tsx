@@ -336,7 +336,7 @@ function UsersPage() {
       <TeamsSection users={list.data ?? []} teams={teamsQuery.data ?? []} onChanged={refresh} />
       <BulkImport onImported={refresh} />
       <form onSubmit={submit} className="flex flex-col md:flex-row gap-xs md:items-start bg-surface-container-lowest border border-outline-variant p-md">
-        <input
+        <input name="prenom"
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
           placeholder="Prénom (facultatif)"
@@ -344,7 +344,7 @@ function UsersPage() {
           maxLength={100}
           className="border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
         />
-        <input
+        <input name="nom"
           value={lastName}
           onChange={(e) => setLastName(e.target.value)}
           placeholder="Nom (facultatif)"
@@ -353,7 +353,7 @@ function UsersPage() {
           className="border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
         />
         <div className="flex-1">
-          <input
+          <input name="email-google"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="prenom.nom@gmail.com"
@@ -362,7 +362,7 @@ function UsersPage() {
           />
           {err && <p className="text-error text-sm mt-1">{err}</p>}
         </div>
-        <select
+        <select name="role"
           value={role}
           onChange={(e) => { setRole(e.target.value as Row["role"]); setTeamErr(null); }}
           aria-label="Rôle"
@@ -375,7 +375,7 @@ function UsersPage() {
         {role !== "admin" && (
           <div className="flex flex-col gap-xs">
             {role === "collaborateur" ? (
-              <select
+              <select name="equipe-collaborateur"
                 value={newTeam}
                 onChange={(e) => setNewTeam(e.target.value)}
                 aria-label="Équipe du collaborateur"
@@ -392,7 +392,7 @@ function UsersPage() {
                 <div className="absolute z-10 mt-xs max-h-64 min-w-56 overflow-y-auto border border-outline-variant bg-surface p-xs">
                   {selectableTeams.map((t) => (
                     <label key={t} className="flex items-center gap-xs px-xs py-1 font-body-md">
-                      <input
+                      <input name="equipes-gerees"
                         type="checkbox"
                         checked={newTeams.includes(t)}
                         onChange={(e) =>
@@ -420,7 +420,7 @@ function UsersPage() {
               <div className="space-y-xs">
                 {editingName?.id === u.id ? (
                   <div className="flex flex-wrap items-center gap-xs">
-                    <input
+                    <input name="prenom-modifie"
                       value={editingName.first}
                       onChange={(e) => setEditingName({ ...editingName, first: e.target.value })}
                       placeholder="Prénom (facultatif)"
@@ -428,7 +428,7 @@ function UsersPage() {
                       maxLength={100}
                       className="border border-[#8A8A90] bg-surface px-sm py-1 font-body-md"
                     />
-                    <input
+                    <input name="nom-modifie"
                       value={editingName.last}
                       onChange={(e) => setEditingName({ ...editingName, last: e.target.value })}
                       placeholder="Nom (facultatif)"
@@ -493,7 +493,7 @@ function UsersPage() {
                 </div>
               </div>
               <div className="flex gap-xs">
-              <select
+              <select name="role-utilisateur"
                 value={u.role}
                 disabled={isLastAdmin(u)}
                 onChange={(e) => {
@@ -587,7 +587,7 @@ function UsersPage() {
             {u.role === "collaborateur" && (
               <div className="flex flex-wrap items-center gap-xs border-t border-outline-variant pt-sm">
                 <span className="font-label-sm text-label-sm text-on-surface-variant">Équipe :</span>
-<select
+<select name="equipe-membre"
             value={memberTeams[u.id] ?? u.team ?? ""}
             onChange={(e) => setMemberTeams((c) => ({ ...c, [u.id]: e.target.value }))}
             aria-label={`Équipe de ${u.email}`}
@@ -637,7 +637,7 @@ function UsersPage() {
                     {team} ×
                   </button>
                 ))}
-<select
+<select name="equipe-saisie"
             value={teamInputs[u.id] ?? ""}
             onChange={(e) => setTeamInputs((current) => ({ ...current, [u.id]: e.target.value }))}
             aria-label={`Ajouter une équipe à ${u.email}`}
@@ -665,7 +665,7 @@ function UsersPage() {
           <DialogHeader>
             <DialogTitle>Équipe de {roleDialog?.email}</DialogTitle>
           </DialogHeader>
-          <select
+          <select name="equipe-role"
             value={roleDialog?.team ?? ""}
             onChange={(e) => roleDialog && setRoleDialog({ ...roleDialog, team: e.target.value })}
             aria-label="Équipe du collaborateur"
@@ -751,7 +751,7 @@ function TeamsSection({ users, teams, onChanged }: { users: Row[]; teams: { name
       <h2 className="font-label-md text-label-md text-primary">Équipes</h2>
       <form onSubmit={submit} className="flex flex-wrap items-start gap-xs">
         <div>
-          <input
+          <input name="nouvelle-equipe"
             value={name}
             onChange={(e) => { setName(e.target.value); setErr(null); }}
             placeholder="Nouvelle équipe"
@@ -770,7 +770,7 @@ function TeamsSection({ users, teams, onChanged }: { users: Row[]; teams: { name
           <li key={t.name} className="flex flex-wrap items-center justify-between gap-xs p-xs">
             {editing?.from === t.name ? (
               <span className="flex flex-wrap gap-xs">
-                <input
+                <input name="nouveau-nom-equipe"
                   value={editing.to}
                   onChange={(e) => setEditing({ ...editing, to: e.target.value })}
                   aria-label={`Nouveau nom pour ${t.name}`}

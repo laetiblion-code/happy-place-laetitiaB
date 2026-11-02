@@ -15,6 +15,7 @@ import { Route as MotDePasseRouteImport } from './routes/mot-de-passe'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedActualitesRouteImport } from './routes/_authenticated/actualites'
+import { Route as AuthenticatedDemandesRouteImport } from './routes/_authenticated/demandes'
 import { Route as AuthenticatedManageRouteImport } from './routes/_authenticated/manage'
 import { Route as AuthenticatedManageIndexRouteImport } from './routes/_authenticated/manage.index'
 import { Route as AuthenticatedManageBlockersRouteImport } from './routes/_authenticated/manage.blockers'
@@ -50,6 +51,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedActualitesRoute = AuthenticatedActualitesRouteImport.update({
   id: '/actualites',
   path: '/actualites',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDemandesRoute = AuthenticatedDemandesRouteImport.update({
+  id: '/demandes',
+  path: '/demandes',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedManageRoute = AuthenticatedManageRouteImport.update({
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/mot-de-passe': typeof MotDePasseRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/actualites': typeof AuthenticatedActualitesRoute
+  '/demandes': typeof AuthenticatedDemandesRoute
   '/manage': typeof AuthenticatedManageRouteWithChildren
   '/manage/blockers': typeof AuthenticatedManageBlockersRoute
   '/manage/metrics': typeof AuthenticatedManageMetricsRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/mot-de-passe': typeof MotDePasseRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/actualites': typeof AuthenticatedActualitesRoute
+  '/demandes': typeof AuthenticatedDemandesRoute
   '/': typeof AuthenticatedIndexRoute
   '/manage/blockers': typeof AuthenticatedManageBlockersRoute
   '/manage/metrics': typeof AuthenticatedManageMetricsRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/mot-de-passe': typeof MotDePasseRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/actualites': typeof AuthenticatedActualitesRoute
+  '/_authenticated/demandes': typeof AuthenticatedDemandesRoute
   '/_authenticated/manage': typeof AuthenticatedManageRouteWithChildren
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/manage/blockers': typeof AuthenticatedManageBlockersRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/mot-de-passe'
     | '/sitemap.xml'
     | '/actualites'
+    | '/demandes'
     | '/manage'
     | '/manage/blockers'
     | '/manage/metrics'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/mot-de-passe'
     | '/sitemap.xml'
     | '/actualites'
+    | '/demandes'
     | '/'
     | '/manage/blockers'
     | '/manage/metrics'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/mot-de-passe'
     | '/sitemap.xml'
     | '/_authenticated/actualites'
+    | '/_authenticated/demandes'
     | '/_authenticated/manage'
     | '/_authenticated/'
     | '/_authenticated/manage/blockers'
@@ -230,6 +242,13 @@ declare module '@tanstack/react-router' {
       path: '/actualites'
       fullPath: '/actualites'
       preLoaderRoute: typeof AuthenticatedActualitesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/demandes': {
+      id: '/_authenticated/demandes'
+      path: '/demandes'
+      fullPath: '/demandes'
+      preLoaderRoute: typeof AuthenticatedDemandesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/manage': {
@@ -307,12 +326,14 @@ const AuthenticatedManageRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedActualitesRoute: typeof AuthenticatedActualitesRoute
+  AuthenticatedDemandesRoute: typeof AuthenticatedDemandesRoute
   AuthenticatedManageRoute: typeof AuthenticatedManageRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedActualitesRoute: AuthenticatedActualitesRoute,
+  AuthenticatedDemandesRoute: AuthenticatedDemandesRoute,
   AuthenticatedManageRoute: AuthenticatedManageRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
 import { StatusBadge } from "@/components/status-badge";
@@ -9,8 +10,9 @@ import { cn } from "@/lib/utils";
 import { fetchCabinetSubmissions, type Submission } from "@/lib/dashboard";
 import { ilYaCourt } from "@/lib/noms";
 
-/** Lignes par page : au départ, puis 10 de plus à chaque clic. */
-const PAGE = 10;
+/** Accueil : 10 dernières demandes, avec un lien vers la page complète. Page /demandes : 20, puis 20 de plus. */
+const PAGE_ACCUEIL = 10;
+const PAGE_COMPLETE = 20;
 
 type Filtre = "toutes" | "mes" | "pj";
 const FILTRES: { valeur: Filtre; libelle: string }[] = [
@@ -19,20 +21,22 @@ const FILTRES: { valeur: Filtre; libelle: string }[] = [
   { valeur: "pj", libelle: "Avec pièce jointe" },
 ];
 
-const CELLULE = "block px-sm py-xs align-top md:table-cell md:px-sm md:py-sm";
+const CELLULE = "block px-sm py-xs align-middle md:table-cell md:px-sm md:py-sm";
 /** Sur petit écran, chaque cellule affiche son nom de colonne avant la valeur. */
 const ETIQUETTE =
   "before:mb-xs before:block before:font-label-sm before:text-sm before:uppercase before:text-on-surface-variant before:content-[attr(data-label)] md:before:hidden";
 
 /**
- * « 10 dernières demandes du cabinet » : tous statuts, les plus récentes d'abord. Les règles d'accès (RLS)
- * décident de ce qui est visible : les demandes privées des autres équipes n'apparaissent pas.
+ * « 10 dernières demandes du cabinet » (accueil) ou tableau complet (page /demandes) : tous statuts, les plus
+ * récentes d'abord. Les règles d'accès (RLS) décident de ce qui est visible : les demandes privées des autres
+ * équipes n'apparaissent pas.
  */
 export function DemandesCabinet({
   email,
   role,
   managerTeams,
   onRead,
+  variante = "accueil",
 }: {
   /** Adresse de la personne connectée, pour le filtre « Mes demandes ». */
   email: string;
@@ -40,7 +44,10 @@ export function DemandesCabinet({
   /** Équipes gérées (manager) : elles donnent accès aux pièces jointes de ces équipes. */
   managerTeams: string[];
   onRead: (s: Submission) => void;
+  /** accueil : bloc de 10 lignes et lien « Voir toutes » ; page : 20 lignes et « Afficher 20 de plus ». */
+  variante?: "accueil" | "page";
 }) {
+  const PAGE = variante === "page" ? PAGE_COMPLETE : PAGE_ACCUEIL;
   /** Même règle que le stockage : admin, auteur, ou manager de l'équipe. */
   function peutLirePiece(s: Submission) {
     if (role === "admin") return true;
@@ -57,8 +64,6 @@ export function DemandesCabinet({
   const [equipe, setEquipe] = useState("");
   const [limite, setLimite] = useState(PAGE);
   const premiereAjoutee = useRef<HTMLTableRowElement>(null);
-  const sectionRef = useRef<HTMLElement>(null);
-  const titreRef = useRef<HTMLHeadingElement>(null);
 
   const toutes = useMemo(() => q.data ?? [], [q.data]);
   const equipes = useMemo(
@@ -75,10 +80,10 @@ export function DemandesCabinet({
   );
   const visibles = filtrees.slice(0, limite);
 
-  // Après « Voir toutes les demandes », le focus va sur la première ligne ajoutée
+  // Après « Afficher 20 de plus », le focus va sur la première ligne ajoutée
   useEffect(() => {
     if (limite > PAGE) premiereAjoutee.current?.focus();
-  }, [limite]);
+  }, [limite, PAGE]);
 
   function changerFiltre(f: Filtre) {
     setFiltre(f);
@@ -87,24 +92,24 @@ export function DemandesCabinet({
 
   return (
     <section
-      ref={sectionRef}
       aria-labelledby="titre-cabinet"
       className="min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest p-md"
     >
-      <div className="space-y-xs border-b border-outline-variant pb-sm">
-        <h2
-          ref={titreRef}
-          id="titre-cabinet"
-          tabIndex={-1}
-          className="font-headline-sm text-headline-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          10 dernières demandes du cabinet
+      {variante === "accueil" ? (
+        <div className="space-y-xs border-b border-outline-variant pb-sm">
+          <h2 id="titre-cabinet" className="font-headline-sm text-headline-sm text-primary">
+            10 dernières demandes du cabinet
+          </h2>
+          <p className="font-body-md text-on-surface-variant">
+            Les tiennes, celles de ton équipe et celles ouvertes à toute l'entreprise. Les demandes
+            privées des autres équipes restent entre leur auteur et leur manager.
+          </p>
+        </div>
+      ) : (
+        <h2 id="titre-cabinet" className="sr-only">
+          Demandes du cabinet
         </h2>
-        <p className="font-body-md text-on-surface-variant">
-          Les tiennes, celles de ton équipe et celles ouvertes à toute l'entreprise. Les demandes
-          privées des autres équipes restent entre leur auteur et leur manager.
-        </p>
-      </div>
+      )}
 
       <div className="mt-md flex flex-wrap items-center justify-between gap-sm">
         <div role="group" aria-label="Filtrer les demandes" className="flex flex-wrap gap-xs">
@@ -126,9 +131,14 @@ export function DemandesCabinet({
             </button>
           ))}
         </div>
-        <label className="flex min-h-11 items-center gap-xs font-label-sm text-sm text-on-surface">
+        <label
+          htmlFor="filtre-equipe-cabinet"
+          className="flex min-h-11 items-center gap-xs font-label-sm text-sm text-on-surface"
+        >
           <span>Équipe :</span>
           <select
+            id="filtre-equipe-cabinet"
+            name="equipe"
             value={equipe}
             onChange={(e) => {
               setEquipe(e.target.value);
@@ -170,20 +180,20 @@ export function DemandesCabinet({
               Dix dernières demandes du cabinet, de la plus récente à la plus ancienne
             </caption>
             <thead className="sr-only md:not-sr-only">
-              <tr className="border-b border-outline-variant font-label-sm text-sm text-on-surface-variant">
-                <th scope="col" className="px-sm py-xs font-semibold">
+              <tr className="border-b border-outline-variant bg-[#F5F4F1] font-label-sm text-sm text-on-surface-variant">
+                <th scope="col" className="px-sm py-xs font-semibold uppercase">
                   Catégorie
                 </th>
-                <th scope="col" className="px-sm py-xs font-semibold">
+                <th scope="col" className="px-sm py-xs font-semibold uppercase">
                   Auteur et demande
                 </th>
-                <th scope="col" className="px-sm py-xs font-semibold">
+                <th scope="col" className="px-sm py-xs font-semibold uppercase">
                   Statut
                 </th>
-                <th scope="col" className="px-sm py-xs font-semibold">
+                <th scope="col" className="px-sm py-xs font-semibold uppercase">
                   Visibilité
                 </th>
-                <th scope="col" className="px-sm py-xs font-semibold">
+                <th scope="col" className="px-sm py-xs font-semibold uppercase">
                   Date
                 </th>
               </tr>
@@ -207,32 +217,34 @@ export function DemandesCabinet({
                     <p className="font-body-sm font-bold text-primary wrap-anywhere">
                       {`${s.author_name} · ${s.team}`}
                     </p>
-                    {/* Texte tronqué sur une ligne, « Lire » sur la même ligne */}
-                    <div className="flex min-w-0 items-center gap-sm">
-                      <p
-                        className="min-w-0 flex-1 truncate font-body-sm text-on-surface"
-                        title={s.content}
-                      >
-                        {s.content}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => onRead(s)}
-                        aria-haspopup="dialog"
-                        aria-label={`Lire la demande de ${s.author_name}`}
-                        className="inline-flex min-h-11 shrink-0 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                      >
-                        <span className="underline underline-offset-2">Lire</span>
-                      </button>
+                    {/* Texte tronqué sur une ligne ; « Voir » juste après (après les « … » s'il y en a) */}
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-sm">
+                      <div className="flex min-w-0 max-w-full items-center gap-xs">
+                        <span
+                          className="min-w-0 truncate font-body-sm text-on-surface"
+                          title={s.content}
+                        >
+                          {s.content}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onRead(s)}
+                          aria-haspopup="dialog"
+                          aria-label={`Voir la demande de ${s.author_name}`}
+                          className="inline-flex min-h-11 shrink-0 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        >
+                          <span className="underline underline-offset-2">Voir</span>
+                        </button>
+                      </div>
+                      {s.attachment_path &&
+                        (peutLirePiece(s) ? (
+                          <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+                        ) : (
+                          <p className="font-label-sm text-sm text-on-surface-variant wrap-anywhere">
+                            {`${s.attachment_name ?? "Pièce jointe"} · réservée à l'équipe`}
+                          </p>
+                        ))}
                     </div>
-                    {s.attachment_path &&
-                      (peutLirePiece(s) ? (
-                        <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-                      ) : (
-                        <p className="mt-xs font-label-sm text-sm text-on-surface-variant wrap-anywhere">
-                          {`${s.attachment_name ?? "Pièce jointe"} · réservée à l'équipe`}
-                        </p>
-                      ))}
                   </td>
                   <td data-label="Statut" className={`${CELLULE} ${ETIQUETTE}`}>
                     <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
@@ -255,32 +267,26 @@ export function DemandesCabinet({
         </div>
       )}
 
-      {(filtrees.length > limite || limite > PAGE) && (
-        <div className="mt-md flex flex-wrap items-center gap-md">
-          {filtrees.length > limite && (
-            <button
-              type="button"
-              onClick={() => setLimite((l) => l + PAGE)}
-              className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              <span className="underline underline-offset-2">{`Voir toutes les demandes (${filtrees.length})`}</span>
-            </button>
-          )}
-          {limite > PAGE && (
-            <button
-              type="button"
-              onClick={() => {
-                setLimite(PAGE);
-                // Le focus revient au titre du bloc ; le bloc remonte à l'écran s'il est sorti vers le haut
-                titreRef.current?.focus({ preventScroll: true });
-                const haut = sectionRef.current?.getBoundingClientRect().top ?? 0;
-                if (haut < 0) sectionRef.current?.scrollIntoView({ block: "start" });
-              }}
-              className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              <span className="underline underline-offset-2">Revenir aux 10 dernières</span>
-            </button>
-          )}
+      {variante === "accueil" && filtrees.length > 0 && (
+        <div className="mt-md flex justify-center">
+          <Link
+            to={role === "admin" ? "/manage/submissions" : "/demandes"}
+            className="inline-flex min-h-11 items-center font-label-sm text-sm font-bold text-primary underline underline-offset-4 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            {`Voir toutes les demandes (${filtrees.length}) →`}
+          </Link>
+        </div>
+      )}
+
+      {variante === "page" && filtrees.length > limite && (
+        <div className="mt-md flex justify-center">
+          <button
+            type="button"
+            onClick={() => setLimite((l) => l + PAGE)}
+            className="inline-flex min-h-11 items-center font-label-sm text-sm font-bold text-primary underline underline-offset-4 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            {`Afficher ${Math.min(PAGE, filtrees.length - limite)} de plus`}
+          </button>
         </div>
       )}
     </section>

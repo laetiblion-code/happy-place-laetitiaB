@@ -368,140 +368,139 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
   }
 
   const bouton = buttonVariants({ variant: "secondary", size: "sm" }) + " min-h-11";
-  const colonne = "min-w-0 md:border-l md:border-outline-variant md:pl-md";
 
   // Texte lu par les lecteurs d'écran seulement : la chip J-N reste visible
   const texteUrgence =
     ligne.jours === 0 ? ", aujourd'hui" : `, dans ${plural(ligne.jours, "jour", "jours")}`;
 
+  // Trois zones sur une grille fixe : chaque ligne s'aligne sur les autres. Sur petit écran, elles s'empilent.
   return (
-    <li className="flex flex-col gap-sm py-sm md:flex-row md:items-start md:gap-md">
-      <div className="flex min-w-0 items-center gap-sm md:w-64 md:shrink-0">
+    <li className="grid grid-cols-1 items-center gap-sm py-sm md:grid-cols-[minmax(0,17rem)_minmax(0,15rem)_minmax(0,1fr)] md:gap-md">
+      {/* Gauche : initiales, nom, équipe et manager */}
+      <div className="flex min-w-0 items-center gap-sm">
         <span
           aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#EDEBE6] font-label-sm font-semibold text-primary"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F5D5D4] font-label-sm font-semibold text-[#28282D]"
         >
           {ligne.initiales}
         </span>
-        <p className="min-w-0 font-body-md text-on-surface wrap-anywhere">
-          <span className="font-bold">{ligne.nom}</span>
-          {ligne.equipe && <span>{` · ${ligne.equipe}`}</span>}
-        </p>
-      </div>
-
-      {ligne.managers !== null && (
-        <div className={`${colonne} overflow-hidden md:w-56 md:shrink-0`}>
-          {ligne.managers.length === 0 ? (
-            <p className={`flex items-start gap-xs font-label-sm text-sm font-semibold ${ROUGE}`}>
-              <Icon name="warning" className="text-base shrink-0" />
-              <span>Sans manager</span>
-            </p>
-          ) : (
-            <p
-              className="line-clamp-2 font-label-sm text-sm text-on-surface wrap-anywhere"
-              title={`Manager : ${ligne.managers.join(" et ")}`}
-            >
-              {`Manager : ${ligne.managers.join(" et ")}`}
-            </p>
-          )}
+        <div className="min-w-0">
+          <p className="font-body-md text-on-surface wrap-anywhere">
+            <span className="font-bold">{ligne.nom}</span>
+            {ligne.equipe && <span className="text-[#68686D]">{` · ${ligne.equipe}`}</span>}
+          </p>
+          {ligne.managers !== null &&
+            (ligne.managers.length === 0 ? (
+              <p className={`flex items-start gap-xs font-label-sm text-sm font-semibold ${ROUGE}`}>
+                <Icon name="warning" className="text-base shrink-0" />
+                <span>Sans manager</span>
+              </p>
+            ) : (
+              <p
+                className="font-label-sm text-sm text-[#68686D] wrap-anywhere"
+                title={`Manager : ${ligne.managers.join(" et ")}`}
+              >
+                {`Manager : ${ligne.managers.join(" et ")}`}
+              </p>
+            ))}
         </div>
-      )}
-
-      <div className={`${colonne} overflow-hidden md:w-72 md:shrink-0`}>
-        <p
-          className={`flex flex-wrap items-center gap-x-xs gap-y-xs font-label-sm text-sm ${urgent ? `font-semibold ${ROUGE}` : "text-on-surface"}`}
-        >
-          <Icon name="calendar_month" className="text-base shrink-0" />
-          <span className="whitespace-nowrap">{`Départ le ${FR_LONG.format(dateDepart(n.departure_date))}`}</span>
-          {urgent && <span className="sr-only">{texteUrgence}</span>}
-          <span
-            className={`shrink-0 rounded-full px-sm py-[2px] text-sm font-semibold ${urgent ? "bg-[#FFDAD6] text-[#A81E25]" : "bg-[#EDEBE6] text-[#28282D]"}`}
-          >
-            {passe ? "Passé" : ligne.jours === 0 ? "Aujourd'hui" : `J-${ligne.jours}`}
-          </span>
-        </p>
       </div>
 
-      <div className={`${colonne} min-w-0 flex-1 space-y-xs`}>
-        <div className="flex flex-wrap items-center justify-between gap-sm">
-          {count > 0 ? (
-            <p className={`flex items-center gap-xs font-label-sm text-sm font-semibold ${ROUGE}`}>
-              <Icon name="attach_file" className="text-base shrink-0" />
-              {plural(count, "document", "documents")}
-            </p>
-          ) : (
-            <p className="font-label-sm text-sm text-on-surface-variant">Aucun document requis</p>
-          )}
-          {count > 0 ? (
-            <div className="flex flex-wrap items-center gap-xs">
-              <button
-                type="button"
-                className={bouton}
-                onClick={zipAll}
-                disabled={zipping}
-                aria-label={`Télécharger les documents de ${ligne.nom} avant le ${limiteCourte}`}
-              >
-                {zipping ? "Préparation…" : `Télécharger avant le ${limiteCourte}`}
-              </button>
-              <button
-                type="button"
-                className={bouton}
-                onClick={() => setOpen((o) => !o)}
-                aria-expanded={open}
-                aria-label={`${open ? "Masquer" : "Voir"} les documents de ${ligne.nom}`}
-              >
-                {open ? "Masquer les documents" : "Voir les documents"}
-              </button>
-              <button
-                type="button"
-                className={bouton}
-                onClick={() => mark.mutate()}
-                disabled={mark.isPending}
-                aria-label={`J'ai téléchargé les documents de ${ligne.nom}`}
-              >
-                J'ai téléchargé les documents
-              </button>
-            </div>
-          ) : (
+      {/* Milieu : date de départ et délai, colonne fixe */}
+      <p
+        className={`flex flex-wrap items-center gap-x-xs gap-y-xs font-label-sm text-sm ${urgent ? `font-semibold ${ROUGE}` : "text-on-surface"}`}
+      >
+        <Icon name="calendar_month" className="text-base shrink-0" />
+        <span className="whitespace-nowrap">{`Départ le ${FR_LONG.format(dateDepart(n.departure_date))}`}</span>
+        {urgent && <span className="sr-only">{texteUrgence}</span>}
+        <span
+          className={`shrink-0 rounded-full px-sm py-[2px] text-sm font-semibold ${urgent ? "bg-[#FFDAD6] text-[#A81E25]" : "bg-[#EDEBE6] text-[#28282D]"}`}
+        >
+          {passe ? "Passé" : ligne.jours === 0 ? "Aujourd'hui" : `J-${ligne.jours}`}
+        </span>
+      </p>
+
+      {/* Droite : état des documents, puis le bouton, alignés à droite */}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-xs md:justify-end">
+        {count > 0 ? (
+          <p className={`flex items-center gap-xs font-label-sm text-sm font-semibold ${ROUGE}`}>
+            <Icon name="attach_file" className="text-base shrink-0" />
+            {plural(count, "document", "documents")}
+          </p>
+        ) : (
+          <p className="font-label-sm text-sm text-on-surface-variant">Aucun document requis</p>
+        )}
+        {count > 0 ? (
+          <div className="flex flex-wrap items-center justify-end gap-xs">
+            <button
+              type="button"
+              className={bouton}
+              onClick={zipAll}
+              disabled={zipping}
+              aria-label={`Télécharger les documents de ${ligne.nom} avant le ${limiteCourte}`}
+            >
+              {zipping ? "Préparation…" : `Télécharger avant le ${limiteCourte}`}
+            </button>
+            <button
+              type="button"
+              className={bouton}
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
+              aria-label={`${open ? "Masquer" : "Voir"} les documents de ${ligne.nom}`}
+            >
+              {open ? "Masquer les documents" : "Voir les documents"}
+            </button>
             <button
               type="button"
               className={bouton}
               onClick={() => mark.mutate()}
               disabled={mark.isPending}
-              aria-label={`J'ai pris note du départ de ${ligne.nom}`}
+              aria-label={`J'ai téléchargé les documents de ${ligne.nom}`}
             >
-              J'ai pris note
+              J'ai téléchargé les documents
             </button>
-          )}
-        </div>
-        {open && (
-          <ul className="space-y-xs border-t border-outline-variant pt-xs">
-            {n.documents.map((d) => (
-              <li
-                key={d.path}
-                className="flex flex-wrap items-center justify-between gap-xs text-body-sm"
-              >
-                <span>
-                  <span className="font-bold">{FR_LONG.format(new Date(d.created_at))}</span> ·{" "}
-                  {d.excerpt}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Télécharger le document du ${FR_COURT.format(new Date(d.created_at))} de ${ligne.nom}`}
-                  className="min-h-11 text-primary underline font-label-sm text-sm"
-                  onClick={() =>
-                    downloadAttachment(d.path, d.name).catch((e) =>
-                      toast.error((e as Error).message),
-                    )
-                  }
-                >
-                  Télécharger
-                </button>
-              </li>
-            ))}
-          </ul>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={bouton}
+            onClick={() => mark.mutate()}
+            disabled={mark.isPending}
+            aria-label={`J'ai pris note du départ de ${ligne.nom}`}
+          >
+            <Icon name="check" className="text-base" />
+            J'ai pris note
+          </button>
         )}
       </div>
+
+      {open && (
+        <ul className="space-y-xs border-t border-outline-variant pt-xs md:col-span-3">
+          {n.documents.map((d) => (
+            <li
+              key={d.path}
+              className="flex flex-wrap items-center justify-between gap-xs text-body-sm"
+            >
+              <span>
+                <span className="font-bold">{FR_LONG.format(new Date(d.created_at))}</span> ·{" "}
+                {d.excerpt}
+              </span>
+              <button
+                type="button"
+                aria-label={`Télécharger le document du ${FR_COURT.format(new Date(d.created_at))} de ${ligne.nom}`}
+                className="min-h-11 text-primary underline font-label-sm text-sm"
+                onClick={() =>
+                  downloadAttachment(d.path, d.name).catch((e) =>
+                    toast.error((e as Error).message),
+                  )
+                }
+              >
+                Télécharger
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </li>
   );
 }

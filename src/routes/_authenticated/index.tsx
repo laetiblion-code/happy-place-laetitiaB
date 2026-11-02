@@ -11,7 +11,7 @@ import { SubmissionReader } from "@/components/submission-reader";
 import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS } from "@/components/submission-choices";
 import { ManagerCards } from "@/components/home-counters";
 import { fetchAlertCounts, fetchDelaiValidation, fetchDraftCounts, fetchMyCounts, fetchPublicationActus, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
-import { BlockerArchive } from "@/components/dashboard-extras";
+import { AlertsKanban } from "@/components/alerts-kanban";
 import { buttonVariants } from "@/components/ui/button";
 import { DepartureNotices } from "@/components/departure-notices";
 import { ActualitesCabinet } from "@/components/actualites-cabinet";
@@ -19,10 +19,8 @@ import { DemandesATraiter } from "@/components/demandes-a-traiter";
 import { MesDemandes } from "@/components/mes-demandes";
 import { DemandesCabinet } from "@/components/cabinet-demandes";
 import { useExportMesDemandes } from "@/hooks/use-export-mes-demandes";
-import { ALERT_STATES, alertStatusOptions } from "@/lib/alert-states";
 import { CLARIFY_CATEGORY } from "@/components/status-badge";
 import {
-  fetchBlockers,
   fetchDashboardMetrics,
   fetchLastStatusChanges,
   fetchMySubmissions,
@@ -30,8 +28,6 @@ import {
   type Submission,
   reviewSubmission,
   submitIdea,
-  timeAgo,
-  updateBlockerStatus,
   type SubmissionInput,
 } from "@/lib/dashboard";
 import { supabase } from "@/integrations/supabase/client";
@@ -119,7 +115,6 @@ function ManagerSpace() {
   // Refus ou demande de clarification : la clarification préremplit le motif « à clarifier »
   const [modeRefus, setModeRefus] = useState<"refus" | "clarification">("refus");
   const [reading, setReading] = useState<Submission | null>(null);
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [rejectForm, setRejectForm] = useState({ rejection_category: "", rejection_note: "" });
   const [rejectErrors, setRejectErrors] = useState<FieldErrors>({});
   const exporter = useExportMesDemandes(email ?? "");
@@ -154,7 +149,6 @@ function ManagerSpace() {
       queryFn: () => fetchLastStatusChanges(mineIds),
       retry: false,
     }).data ?? SANS_CHANGEMENT;
-  const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
   const dashMetrics = useQuery({ queryKey: ["metrics", "dashboard"], queryFn: fetchDashboardMetrics, retry: false });
   // Compteurs de l'accueil : invalidés par toutes les mutations qui changent un statut, un brouillon ou une alerte
   const homeReview = useQuery({
@@ -194,7 +188,6 @@ function ManagerSpace() {
     queryFn: fetchPublicationActus,
     retry: false,
   });
-  const onError = (e: unknown) => toast.error((e as Error).message);
 
   const review = useMutation({
     mutationFn: reviewSubmission,
@@ -240,15 +233,6 @@ function ManagerSpace() {
       qc.invalidateQueries({ queryKey: ["home-counts"] });
     },
     onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
-  });
-
-  const setBlocker = useMutation({
-    mutationFn: updateBlockerStatus,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["blockers"] });
-      qc.invalidateQueries({ queryKey: ["home-counts"] });
-    },
-    onError,
   });
 
   const roleIntro =
@@ -377,94 +361,8 @@ function ManagerSpace() {
           onRead={setReading}
         />
 
-          {/* Alertes opérationnelles */}
-          <section id="alertes" className="scroll-mt-4 rounded-lg bg-surface-container-lowest border border-outline-variant p-md">
-            <div className="flex items-center justify-between mb-md">
-              <div className="flex items-center gap-sm">
-                <h2 className="font-headline-sm text-headline-sm text-primary">Alertes opérationnelles</h2>
-                <span className="inline-flex items-center gap-xs rounded-full bg-error-container px-sm py-[2px] font-label-sm text-sm text-on-error-container">
-                  <Icon name="priority_high" className="text-base" />
-                  Priorité haute
-                </span>
-              </div>
-              <button
-                type="button"
-                aria-haspopup="dialog"
-                onClick={() => setArchiveOpen(true)}
-                className="text-primary font-label-sm text-sm underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                 Voir l'archive
-              </button>
-            </div>
-            <div className="space-y-sm">
-              {blockers.isError && (
-                <p className="text-body-sm text-error">
-                  Les alertes sont indisponibles.
-                </p>
-              )}
-              {blockers.data?.length === 0 && (
-                <p className="text-body-sm text-on-surface-variant italic">
-                  Aucun point bloquant en cours.
-                </p>
-              )}
-              {blockers.data?.map((b) => {
-                const critical = b.severity === "critical";
-                return (
-                  <div
-                    key={b.id}
-                    className={`${critical ? "accent-bar " : ""}rounded-md bg-card border border-outline-variant p-sm flex items-start justify-between`}
-                  >
-                    <div className="flex gap-md">
-                      <Icon
-                        name={critical ? "error" : "warning"}
-                        className={
-                          critical
-                            ? "text-error mt-1 [font-variation-settings:'FILL'_1]"
-                            : "text-secondary mt-1"
-                        }
-                      />
-                      <div>
-                        <p className="font-body-md text-primary font-bold">{b.title}</p>
-                        <p className="text-body-sm text-on-surface-variant">{b.description}</p>
-                        <div className="flex items-center gap-sm mt-xs">
-                          <span className="font-label-sm text-sm bg-surface-container-highest px-xs py-0.5">
-                            {b.department}
-                          </span>
-                          <span className="font-label-sm text-sm text-on-surface-variant">
-                            Mis à jour {timeAgo(b.updated_at)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    {(() => {
-                      const state = ALERT_STATES[b.status as keyof typeof ALERT_STATES];
-                      return (
-                        <span className={`inline-flex shrink-0 items-center gap-xs rounded-full px-sm py-[2px] font-label-sm text-sm font-semibold ${state?.className ?? "bg-surface-container-highest text-on-surface"}`}>
-                          <Icon name={state?.icon ?? "help"} className="text-base" />
-                          {isAdmin ? (
-                            <select
-                              aria-label={`Statut de ${b.title}`}
-                              value={b.status}
-                              onChange={(e) => setBlocker.mutate({ id: b.id, status: e.target.value })}
-                              className="cursor-pointer bg-transparent font-label-sm text-sm font-semibold text-[inherit] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                            >
-                              {alertStatusOptions(b.status).map((value) => (
-                                <option key={value} value={value}>
-                                  {ALERT_STATES[value].label}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span>{state?.label ?? b.status}</span>
-                          )}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+          {/* Alertes opérationnelles en quatre colonnes (tous les rôles) */}
+          <AlertsKanban isAdmin={isAdmin} />
 
           {/* Performance Hub */}
           <section aria-labelledby="titre-indicateurs" className="rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
@@ -497,7 +395,6 @@ function ManagerSpace() {
             )}
           </section>
       </main>
-      <BlockerArchive open={archiveOpen} onClose={() => setArchiveOpen(false)} />
       <SubmissionReader
         submission={reading}
         onClose={() => setReading(null)}
@@ -525,7 +422,7 @@ function ManagerSpace() {
             <p className="max-h-48 overflow-y-auto border border-outline-variant bg-surface-container-low p-xs text-body-sm italic text-on-surface-variant whitespace-pre-line wrap-anywhere">“{rejecting.content}”</p>
             <ErrorSummary errors={rejectErrors} />
             <Field label="Motif du refus" error={rejectErrors.rejection_category}>
-              <select
+              <select name="motif-refus"
                 className="w-full border border-outline-variant bg-card p-xs text-body-sm"
                 value={rejectForm.rejection_category}
                 onChange={(e) => setRejectForm({ ...rejectForm, rejection_category: e.target.value })}
@@ -578,7 +475,7 @@ function ManagerSpace() {
             )}
             {role === "manager" && (
               <Field label="Équipe" error={submissionErrors.team}>
-                <select
+                <select name="equipe-demande"
                   required
                   value={submissionForm.team}
                   onChange={(e) => setSubmissionForm({ ...submissionForm, team: e.target.value })}

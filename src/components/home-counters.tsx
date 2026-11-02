@@ -70,7 +70,7 @@ function StatCard({
       className="flex flex-col gap-sm rounded-lg border border-[#CDCDD1] bg-white p-md"
     >
       <div className="flex items-start justify-between gap-sm">
-        <h2 className="font-label-md text-base font-semibold text-primary">{title}</h2>
+        <h2 className="font-label-md text-[16px] font-semibold normal-case leading-snug tracking-normal text-primary">{title}</h2>
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#F5D5D4] text-primary">
           <Icon name={icon} />
         </span>

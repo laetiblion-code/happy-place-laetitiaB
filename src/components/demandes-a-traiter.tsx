@@ -96,20 +96,21 @@ export function DemandesATraiter({
                   <span className="inline-flex min-h-7 items-center gap-xs rounded-full bg-[#F0D0BC] px-sm py-xs font-label-sm text-sm text-[#28282D]">
                     <Icon name="hourglass_empty" className="text-base" />
                     <span>
-                      En attente chez toi depuis <DureeCourte iso={depuis} />
+                      Attend chez toi depuis <DureeCourte iso={depuis} />
                     </span>
                   </span>
                   <VisibilityChip visibility={s.visibility} />
                 </div>
               </div>
 
-              <div className="space-y-sm rounded-md border border-[#E4E2DD] bg-[#FAF9F7] p-sm">
+              <div className="flex flex-col gap-sm rounded-md border border-[#E4E2DD] bg-[#FAF9F7] p-sm">
                 <CategoryChip category={s.category} />
                 <p className="line-clamp-4 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
                   {`« ${s.content} »`}
                 </p>
-                {/* Voir tout : toujours en bas à droite de l'encadré, avec ou sans pièce jointe */}
-                <div className="flex flex-wrap items-center gap-sm">
+                {/* Voir tout : à droite, juste sous le texte. La zone de 44 px dépasse en bas de l'encadré
+                    (-mb-3) pour que la marge sous « Voir tout » soit la même que la marge au-dessus de la chip. */}
+                <div className="-mt-4 -mb-3 flex flex-wrap items-center gap-sm">
                   <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
                   <button
                     type="button"

@@ -528,6 +528,10 @@ export type Database = {
         Args: { _emails: string[] }
         Returns: { email: string; nom: string }[]
       }
+      managers_de_mon_equipe: {
+        Args: never
+        Returns: { team: string; prenom: string; nom: string }[]
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "collaborateur"

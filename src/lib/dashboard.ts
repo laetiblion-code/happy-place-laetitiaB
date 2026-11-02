@@ -51,6 +51,7 @@ export type Blocker = {
   department: string;
   severity: string;
   status: string;
+  created_at: string;
   updated_at: string;
 };
 
@@ -339,6 +340,15 @@ export async function fetchBlockers(): Promise<Blocker[]> {
     .order("updated_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Blocker[];
+}
+
+/** Managers de l'équipe de la personne connectée (prénom et nom seulement, sans e-mail). */
+export type ManagerEquipe = { team: string; prenom: string; nom: string };
+
+export async function fetchManagersMonEquipe(): Promise<ManagerEquipe[]> {
+  const { data, error } = await db.rpc("managers_de_mon_equipe");
+  if (error) throw error;
+  return (data ?? []) as ManagerEquipe[];
 }
 
 export async function fetchResolvedBlockers(): Promise<Blocker[]> {
