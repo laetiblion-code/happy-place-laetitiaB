@@ -618,9 +618,9 @@ function ManagerSpace() {
                   </p>
                 )}
                 {published.slice(0, 4).map((n) => (
+                  <div key={n.id} className="space-y-xs">
                   <button
                     type="button"
-                    key={n.id}
                     onClick={() => setReadingNews(n)}
                     aria-haspopup="dialog"
                     className="w-full rounded-md text-left p-sm bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer group min-w-0 overflow-hidden space-y-xs focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -638,8 +638,9 @@ function ManagerSpace() {
                     </div>
                     {isAdmin && <Icon name="edit" className="text-on-surface-variant" />}
                     </div>
-                    <NewsLinks links={n.links} />
                   </button>
+                  <NewsLinks links={n.links} />
+                  </div>
                 ))}
               </div>
               {published.length > 0 && (
@@ -742,7 +743,10 @@ function ManagerSpace() {
                     <div className="mt-xs flex flex-wrap items-center gap-xs text-body-sm text-[#68686D]">
                       <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
                       <span>{s.team} · </span>
-                      <DelaiStatut status={s.status} depuis={mineChanges.get(s.id)?.changed_at ?? s.created_at} />
+                      <DelaiStatut
+                        status={s.status === "refusée" && s.rejection_category === "à clarifier" ? "clarification" : s.status}
+                        depuis={mineChanges.get(s.id)?.changed_at ?? s.created_at}
+                      />
                     </div>
                     <SubmissionHistory submissionId={s.id} />
                     {s.status === "refusée" && s.rejection_category && (
@@ -856,7 +860,6 @@ function ManagerSpace() {
           <section className="col-span-12 md:col-span-5 rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
             <div className="flex items-center justify-between mb-md">
               <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs clés</h2>
-              {isAdmin && <Icon name="settings" className="text-on-surface-variant cursor-pointer" />}
             </div>
             {dashMetrics.isError && (
               <p className="text-body-sm text-error mb-md">Les indicateurs sont indisponibles.</p>
