@@ -125,7 +125,7 @@ function PiedDelai({
     return (
       <PiedObjectif>
         <p className="font-label-sm text-sm text-on-surface-variant">
-          Pas encore de demande traitée ce mois-ci
+          Pas encore de demande traitée sur 30 jours
         </p>
       </PiedObjectif>
     );
@@ -133,7 +133,9 @@ function PiedDelai({
   const { delaiValidationJours } = OBJECTIFS_TRIMESTRE;
   const jours = formatNumberFr(delai.jours, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const unite = noun(delai.jours, "jour", "jours");
-  const libelle = isAdmin ? "Délai de validation du cabinet" : "Délai de validation de tes équipes";
+  const libelle = isAdmin
+    ? "Délai de validation du cabinet sur 30 jours"
+    : "Délai de validation de tes équipes sur 30 jours";
   const etat = etatObjectif(delai.jours, delaiValidationJours, "plusBas");
   const objectif = `de moins de ${plural(delaiValidationJours, "jour", "jours")}`;
   return (
@@ -144,14 +146,14 @@ function PiedDelai({
   );
 }
 
-/** Taux de publication des actualités créées ce mois-ci (admin seulement). */
+/** Taux de publication des actualités créées dans les 30 derniers jours (admin seulement). */
 function PiedActus({ actus }: { actus: PublicationActus | undefined }) {
   if (!actus) return null;
   if (actus.commencees === 0) {
     return (
       <PiedObjectif>
         <p className="font-label-sm text-sm text-on-surface-variant">
-          Aucune actualité commencée ce mois-ci
+          Aucune actualité commencée en 30 jours
         </p>
       </PiedObjectif>
     );
@@ -161,7 +163,7 @@ function PiedActus({ actus }: { actus: PublicationActus | undefined }) {
   return (
     <PiedObjectif>
       <p className="font-label-sm text-sm text-on-surface">
-        {`${plural(actus.publiees, "actu publiée", "actus publiées")} sur ${formatNumberFr(actus.commencees)} commencée${actus.commencees > 1 ? "s" : ""} ce mois-ci, soit ${formatObjectif(pourcentage, "%")}`}
+        {`${plural(actus.publiees, "actu publiée", "actus publiées")} sur ${formatNumberFr(actus.commencees)} commencée${actus.commencees > 1 ? "s" : ""} en 30 jours, soit ${formatObjectif(pourcentage, "%")}`}
       </p>
       <LigneEtat
         etat={etat}
