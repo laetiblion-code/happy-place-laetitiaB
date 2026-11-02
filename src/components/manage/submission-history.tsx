@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { CLARIFY_CATEGORY } from "@/components/status-badge";
 import { fetchSubmissionHistory, libelleChangement } from "@/lib/dashboard";
 import { nomAffiche, useNomsAffiches } from "@/lib/noms";
 
@@ -46,7 +47,7 @@ export function SubmissionHistory({ submissionId }: { submissionId: string }) {
                   {auteur}
                 </p>
                 {h.new_status === "refusée" && h.rejection_category && (
-                  <p className="text-error">
+                  <p className={h.rejection_category === CLARIFY_CATEGORY ? "text-on-surface" : "text-error"}>
                     Motif : {h.rejection_category}
                     {h.rejection_note ? ` : ${h.rejection_note}` : ""}
                   </p>

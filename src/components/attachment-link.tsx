@@ -32,11 +32,11 @@ export function AttachmentLink({ path, name }: { path?: string | null; name?: st
           e.preventDefault();
           void openAttachment(path);
         }}
-        className="inline-flex min-h-11 min-w-0 items-center gap-xs text-[#7E5353] underline font-label-sm text-label-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        className="inline-flex min-h-11 min-w-0 items-center gap-xs text-[#7E5353] font-label-sm text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         title={`Ouvrir ${label} dans un nouvel onglet`}
       >
         <span aria-hidden="true" className="material-symbols-outlined text-sm">picture_as_pdf</span>
-        <span className="truncate">{label}</span>
+        <span className="min-w-0 truncate underline underline-offset-2">{label}</span>
       </a>
       <button
         type="button"

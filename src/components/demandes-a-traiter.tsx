@@ -57,7 +57,7 @@ export function DemandesATraiter({
           </p>
         </div>
         {pending > 0 && (
-          <span className="rounded-full bg-tertiary-fixed px-sm py-[2px] font-label-sm text-label-sm tabular-nums text-on-tertiary-fixed">
+          <span className="rounded-full bg-tertiary-fixed px-sm py-[2px] font-label-sm text-sm tabular-nums text-on-tertiary-fixed">
             {`${pending} à valider`}
           </span>
         )}
@@ -105,16 +105,17 @@ export function DemandesATraiter({
                 <p className="line-clamp-4 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
                   {`« ${s.content} »`}
                 </p>
-                <div className="flex flex-wrap items-center justify-between gap-sm">
+                {/* Lire en entier : toujours en bas à droite de l'encadré, avec ou sans pièce jointe */}
+                <div className="flex flex-wrap items-center gap-sm">
                   <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
                   <button
                     type="button"
                     onClick={() => onRead(s)}
                     aria-haspopup="dialog"
                     aria-label={`Lire en entier la demande de ${s.author_name}`}
-                    className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline underline-offset-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    className="ml-auto inline-flex min-h-11 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
-                    Lire en entier
+                    <span className="underline underline-offset-2">Lire en entier</span>
                   </button>
                 </div>
               </div>

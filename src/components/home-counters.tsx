@@ -58,7 +58,7 @@ function StatCard({
       className="flex flex-col gap-sm rounded-lg border border-[#CDCDD1] bg-white p-md"
     >
       <div className="flex items-start justify-between gap-sm">
-        <h2 className="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant">
+        <h2 className="font-label-md text-base font-semibold text-primary">
           {title}
         </h2>
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#F5D5D4] text-primary">
@@ -132,7 +132,8 @@ function PiedDelai({
   }
   const { delaiValidationJours } = OBJECTIFS_TRIMESTRE;
   const jours = formatNumberFr(delai.jours, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const unite = noun(delai.jours, "jour", "jours");
+  // Accord : moins de 2 jours au singulier (« 1,4 jour »), à partir de 2 au pluriel (« 2 jours »)
+  const unite = delai.jours < 2 ? "jour" : "jours";
   const libelle = isAdmin
     ? "Délai de validation du cabinet sur 30 jours"
     : "Délai de validation de tes équipes sur 30 jours";

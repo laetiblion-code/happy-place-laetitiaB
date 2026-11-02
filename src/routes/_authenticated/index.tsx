@@ -370,14 +370,19 @@ function ManagerSpace() {
         )}
 
         {/* 4. 10 dernières demandes du cabinet (tous les rôles) */}
-        <DemandesCabinet email={myEmail} onRead={setReading} />
+        <DemandesCabinet
+          email={myEmail}
+          role={roleAffiche}
+          managerTeams={myTeams.data ?? []}
+          onRead={setReading}
+        />
 
           {/* Alertes opérationnelles */}
           <section id="alertes" className="scroll-mt-4 rounded-lg bg-surface-container-lowest border border-outline-variant p-md">
             <div className="flex items-center justify-between mb-md">
               <div className="flex items-center gap-sm">
                 <h2 className="font-headline-sm text-headline-sm text-primary">Alertes opérationnelles</h2>
-                <span className="inline-flex items-center gap-xs rounded-full bg-error-container px-sm py-[2px] font-label-sm text-label-sm text-on-error-container">
+                <span className="inline-flex items-center gap-xs rounded-full bg-error-container px-sm py-[2px] font-label-sm text-sm text-on-error-container">
                   <Icon name="priority_high" className="text-base" />
                   Priorité haute
                 </span>
@@ -386,7 +391,7 @@ function ManagerSpace() {
                 type="button"
                 aria-haspopup="dialog"
                 onClick={() => setArchiveOpen(true)}
-                className="text-primary font-label-sm text-label-sm underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="text-primary font-label-sm text-sm underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                  Voir l'archive
               </button>
@@ -422,10 +427,10 @@ function ManagerSpace() {
                         <p className="font-body-md text-primary font-bold">{b.title}</p>
                         <p className="text-body-sm text-on-surface-variant">{b.description}</p>
                         <div className="flex items-center gap-sm mt-xs">
-                          <span className="text-[11px] font-label-sm bg-surface-container-highest px-xs py-0.5">
+                          <span className="font-label-sm text-sm bg-surface-container-highest px-xs py-0.5">
                             {b.department}
                           </span>
-                          <span className="text-[11px] font-label-sm text-on-surface-variant">
+                          <span className="font-label-sm text-sm text-on-surface-variant">
                             Mis à jour {timeAgo(b.updated_at)}
                           </span>
                         </div>
@@ -434,14 +439,14 @@ function ManagerSpace() {
                     {(() => {
                       const state = ALERT_STATES[b.status as keyof typeof ALERT_STATES];
                       return (
-                        <span className={`inline-flex shrink-0 items-center gap-xs rounded-full px-sm py-[2px] font-label-sm text-label-sm font-semibold ${state?.className ?? "bg-surface-container-highest text-on-surface"}`}>
+                        <span className={`inline-flex shrink-0 items-center gap-xs rounded-full px-sm py-[2px] font-label-sm text-sm font-semibold ${state?.className ?? "bg-surface-container-highest text-on-surface"}`}>
                           <Icon name={state?.icon ?? "help"} className="text-base" />
                           {isAdmin ? (
                             <select
                               aria-label={`Statut de ${b.title}`}
                               value={b.status}
                               onChange={(e) => setBlocker.mutate({ id: b.id, status: e.target.value })}
-                              className="cursor-pointer bg-transparent font-label-sm text-label-sm font-semibold text-[inherit] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                              className="cursor-pointer bg-transparent font-label-sm text-sm font-semibold text-[inherit] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                             >
                               {alertStatusOptions(b.status).map((value) => (
                                 <option key={value} value={value}>
@@ -481,9 +486,14 @@ function ManagerSpace() {
               ))}
             </div>
             {isAdmin && (
-              <Link to="/manage/metrics" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-                Gérer les indicateurs
-              </Link>
+              <div className="flex justify-end">
+                <Link
+                  to="/manage/metrics"
+                  className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline underline-offset-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  Gérer les indicateurs
+                </Link>
+              </div>
             )}
           </section>
       </main>

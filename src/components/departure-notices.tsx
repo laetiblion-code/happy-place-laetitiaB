@@ -60,9 +60,13 @@ function dateLimite(n: DepartureNotice) {
   return new Date(new Date(n.created_at).getTime() + 7 * 86_400_000);
 }
 
-/** Prénom seul : premier mot du nom affiché, ou l'adresse si aucun nom n'existe. */
-function prenom(nom: string) {
-  return nom.includes("@") ? nom : (nom.split(/\s+/)[0] ?? nom);
+/** Prénom et nom lus dans l'annuaire admin ; l'adresse seulement si aucun nom n'est renseigné. */
+function nomDeAnnuaire(u: { email: string; first_name: string | null; last_name: string | null }) {
+  const nom = [u.first_name, u.last_name]
+    .map((p) => p?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ");
+  return nom || u.email;
 }
 
 type LigneDepart = {
@@ -88,7 +92,6 @@ function lignesDepart(
   moi: { email: string; equipesGerees: string[] },
   annuaire: AdminDirectory | undefined,
 ): LigneDepart[] {
-  const monPrenom = prenom(nomAffiche(moi.email, noms));
   return notices.map((n) => {
     const nom = nomAffiche(n.departing_label, noms);
     let equipe: string | null = null;
@@ -102,11 +105,12 @@ function lignesDepart(
         const cle = teamKey(equipe);
         managers = annuaire.users
           .filter((u) => u.role === "manager" && u.managedTeams.some((t) => teamKey(t) === cle))
-          .map((u) => prenom(nomAffiche(u.email, noms)));
+          .map((u) => nomDeAnnuaire(u));
       }
     } else if (role === "manager") {
+      // Le manager ne voit que ses propres rattachements : une seule équipe gérée donne l'équipe.
+      // Son propre nom n'est pas répété : la colonne Manager n'est pas affichée pour lui.
       equipe = moi.equipesGerees.length === 1 ? (moi.equipesGerees[0] ?? null) : null;
-      managers = [monPrenom];
     }
     return {
       notice: n,
@@ -239,30 +243,10 @@ function BlocAdmin({
           </p>
         )}
         {gaps && gaps.teamsWithoutManager.length > 0 && (
-          <ul className="space-y-xs">
-            {gaps.teamsWithoutManager.map((t) => {
-              const attente = demandesEnAttente.filter(
-                (s) => teamKey(s.team) === teamKey(t.name),
-              ).length;
-              return (
-                <li
-                  key={t.name}
-                  className="flex flex-wrap items-center justify-between gap-sm rounded-md bg-[#F0D0BC] p-sm text-[#28282D]"
-                >
-                  <div className="min-w-0">
-                    <p className="font-body-md font-bold wrap-anywhere">{t.name}</p>
-                    <p className="font-label-sm text-sm">
-                      {`${plural(t.personnes, "personne", "personnes")} · ${plural(attente, "demande en attente à modérer", "demandes en attente à modérer")}`}
-                    </p>
-                  </div>
-                  <p className="flex items-start gap-xs font-label-sm text-sm font-semibold">
-                    <Icon name="warning" className="text-base shrink-0" />
-                    <span>Leurs demandes privées arrivent chez toi</span>
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
+          <EquipesSansManager
+            equipes={gaps.teamsWithoutManager}
+            demandesEnAttente={demandesEnAttente}
+          />
         )}
       </section>
 
@@ -282,6 +266,66 @@ function BlocAdmin({
         Gérer les utilisateurs et équipes
       </Link>
     </section>
+  );
+}
+
+/**
+ * Équipes sans manager : une ligne de synthèse, puis une liste compacte. Fond sable seulement pour les
+ * équipes qui ont des demandes en attente ; les équipes sans membre sont regroupées sur une ligne.
+ */
+function EquipesSansManager({
+  equipes,
+  demandesEnAttente,
+}: {
+  equipes: { name: string; personnes: number }[];
+  demandesEnAttente: Submission[];
+}) {
+  const n = equipes.length;
+  const avecMembres = equipes.filter((t) => t.personnes > 0);
+  const sansMembre = equipes.filter((t) => t.personnes === 0);
+  return (
+    <div className="space-y-xs">
+      <p className="flex items-start gap-xs font-body-sm text-sm font-semibold text-on-surface">
+        <Icon name="warning" className="text-base shrink-0" />
+        <span>
+          {`${plural(n, "équipe sans manager", "équipes sans manager")} : ${
+            n > 1 ? "leurs demandes privées arrivent" : "ses demandes privées arrivent"
+          } chez toi`}
+        </span>
+      </p>
+      {avecMembres.length > 0 && (
+        <ul className="divide-y divide-outline-variant rounded-md border border-outline-variant bg-white">
+          {avecMembres.map((t) => {
+            const attente = demandesEnAttente.filter(
+              (s) => teamKey(s.team) === teamKey(t.name),
+            ).length;
+            return (
+              <li
+                key={t.name}
+                className={`flex flex-wrap items-center justify-between gap-x-sm gap-y-xs px-sm py-xs font-label-sm text-sm text-on-surface ${attente > 0 ? "bg-[#F0D0BC]" : ""}`}
+              >
+                <span className="min-w-0 font-semibold wrap-anywhere">{t.name}</span>
+                <span className="flex flex-wrap gap-x-sm">
+                  <span>{plural(t.personnes, "personne", "personnes")}</span>
+                  <span>
+                    {plural(
+                      attente,
+                      "demande en attente à modérer",
+                      "demandes en attente à modérer",
+                    )}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {sansMembre.length > 0 && (
+        <p className="rounded-md bg-surface-container px-sm py-xs font-label-sm text-sm text-on-surface-variant wrap-anywhere">
+          {`Sans membre : ${sansMembre.map((t) => t.name).join(", ")}`}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -345,26 +389,33 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
         </p>
       </div>
 
-      <div className={`${colonne} md:w-56 md:shrink-0`}>
-        {ligne.managers && ligne.managers.length === 0 ? (
-          <p className={`flex items-start gap-xs font-label-sm text-sm font-semibold ${ROUGE}`}>
-            <Icon name="warning" className="text-base shrink-0" />
-            <span>Sans manager</span>
-          </p>
-        ) : ligne.managers ? (
-          <p className="font-label-sm text-sm text-on-surface">{`Manager : ${ligne.managers.join(" et ")}`}</p>
-        ) : null}
-      </div>
+      {ligne.managers !== null && (
+        <div className={`${colonne} overflow-hidden md:w-56 md:shrink-0`}>
+          {ligne.managers.length === 0 ? (
+            <p className={`flex items-start gap-xs font-label-sm text-sm font-semibold ${ROUGE}`}>
+              <Icon name="warning" className="text-base shrink-0" />
+              <span>Sans manager</span>
+            </p>
+          ) : (
+            <p
+              className="line-clamp-2 font-label-sm text-sm text-on-surface wrap-anywhere"
+              title={`Manager : ${ligne.managers.join(" et ")}`}
+            >
+              {`Manager : ${ligne.managers.join(" et ")}`}
+            </p>
+          )}
+        </div>
+      )}
 
-      <div className={`${colonne} md:w-56 md:shrink-0`}>
+      <div className={`${colonne} overflow-hidden md:w-72 md:shrink-0`}>
         <p
-          className={`flex flex-wrap items-center gap-xs font-label-sm text-sm ${urgent ? `font-semibold ${ROUGE}` : "text-on-surface"}`}
+          className={`flex flex-wrap items-center gap-x-xs gap-y-xs font-label-sm text-sm ${urgent ? `font-semibold ${ROUGE}` : "text-on-surface"}`}
         >
           <Icon name="calendar_month" className="text-base shrink-0" />
-          <span>{`Départ le ${FR_LONG.format(dateDepart(n.departure_date))}`}</span>
+          <span className="whitespace-nowrap">{`Départ le ${FR_LONG.format(dateDepart(n.departure_date))}`}</span>
           {urgent && <span className="sr-only">{texteUrgence}</span>}
           <span
-            className={`rounded-full px-sm py-[2px] text-xs font-semibold ${urgent ? "bg-[#FFDAD6] text-[#A81E25]" : "bg-[#EDEBE6] text-[#28282D]"}`}
+            className={`shrink-0 rounded-full px-sm py-[2px] text-sm font-semibold ${urgent ? "bg-[#FFDAD6] text-[#A81E25]" : "bg-[#EDEBE6] text-[#28282D]"}`}
           >
             {passe ? "Passé" : ligne.jours === 0 ? "Aujourd'hui" : `J-${ligne.jours}`}
           </span>
@@ -393,6 +444,7 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
                 className={bouton}
                 onClick={() => setOpen((o) => !o)}
                 aria-expanded={open}
+                aria-label={`${open ? "Masquer" : "Voir"} les documents de ${ligne.nom}`}
               >
                 {open ? "Masquer les documents" : "Voir les documents"}
               </button>
@@ -401,6 +453,7 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
                 className={bouton}
                 onClick={() => mark.mutate()}
                 disabled={mark.isPending}
+                aria-label={`J'ai téléchargé les documents de ${ligne.nom}`}
               >
                 J'ai téléchargé les documents
               </button>
@@ -418,7 +471,8 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
                     </span>
                     <button
                       type="button"
-                      className="min-h-11 text-primary underline font-label-sm text-label-sm"
+                      aria-label={`Télécharger le document du ${FR_COURT.format(new Date(d.created_at))} de ${ligne.nom}`}
+                      className="min-h-11 text-primary underline font-label-sm text-sm"
                       onClick={() =>
                         downloadAttachment(d.path, d.name).catch((e) =>
                           toast.error((e as Error).message),

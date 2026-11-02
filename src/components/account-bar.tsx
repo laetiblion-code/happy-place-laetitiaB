@@ -50,7 +50,7 @@ export function AccountBar({
     <div className="flex min-w-0 items-center gap-sm">
       <div className="min-w-0 text-right">
         <p className="font-body-md text-body-md font-bold text-primary wrap-anywhere">{name}</p>
-        <p className="font-label-sm text-label-sm text-on-surface-variant">{roleLabel}</p>
+        <p className="font-label-sm text-sm text-on-surface-variant">{roleLabel}</p>
       </div>
 
       <DropdownMenu>

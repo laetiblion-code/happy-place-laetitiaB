@@ -38,11 +38,11 @@ export function StatusBadge({
         ? (status as keyof typeof STATUS_STYLES)
         : null;
   if (!key)
-    return <span className="font-label-sm text-label-sm text-on-surface-variant">{status}</span>;
+    return <span className="font-label-sm text-sm text-on-surface-variant">{status}</span>;
   const style = STATUS_STYLES[key];
   return (
     <span
-      className={`inline-flex items-center gap-xs rounded-md px-xs py-[2px] font-label-sm text-label-sm font-semibold ${style.className}`}
+      className={`inline-flex items-center gap-xs rounded-md px-xs py-[2px] font-label-sm text-sm font-semibold ${style.className}`}
     >
       <span aria-hidden="true" className="material-symbols-outlined text-sm">
         {style.icon}

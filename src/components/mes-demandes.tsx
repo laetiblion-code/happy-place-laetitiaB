@@ -125,7 +125,7 @@ function CarteDemande({
         </p>
         <div className="flex flex-wrap items-center gap-xs">
           {enAttente ? (
-            <span className="inline-flex min-h-7 items-center gap-xs rounded-md bg-[#F0D0BC] px-xs py-[2px] font-label-sm text-label-sm font-semibold text-[#28282D]">
+            <span className="inline-flex min-h-7 items-center gap-xs rounded-md bg-[#F0D0BC] px-xs py-[2px] font-label-sm text-sm font-semibold text-[#28282D]">
               <Icon name="hourglass_empty" className="text-sm" />
               {`En attente chez ton manager depuis ${delaiTexte(changement)}`}
             </span>
@@ -139,7 +139,19 @@ function CarteDemande({
       <div className="space-y-sm rounded-md bg-[#F5F4F1] p-sm">
         <CategoryChip category={s.category} />
         <p className="whitespace-pre-line font-body-md text-on-surface wrap-anywhere">{`« ${s.content} »`}</p>
-        <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+        {/* Lire ma demande en entier : même place que dans « Demandes à traiter » */}
+        <div className="flex flex-wrap items-center gap-sm">
+          <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+          <button
+            type="button"
+            onClick={() => onRead(s)}
+            aria-haspopup="dialog"
+            aria-label={`Lire ma demande en entier, envoyée le ${formatDateCourte(s.created_at)}`}
+            className="ml-auto inline-flex min-h-11 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            <span className="underline underline-offset-2">Lire ma demande en entier</span>
+          </button>
+        </div>
       </div>
 
       {clarification && (
@@ -178,14 +190,6 @@ function CarteDemande({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => onRead(s)}
-        aria-haspopup="dialog"
-        className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline underline-offset-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-      >
-        Lire ma demande en entier
-      </button>
       <SubmissionHistory submissionId={s.id} />
     </li>
   );

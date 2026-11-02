@@ -12,7 +12,7 @@ const FOCUS =
  */
 export function BrandHeader({ account }: { account?: ReactNode }) {
   const grille = account
-    ? "lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_auto_auto]"
+    ? "lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
     : "lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]";
 
   return (

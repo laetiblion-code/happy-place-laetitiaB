@@ -8,6 +8,7 @@ import { NewsAiHelper } from "@/components/news-ai-helper";
 import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
 import { NewsReader } from "@/components/news-reader";
 import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   deleteDraftNews,
   deleteNews,
@@ -36,8 +37,9 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
+/** Lien d'action : le soulignement porte sur le texte seulement (les icônes ne sont pas soulignées). */
 const LIEN_ACTION =
-  "inline-flex min-h-11 items-center gap-xs font-label-sm text-sm text-primary underline underline-offset-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "inline-flex min-h-11 items-center gap-xs font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 type Brouillon = { id: string | null; publiee: boolean };
 
@@ -219,40 +221,45 @@ export function ActualitesCabinet({
             <h3 className="font-label-md text-label-md uppercase text-on-surface-variant">
               {isAdmin ? "Tous les brouillons" : "Mes brouillons"}
             </h3>
-            <span className="rounded-full bg-tertiary-fixed px-sm py-[2px] font-label-sm text-label-sm tabular-nums text-on-tertiary-fixed">
+            <span className="rounded-full bg-tertiary-fixed px-sm py-[2px] font-label-sm text-sm tabular-nums text-on-tertiary-fixed">
               {`${drafts.length} en cours`}
             </span>
           </div>
           {drafts.length === 0 ? (
             <p className="font-body-sm italic text-on-surface-variant">Aucun brouillon en cours.</p>
           ) : (
-            <ul className="space-y-xs">
+            // Conteneur : toutes les cartes changent de disposition ensemble, selon la largeur de la liste
+            <ul className="@container space-y-xs">
               {drafts.map((n) => (
                 <li
                   key={n.id}
-                  className="flex flex-wrap items-center justify-between gap-sm rounded-md border border-outline-variant bg-card p-sm"
+                  className="flex flex-col gap-sm rounded-md border border-outline-variant bg-card p-sm @[36rem]:flex-row @[36rem]:items-center @[36rem]:justify-between"
                 >
                   <div className="min-w-0">
                     <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
                     <p className="font-label-sm text-sm text-on-surface-variant">
-                      {`Rédigé par ${nomAffiche(n.author ?? "", noms)} · Créé il y a ${timeAgo(n.created_at)}`}
+                      {`Rédigé par ${nomAffiche(n.author ?? "", noms)} · Créé ${timeAgo(n.created_at)}`}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-xs">
+                  <div className="flex flex-wrap items-center gap-xs @[36rem]:shrink-0 @[36rem]:justify-end">
                     <button
                       type="button"
                       disabled={supprimer.isPending}
                       onClick={() => confirmerSuppression(n)}
                       aria-label={`Supprimer le brouillon « ${n.title} »`}
-                      className="inline-flex min-h-11 items-center gap-xs px-sm font-label-sm text-sm text-error underline underline-offset-2"
+                      className="inline-flex min-h-11 items-center gap-xs px-sm font-label-sm text-sm text-error"
                     >
-                      <Icon name="delete" /> Supprimer
+                      <Icon name="delete" />
+                      <span className="underline underline-offset-2">Supprimer</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => ouvrir(n)}
                       aria-label={`Modifier le brouillon « ${n.title} »`}
-                      className={buttonVariants({ variant: "secondary", size: "sm" })}
+                      className={cn(
+                        buttonVariants({ variant: "secondary", size: "sm" }),
+                        "text-sm",
+                      )}
                     >
                       <Icon name="edit" /> Modifier
                     </button>
@@ -270,7 +277,7 @@ export function ActualitesCabinet({
                           publier.mutate(n.id);
                       }}
                       aria-label={`Publier « ${n.title} »`}
-                      className={buttonVariants({ variant: "default", size: "sm" })}
+                      className={cn(buttonVariants({ variant: "default", size: "sm" }), "text-sm")}
                     >
                       Publier
                     </button>
@@ -319,9 +326,11 @@ export function ActualitesCabinet({
                     type="button"
                     onClick={() => setLue(n)}
                     aria-haspopup="dialog"
+                    aria-label={`Lire l'actualité « ${n.title} »`}
                     className={LIEN_ACTION}
                   >
-                    Lire <Icon name="arrow_forward" className="text-base" />
+                    <span className="underline underline-offset-2">Lire</span>
+                    <Icon name="arrow_forward" className="text-base" />
                   </button>
                   {isAdmin && (
                     <>
@@ -331,16 +340,18 @@ export function ActualitesCabinet({
                         aria-label={`Modifier l'actualité « ${n.title} »`}
                         className={LIEN_ACTION}
                       >
-                        <Icon name="edit" className="text-base" /> Modifier
+                        <Icon name="edit" className="text-base" />
+                        <span className="underline underline-offset-2">Modifier</span>
                       </button>
                       <button
                         type="button"
                         disabled={supprimer.isPending}
                         onClick={() => confirmerSuppression(n)}
                         aria-label={`Supprimer l'actualité « ${n.title} »`}
-                        className="inline-flex min-h-11 items-center gap-xs font-label-sm text-sm text-error underline underline-offset-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        className="inline-flex min-h-11 items-center gap-xs font-label-sm text-sm text-error focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                       >
-                        <Icon name="delete" className="text-base" /> Supprimer
+                        <Icon name="delete" className="text-base" />
+                        <span className="underline underline-offset-2">Supprimer</span>
                       </button>
                     </>
                   )}
@@ -351,7 +362,7 @@ export function ActualitesCabinet({
         </ul>
         {published.length > 0 && (
           <Link to="/actualites" className={LIEN_ACTION}>
-            Voir toutes les actualités
+            <span className="underline underline-offset-2">Voir toutes les actualités</span>
           </Link>
         )}
       </div>
@@ -369,7 +380,7 @@ export function ActualitesCabinet({
         >
           <form data-corps-modale onSubmit={envoyer} noValidate className="space-y-md">
             {propositionIA && (
-              <p className="inline-flex items-center gap-xs bg-[#F0D0BC] px-sm py-xs font-label-sm text-label-sm text-on-surface">
+              <p className="inline-flex items-center gap-xs bg-[#F0D0BC] px-sm py-xs font-label-sm text-sm text-on-surface">
                 <Icon name="auto_awesome" className="text-sm" />
                 Proposition de l'IA, à relire
               </p>

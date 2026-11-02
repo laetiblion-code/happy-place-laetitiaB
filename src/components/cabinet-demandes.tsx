@@ -4,16 +4,10 @@ import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
 import { StatusBadge } from "@/components/status-badge";
 import { formatExactDate } from "@/components/expandable-card";
 import { buttonVariants } from "@/components/ui/button";
+import { AttachmentLink } from "@/components/attachment-link";
+import { cn } from "@/lib/utils";
 import { fetchCabinetSubmissions, type Submission } from "@/lib/dashboard";
 import { ilYaCourt } from "@/lib/noms";
-
-function Icon({ name, className = "" }: { name: string; className?: string }) {
-  return (
-    <span aria-hidden="true" className={`material-symbols-outlined ${className}`}>
-      {name}
-    </span>
-  );
-}
 
 /** Lignes par page : au départ, puis 10 de plus à chaque clic. */
 const PAGE = 10;
@@ -28,7 +22,7 @@ const FILTRES: { valeur: Filtre; libelle: string }[] = [
 const CELLULE = "block px-sm py-xs align-top md:table-cell md:px-sm md:py-sm";
 /** Sur petit écran, chaque cellule affiche son nom de colonne avant la valeur. */
 const ETIQUETTE =
-  "before:mb-xs before:block before:font-label-sm before:text-xs before:uppercase before:text-on-surface-variant before:content-[attr(data-label)] md:before:hidden";
+  "before:mb-xs before:block before:font-label-sm before:text-sm before:uppercase before:text-on-surface-variant before:content-[attr(data-label)] md:before:hidden";
 
 /**
  * « 10 dernières demandes du cabinet » : tous statuts, les plus récentes d'abord. Les règles d'accès (RLS)
@@ -36,12 +30,24 @@ const ETIQUETTE =
  */
 export function DemandesCabinet({
   email,
+  role,
+  managerTeams,
   onRead,
 }: {
   /** Adresse de la personne connectée, pour le filtre « Mes demandes ». */
   email: string;
+  role: "admin" | "manager" | "collaborateur";
+  /** Équipes gérées (manager) : elles donnent accès aux pièces jointes de ces équipes. */
+  managerTeams: string[];
   onRead: (s: Submission) => void;
 }) {
+  /** Même règle que le stockage : admin, auteur, ou manager de l'équipe. */
+  function peutLirePiece(s: Submission) {
+    if (role === "admin") return true;
+    if ((s.submitted_by_email ?? "").toLowerCase() === email) return true;
+    return role === "manager" && managerTeams.includes(s.team);
+  }
+
   const q = useQuery({
     queryKey: ["submissions", "cabinet"],
     queryFn: fetchCabinetSubmissions,
@@ -100,7 +106,13 @@ export function DemandesCabinet({
               type="button"
               aria-pressed={filtre === f.valeur}
               onClick={() => changerFiltre(f.valeur)}
-              className={`${buttonVariants({ variant: filtre === f.valeur ? "default" : "secondary", size: "sm" })} min-h-11`}
+              className={cn(
+                buttonVariants({
+                  variant: filtre === f.valeur ? "default" : "secondary",
+                  size: "sm",
+                }),
+                "min-h-11 text-sm",
+              )}
             >
               {f.libelle}
             </button>
@@ -137,7 +149,15 @@ export function DemandesCabinet({
 
       {visibles.length > 0 && (
         <div className="mt-md">
-          <table className="w-full table-auto border-collapse text-left">
+          <table className="w-full border-collapse text-left md:table-fixed">
+            {/* Largeurs fixes pour Catégorie, Statut, Visibilité et Date ; Auteur prend le reste */}
+            <colgroup>
+              <col className="md:w-[220px]" />
+              <col />
+              <col className="md:w-[180px]" />
+              <col className="md:w-[150px]" />
+              <col className="md:w-[90px]" />
+            </colgroup>
             <caption className="sr-only">
               Dix dernières demandes du cabinet, de la plus récente à la plus ancienne
             </caption>
@@ -175,33 +195,36 @@ export function DemandesCabinet({
                       <span className="text-on-surface-variant">Non renseignée</span>
                     )}
                   </td>
-                  <td
-                    data-label="Auteur et demande"
-                    className={`${CELLULE} ${ETIQUETTE} min-w-0 md:max-w-md`}
-                  >
+                  <td data-label="Auteur et demande" className={`${CELLULE} ${ETIQUETTE} min-w-0`}>
                     <p className="font-body-sm font-bold text-primary wrap-anywhere">
                       {`${s.author_name} · ${s.team}`}
                     </p>
-                    <p className="line-clamp-2 font-body-sm text-on-surface wrap-anywhere">
-                      {s.content}
-                    </p>
-                    <div className="mt-xs flex flex-wrap items-center gap-sm">
+                    {/* Texte tronqué sur une ligne, « Lire » sur la même ligne */}
+                    <div className="flex min-w-0 items-center gap-sm">
+                      <p
+                        className="min-w-0 flex-1 truncate font-body-sm text-on-surface"
+                        title={s.content}
+                      >
+                        {s.content}
+                      </p>
                       <button
                         type="button"
                         onClick={() => onRead(s)}
                         aria-haspopup="dialog"
                         aria-label={`Lire la demande de ${s.author_name}`}
-                        className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline underline-offset-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        className="inline-flex min-h-11 shrink-0 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                       >
-                        Lire
+                        <span className="underline underline-offset-2">Lire</span>
                       </button>
-                      {s.attachment_path && (
-                        <span className="inline-flex items-center gap-xs font-label-sm text-sm text-on-surface-variant">
-                          <Icon name="attach_file" className="text-base" />
-                          Pièce jointe
-                        </span>
-                      )}
                     </div>
+                    {s.attachment_path &&
+                      (peutLirePiece(s) ? (
+                        <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+                      ) : (
+                        <p className="mt-xs font-label-sm text-sm text-on-surface-variant wrap-anywhere">
+                          {`${s.attachment_name ?? "Pièce jointe"} · réservée à l'équipe`}
+                        </p>
+                      ))}
                   </td>
                   <td data-label="Statut" className={`${CELLULE} ${ETIQUETTE}`}>
                     <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
