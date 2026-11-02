@@ -244,6 +244,7 @@ export type Database = {
         Row: {
           key: string
           label: string
+          on_dashboard: boolean
           unit: string | null
           updated_at: string
           value: number
@@ -251,6 +252,7 @@ export type Database = {
         Insert: {
           key: string
           label: string
+          on_dashboard?: boolean
           unit?: string | null
           updated_at?: string
           value: number
@@ -258,6 +260,7 @@ export type Database = {
         Update: {
           key?: string
           label?: string
+          on_dashboard?: boolean
           unit?: string | null
           updated_at?: string
           value?: number

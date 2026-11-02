@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const NEWS_MEDIA_BUCKET = "news-media";
 export const NEWS_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const NEWS_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
-export const NEWS_IMAGE_ERROR = "Image JPG, PNG ou WebP, 5 Mo maximum";
+export const NEWS_IMAGE_ERROR = "Image refusée : JPG, PNG ou WebP uniquement, 5 Mo maximum.";
 export const MAX_NEWS_LINKS = 3;
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 

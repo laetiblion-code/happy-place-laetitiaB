@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   ConfirmDelete,
@@ -47,7 +48,7 @@ const newsStatusLabels: Record<string, string> = {
   publiée: "Publiée",
 };
 
-const empty: NewsInput = { title: "", body: "", author: "Direction Recrutement", status: "brouillon" };
+const empty: NewsInput = { title: "", body: "", author: "", status: "brouillon" };
 
 function ManageNews() {
   const qc = useQueryClient();
@@ -59,6 +60,26 @@ function ManageNews() {
   const [showLinkErrs, setShowLinkErrs] = useState(false);
 
   const list = useQuery({ queryKey: ["news", "all"], queryFn: fetchAllNews, retry: false });
+  // Auteur prérempli : prénom et nom de la personne connectée (sinon son e-mail)
+  const { email } = Route.useRouteContext();
+  const myEmail = (email ?? "").toLowerCase();
+  const profil = useQuery({
+    queryKey: ["allowed_user_profile", myEmail],
+    enabled: !!myEmail,
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("allowed_users")
+        .select("first_name, last_name")
+        .eq("email", myEmail)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const myName =
+    [profil.data?.first_name, profil.data?.last_name].map((p) => p?.trim() ?? "").filter(Boolean).join(" ") ||
+    myEmail;
   const noms = useNomsAffiches((list.data ?? []).map((n) => n.author ?? "")).data;
   const invalidate = () => qc.invalidateQueries({ queryKey: ["news"] });
   const onError = (e: unknown) => toast.error((e as Error).message);
@@ -118,7 +139,7 @@ function ManageNews() {
             setErrors({});
             setMedia(emptyMedia());
             setShowLinkErrs(false);
-            setForm({ ...empty });
+            setForm({ ...empty, author: myName });
           }}
           type="button"
           className={buttonVariants({ variant: "default" })}

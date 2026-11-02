@@ -9,7 +9,7 @@ export function BrandHeader({ actions }: { actions?: ReactNode }) {
         <Link
           to="/"
           className="flex min-w-0 items-center gap-sm"
-          aria-label="Bigger Boat — accueil"
+          aria-label="Bigger Boat, accueil"
         >
           <img
             src={sharkLogo}

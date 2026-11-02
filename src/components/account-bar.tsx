@@ -17,6 +17,8 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
+const EXPORT_INFO = "30 derniers jours, tous statuts";
+
 const FOCUS =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
@@ -82,8 +84,9 @@ export function AccountBar({
             size="sm"
             disabled={exporting}
             onClick={onExport}
+            title={EXPORT_INFO}
           >
-            <Icon name="file_download" /> {exporting ? "Export en cours…" : "Exporter le rapport"}
+            <Icon name="file_download" /> {exporting ? "Export en cours…" : "Exporter mes demandes"}
           </Button>
           <Button type="button" variant="secondary" size="sm" onClick={onSignOut}>
             <Icon name="logout" /> Déconnexion
@@ -122,9 +125,10 @@ export function AccountBar({
             <DropdownMenuItem
               disabled={exporting}
               onSelect={onExport}
+              title={EXPORT_INFO}
               className="min-h-11 cursor-pointer"
             >
-              <Icon name="file_download" /> {exporting ? "Export en cours…" : "Exporter le rapport"}
+              <Icon name="file_download" /> {exporting ? "Export en cours…" : "Exporter mes demandes"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onSignOut} className="min-h-11 cursor-pointer">

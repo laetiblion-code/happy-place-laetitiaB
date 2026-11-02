@@ -13,6 +13,9 @@ import { SubmissionReader } from "@/components/submission-reader";
 import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS, SubmissionTags } from "@/components/submission-choices";
 import { NewsReader } from "@/components/news-reader";
 import { nomAffiche, useNomsAffiches } from "@/lib/noms";
+import { useConfirm } from "@/components/confirm-dialog";
+import { DelaiStatut } from "@/components/delai-statut";
+import { SubmissionHistory } from "@/components/manage/submission-history";
 import { DepartureNotices } from "@/components/departure-notices";
 import { ManagerCards, MyChips } from "@/components/home-counters";
 import { fetchAlertCounts, fetchDraftCounts, fetchMyCounts, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
@@ -20,14 +23,15 @@ import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
 import { NewsAiHelper } from "@/components/news-ai-helper";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { AccountBar } from "@/components/account-bar";
 import { AdminGapsBanner } from "@/components/admin-gaps-banner";
 import { ALERT_STATES, alertStatusOptions } from "@/lib/alert-states";
 import { RejectionNote, StatusBadge } from "@/components/status-badge";
 import {
   fetchBlockers,
-  fetchMetrics,
+  fetchDashboardMetrics,
+  fetchLastStatusChanges,
   deltaText,
   formatMetricValue,
   fetchNews,
@@ -43,22 +47,20 @@ import {
   submitIdea,
   timeAgo,
   updateBlockerStatus,
-  updateMetric,
   TREND_LABELS,
-  type Metric,
   type SubmissionInput,
 } from "@/lib/dashboard";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
-      { title: "Happy Place — Actualités et vue d'ensemble" },
+      { title: "Accueil · Happy Place" },
       {
         name: "description",
         content:
-          "Pilotez les missions de recrutement IT et digital, les propositions des équipes, les alertes opérationnelles et les indicateurs du cabinet.",
+          "Pilotez les missions de recrutement IT et digital, les demandes des équipes, les alertes opérationnelles et les indicateurs du cabinet.",
       },
-      { property: "og:title", content: "Happy Place — Vue d'ensemble" },
+      { property: "og:title", content: "Accueil · Happy Place" },
       {
         property: "og:description",
         content:
@@ -82,26 +84,10 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
-function trendText(m: Metric | undefined) {
-  return m ? TREND_LABELS[m.trend] : "";
-}
-
-function metricOf(metrics: Metric[] | undefined, key: string) {
-  return metrics?.find((m) => m.key === key);
-}
-
-function formatMetric(m: Metric | undefined, fallback: string) {
-  return m ? formatMetricValue(m.value, m.unit) : fallback;
-}
-
-function metricLabel(metric: Metric | undefined, fallback: string) {
-  if (!metric) return fallback;
-  if (metric.key === "training_kpi") return "Taux de placement";
-  if (metric.key === "active_users") return "Missions actives";
-  return metric.label;
-}
+const SANS_CHANGEMENT = new Map<string, { new_status: string; changed_at: string }>();
 
 function ManagerSpace() {
+  const [demander, dialogueConfirm] = useConfirm();
   const qc = useQueryClient();
   const { role, email } = Route.useRouteContext();
   const isAdmin = role === "admin";
@@ -140,7 +126,6 @@ function ManagerSpace() {
   const [media, setMedia] = useState<MediaDraft>(emptyMedia);
   const [showLinkErrs, setShowLinkErrs] = useState(false);
   const newsLinkErrs = showLinkErrs ? linkErrors(media.links) : {};
-  const [nps, setNps] = useState<string>("");
   const [submissionForm, setSubmissionForm] = useState<SubmissionInput | null>(null);
   const [submissionErrors, setSubmissionErrors] = useState<FieldErrors>({});
   const myTeams = useQuery({
@@ -178,8 +163,25 @@ function ManagerSpace() {
     enabled: !!email,
     retry: false,
   });
+  // Dernier changement de statut de chaque demande affichée (délais « depuis »)
+  const reviewIds = (toReview.data ?? []).map((s) => s.id);
+  const reviewChanges =
+    useQuery({
+      queryKey: ["submissions", "last-changes", reviewIds],
+      enabled: reviewIds.length > 0,
+      queryFn: () => fetchLastStatusChanges(reviewIds),
+      retry: false,
+    }).data ?? SANS_CHANGEMENT;
+  const mineIds = (mine.data ?? []).map((s) => s.id);
+  const mineChanges =
+    useQuery({
+      queryKey: ["submissions", "last-changes", mineIds],
+      enabled: mineIds.length > 0,
+      queryFn: () => fetchLastStatusChanges(mineIds),
+      retry: false,
+    }).data ?? SANS_CHANGEMENT;
   const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
-  const metrics = useQuery({ queryKey: ["metrics"], queryFn: fetchMetrics, retry: false });
+  const dashMetrics = useQuery({ queryKey: ["metrics", "dashboard"], queryFn: fetchDashboardMetrics, retry: false });
   // Compteurs de l'accueil : invalidés par toutes les mutations qui changent un statut, un brouillon ou une alerte
   const homeReview = useQuery({
     queryKey: ["home-counts", "review", role, myEmail, myTeams.data],
@@ -214,7 +216,7 @@ function ManagerSpace() {
     },
     onSuccess: (count) => {
       if (count === 0) {
-        toast.info("Aucune demande en attente ou validée sur les 30 derniers jours.");
+        toast.info("Aucune demande sur les 30 derniers jours.");
         return;
       }
       toast.success(`${count} demande${count > 1 ? "s" : ""} exportée${count > 1 ? "s" : ""} au format CSV.`);
@@ -308,20 +310,10 @@ function ManagerSpace() {
     onError,
   });
 
-  const saveMetric = useMutation({
-    mutationFn: updateMetric,
-    onSuccess: () => {
-      toast.success("KPI mis à jour");
-      qc.invalidateQueries({ queryKey: ["metrics"] });
-    },
-    onError,
-  });
-
   const visibleDrafts = news.data?.filter((n) => n.status === "brouillon") ?? [];
   const drafts = visibleDrafts.length;
   const published = news.data?.filter((n) => n.status === "publiée") ?? [];
   const nomsAuteurs = useNomsAffiches((news.data ?? []).map((n) => n.author ?? "")).data;
-  const npsMetric = metricOf(metrics.data, "nps");
   const roleLabel = role === "admin" ? "Admin" : role === "manager" ? "Manager" : "Collaborateur";
   const roleIntro =
     role === "manager"
@@ -383,7 +375,7 @@ function ManagerSpace() {
           />
         }
       />
-      <main className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
+      <main id="contenu" className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
         <AdminGapsBanner enabled={isAdmin} />
         <header className="flex flex-wrap items-end justify-between gap-md mb-lg">
           <div className="min-w-0 space-y-xs">
@@ -472,7 +464,7 @@ function ManagerSpace() {
                 </label>
                 <input
                   ref={newsTitleInput}
-                  className="w-full bg-transparent border-b border-outline-variant focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-colors font-headline-sm text-headline-sm px-0 py-xs"
+                  className="w-full bg-transparent border-b border-[#8A8A90] focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-colors font-headline-sm text-headline-sm px-0 py-xs"
                    placeholder="Saisis un titre…"
                   type="text"
                   value={title}
@@ -484,7 +476,7 @@ function ManagerSpace() {
                   CONTENU
                 </label>
                 <textarea
-                  className="w-full rounded-md bg-card border border-outline-variant focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary p-sm font-body-md"
+                  className="w-full rounded-md bg-card border border-[#8A8A90] focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary p-sm font-body-md"
                    placeholder="Rédige l'actualité…"
                   rows={4}
                   value={body}
@@ -574,8 +566,15 @@ function ManagerSpace() {
                                 type="button"
                                 className="font-label-sm text-label-sm text-error"
                                 disabled={removeDraft.isPending}
-                                onClick={() => {
-                                  if (window.confirm(`Supprimer le brouillon « ${n.title} » ?`))
+                                onClick={async () => {
+                                  if (
+                                    await demander({
+                                      titre: "Supprimer le brouillon",
+                                      message: `Supprimer le brouillon « ${n.title} » ?`,
+                                      libelleConfirmer: "Supprimer",
+                                      destructive: true,
+                                    })
+                                  )
                                     removeDraft.mutate(n);
                                 }}
                               >
@@ -585,8 +584,14 @@ function ManagerSpace() {
                                 type="button"
                                 className={`${buttonVariants({ variant: "default", size: "sm" })} disabled:opacity-50`}
                                 disabled={publishDraft.isPending || profile.isPending}
-                                onClick={() => {
-                                  if (window.confirm(`Publier l'actualité « ${n.title} » ? Elle sera visible par tous.`))
+                                onClick={async () => {
+                                  if (
+                                    await demander({
+                                      titre: "Publier l'actualité",
+                                      message: `Publier l'actualité « ${n.title} » ? Elle sera visible par tous.`,
+                                      libelleConfirmer: "Publier",
+                                    })
+                                  )
                                     publishDraft.mutate(n.id);
                                 }}
                               >
@@ -613,9 +618,9 @@ function ManagerSpace() {
                   </p>
                 )}
                 {published.slice(0, 4).map((n) => (
+                  <div key={n.id} className="space-y-xs">
                   <button
                     type="button"
-                    key={n.id}
                     onClick={() => setReadingNews(n)}
                     aria-haspopup="dialog"
                     className="w-full rounded-md text-left p-sm bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer group min-w-0 overflow-hidden space-y-xs focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -633,10 +638,19 @@ function ManagerSpace() {
                     </div>
                     {isAdmin && <Icon name="edit" className="text-on-surface-variant" />}
                     </div>
-                    <NewsLinks links={n.links} />
                   </button>
+                  <NewsLinks links={n.links} />
+                  </div>
                 ))}
               </div>
+              {published.length > 0 && (
+                <Link
+                  to="/actualites"
+                  className="font-label-md text-label-md text-primary underline underline-offset-4 min-h-11 inline-flex items-center"
+                >
+                  Voir toutes les actualités
+                </Link>
+              )}
             </div>
           </section>
 
@@ -678,7 +692,7 @@ function ManagerSpace() {
                       <p className="text-[10px] text-on-surface-variant font-label-sm wrap-anywhere">{s.team}</p>
                     </div>
                     <span className="text-[10px] text-on-surface-variant font-label-sm whitespace-nowrap">
-                      {timeAgo(s.created_at)}
+                      <DelaiStatut status="en attente" depuis={reviewChanges.get(s.id)?.changed_at ?? s.created_at} />
                     </span>
                   </div>
                   <SubmissionTags category={s.category} visibility={s.visibility} />
@@ -728,8 +742,13 @@ function ManagerSpace() {
                     <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
                     <div className="mt-xs flex flex-wrap items-center gap-xs text-body-sm text-[#68686D]">
                       <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
-                      <span>{s.team} · {timeAgo(s.created_at)}</span>
+                      <span>{s.team} · </span>
+                      <DelaiStatut
+                        status={s.status === "refusée" && s.rejection_category === "à clarifier" ? "clarification" : s.status}
+                        depuis={mineChanges.get(s.id)?.changed_at ?? s.created_at}
+                      />
                     </div>
+                    <SubmissionHistory submissionId={s.id} />
                     {s.status === "refusée" && s.rejection_category && (
                       <div className="mt-xs">
                         <RejectionNote category={s.rejection_category} note={s.rejection_note} />
@@ -812,19 +831,22 @@ function ManagerSpace() {
                       return (
                         <span className={`inline-flex shrink-0 items-center gap-xs rounded-full px-sm py-[2px] font-label-sm text-label-sm font-semibold ${state?.className ?? "bg-surface-container-highest text-on-surface"}`}>
                           <Icon name={state?.icon ?? "help"} className="text-base" />
-                          <select
-                            aria-label={`Statut de ${b.title}`}
-                            value={b.status}
-                            disabled={!isAdmin}
-                            onChange={(e) => setBlocker.mutate({ id: b.id, status: e.target.value })}
-                            className="cursor-pointer bg-transparent font-label-sm text-label-sm font-semibold text-[inherit] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-default"
-                          >
-                            {alertStatusOptions(b.status).map((value) => (
-                              <option key={value} value={value}>
-                                {ALERT_STATES[value].label}
-                              </option>
-                            ))}
-                          </select>
+                          {isAdmin ? (
+                            <select
+                              aria-label={`Statut de ${b.title}`}
+                              value={b.status}
+                              onChange={(e) => setBlocker.mutate({ id: b.id, status: e.target.value })}
+                              className="cursor-pointer bg-transparent font-label-sm text-label-sm font-semibold text-[inherit] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                            >
+                              {alertStatusOptions(b.status).map((value) => (
+                                <option key={value} value={value}>
+                                  {ALERT_STATES[value].label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span>{state?.label ?? b.status}</span>
+                          )}
                         </span>
                       );
                     })()}
@@ -838,68 +860,40 @@ function ManagerSpace() {
           <section className="col-span-12 md:col-span-5 rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
             <div className="flex items-center justify-between mb-md">
               <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs clés</h2>
-              {isAdmin && <Icon name="settings" className="text-on-surface-variant cursor-pointer" />}
             </div>
-            <div className="grid grid-cols-2 gap-sm mb-md">
-              <div className="p-sm rounded-md bg-card border border-outline-variant text-center">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-                  {metricLabel(metricOf(metrics.data, "training_kpi"), "Taux de placement")}
-                </p>
-                <p className="font-body-md text-[32px] font-semibold leading-tight tabular-nums text-primary">
-                  {formatMetric(metricOf(metrics.data, "training_kpi"), "—")}
-                </p>
-                <p className="text-[10px] text-on-surface-variant font-label-sm">
-                  {trendText(metricOf(metrics.data, "training_kpi"))}
-                  {deltaText(metricOf(metrics.data, "training_kpi")) &&
-                    ` · ${deltaText(metricOf(metrics.data, "training_kpi"))}`}
-                </p>
-              </div>
-              <div className="p-sm rounded-md bg-card border border-outline-variant text-center">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-                  {metricLabel(metricOf(metrics.data, "active_users"), "Missions actives")}
-                </p>
-                <p className="font-body-md text-[32px] font-semibold leading-tight tabular-nums text-primary">
-                  {formatMetric(metricOf(metrics.data, "active_users"), "—")}
-                </p>
-                <p className="text-[10px] text-on-surface-variant font-label-sm">
-                  {trendText(metricOf(metrics.data, "active_users"))}
-                  {deltaText(metricOf(metrics.data, "active_users")) &&
-                    ` · ${deltaText(metricOf(metrics.data, "active_users"))}`}
-                </p>
-              </div>
-            </div>
-            {isAdmin && <div className="space-y-xs">
-              <label className="font-label-sm text-label-sm text-on-surface-variant block">
-                MODIFIER LE NPS CANDIDATS
-              </label>
-              <div className="flex gap-xs">
-                <input
-                  className="flex-grow rounded-md bg-card border border-outline-variant p-xs font-label-md focus:outline-none focus:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  type="number"
-                  value={nps !== "" ? nps : (npsMetric?.value ?? "")}
-                  onChange={(e) => setNps(e.target.value)}
-                />
-                <button
-                  onClick={() =>
-                    saveMetric.mutate({
-                      key: "nps",
-                      value: Number(nps !== "" ? nps : (npsMetric?.value ?? 0)),
-                    })
-                  }
-                  disabled={saveMetric.isPending}
-                  className={buttonVariants({ variant: "default" })}
-                >
-                  Mettre à jour
-                </button>
-              </div>
-              <p className="text-[10px] text-on-surface-variant italic">
-                {npsMetric
-                  ? `Tendance : ${trendText(npsMetric)}${
-                      deltaText(npsMetric) ? ` · ${deltaText(npsMetric)}` : ""
-                    }`
-                  : "Mis à jour à partir des retours candidats."}
+            {dashMetrics.isError && (
+              <p className="text-body-sm text-error mb-md">Les indicateurs sont indisponibles.</p>
+            )}
+            {dashMetrics.isSuccess && dashMetrics.data.length === 0 && (
+              <p className="text-body-sm italic text-on-surface-variant mb-md">
+                Aucun indicateur affiché sur l'accueil.
+                {isAdmin ? " Choisis-en jusqu'à quatre dans la gestion des indicateurs." : ""}
               </p>
-            </div>}
+            )}
+            <div className="grid grid-cols-2 gap-sm mb-md">
+              {dashMetrics.data?.map((m) => (
+                <div key={m.key} className="p-sm rounded-md bg-card border border-outline-variant text-center">
+                  <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">{m.label}</p>
+                  <p className="font-body-md text-[32px] font-semibold leading-tight tabular-nums text-primary">
+                    {formatMetricValue(m.value, m.unit)}
+                  </p>
+                  <p className="text-xs text-on-surface-variant font-label-sm">
+                    {TREND_LABELS[m.trend]}
+                    {deltaText(m) && ` · ${deltaText(m)}`}
+                  </p>
+                  {m.updated_at && (
+                    <p className="text-xs text-on-surface-variant font-label-sm">
+                      Mis à jour {timeAgo(m.updated_at)}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            {isAdmin && (
+              <Link to="/manage/metrics" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                Gérer les indicateurs
+              </Link>
+            )}
             <div className="mt-auto pt-md">
               <img
                 src={PERF_IMAGE}
@@ -945,7 +939,7 @@ function ManagerSpace() {
                 value={rejectForm.rejection_category}
                 onChange={(e) => setRejectForm({ ...rejectForm, rejection_category: e.target.value })}
               >
-                <option value="">— Choisir un motif —</option>
+                <option value="">Choisir un motif</option>
                 {REJECTION_CATEGORIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
@@ -964,6 +958,7 @@ function ManagerSpace() {
           </form>
         </Modal>
       )}
+      {dialogueConfirm}
       {submissionForm && (
         <Modal title="Nouvelle demande" onClose={() => setSubmissionForm(null)}>
           <form onSubmit={sendSubmission} className="space-y-sm" noValidate>
@@ -979,10 +974,7 @@ function ManagerSpace() {
             />
             {profileName ? (
               <Field label="Nom">
-                <p className="font-body-md text-on-surface wrap-anywhere">
-                  {profileName}
-                  {profile.data?.team ? ` · ${profile.data.team}` : ""}
-                </p>
+                <p className="font-body-md text-on-surface wrap-anywhere">{profileName}</p>
               </Field>
             ) : (
               <Field label="Nom" error={submissionErrors.author_name}>
@@ -1000,13 +992,20 @@ function ManagerSpace() {
                   required
                   value={submissionForm.team}
                   onChange={(e) => setSubmissionForm({ ...submissionForm, team: e.target.value })}
-                  className="w-full border border-outline-variant bg-surface px-sm py-xs font-body-md"
+                  className="w-full border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
                 >
                   <option value="">Choisis une de tes équipes</option>
                   {myTeams.data?.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
+              </Field>
+            )}
+            {role === "collaborateur" && (
+              <Field label="Équipe">
+                <p className="font-body-md text-on-surface wrap-anywhere">
+                  {profile.data?.team ?? "Aucune équipe renseignée. Demande à un admin de t'en affecter une."}
+                </p>
               </Field>
             )}
             {role === "admin" && (
@@ -1050,11 +1049,11 @@ function ManagerSpace() {
                   onChange={(e) => {
                     const f = e.target.files?.[0] ?? null;
                     if (f && f.type !== "application/pdf") {
-                      setSubmissionErrors({ ...submissionErrors, attachment: "Seuls les fichiers PDF sont acceptés." });
+                      setSubmissionErrors({ ...submissionErrors, attachment: "Fichier refusé : PDF uniquement, 20 Mo maximum." });
                       e.target.value = ""; setAttachment(null); return;
                     }
                     if (f && f.size > 20 * 1024 * 1024) {
-                      setSubmissionErrors({ ...submissionErrors, attachment: "Le fichier dépasse 20 Mo." });
+                      setSubmissionErrors({ ...submissionErrors, attachment: "Fichier refusé : PDF uniquement, 20 Mo maximum." });
                       e.target.value = ""; setAttachment(null); return;
                     }
                     const { attachment: _a, ...rest } = submissionErrors;

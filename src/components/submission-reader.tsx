@@ -38,7 +38,7 @@ export function SubmissionReader({
                   <span className="inline-flex flex-wrap items-center gap-xs">
                     <span>{s.team}</span>
                     <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
-                    <span>Soumise le {formatExactDate(s.created_at)}</span>
+                    <span>Envoyée le {formatExactDate(s.created_at)}</span>
                   </span>
                 </DialogPrimitive.Description>
               </div>

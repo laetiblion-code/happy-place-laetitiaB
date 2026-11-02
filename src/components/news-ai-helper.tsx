@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useConfirm } from "@/components/confirm-dialog";
 import { supabase } from "@/integrations/supabase/client";
 
 // Aide à la rédaction d'une actualité depuis un lien ou un PDF (T8, EP10).
@@ -15,7 +16,7 @@ const boutonSecondaire =
 const boutonPrincipal =
   "min-h-[44px] px-lg py-xs bg-primary text-on-primary font-label-md text-label-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50";
 const champ =
-  "min-h-[44px] flex-1 bg-card border border-outline-variant focus:border-primary focus:outline-none px-sm py-xs font-body-md";
+  "min-h-[44px] flex-1 bg-card border border-[#8A8A90] focus:border-primary focus:outline-none px-sm py-xs font-body-md";
 
 // Lit le message « erreur » du corps de la réponse en cas d'erreur HTTP
 async function messageErreur(error: unknown): Promise<string> {
@@ -52,6 +53,7 @@ export function NewsAiHelper({
   texte: string;
   onProposition: (p: PropositionIA) => void;
 }) {
+  const [demander, dialogueConfirm] = useConfirm();
   const [mode, setMode] = useState<Mode | null>(null);
   const [url, setUrl] = useState("");
   const [pdf, setPdf] = useState<File | null>(null);
@@ -103,7 +105,11 @@ export function NewsAiHelper({
       const { titre: titreActuel, texte: texteActuel } = actuel.current;
       if (
         (titreActuel.trim() || texteActuel.trim()) &&
-        !window.confirm("Remplacer ton titre et ton texte par la proposition de l'IA ?")
+        !(await demander({
+          titre: "Remplacer le contenu",
+          message: "Remplacer ton titre et ton texte par la proposition de l'IA ?",
+          libelleConfirmer: "Remplacer",
+        }))
       ) {
         return;
       }
@@ -247,6 +253,7 @@ export function NewsAiHelper({
           {erreur}
         </p>
       )}
+      {dialogueConfirm}
     </section>
   );
 }

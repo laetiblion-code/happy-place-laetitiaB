@@ -16,8 +16,8 @@ const STATUS_STYLES: Record<"en attente" | "clarification" | "validée" | "refus
     icon: "help",
     className: "bg-[#F5D5D4] text-[#28282D]",
   },
-  validée: { label: "Validée", icon: "check", className: "bg-[#DDF2E3] text-[#298646]" },
-  refusée: { label: "Refusée", icon: "close", className: "bg-[#FFDAD6] text-[#C2272D]" },
+  validée: { label: "Validée", icon: "check", className: "bg-[#DDF2E3] text-[#1F6B38]" },
+  refusée: { label: "Refusée", icon: "close", className: "bg-[#FFDAD6] text-[#A81E25]" },
 };
 
 /**
@@ -73,7 +73,7 @@ export function RejectionNote({
           <strong>Motif du refus :</strong> {category}
           {note ? (
             <>
-              {" — "}
+              {" : "}
               <Linkify text={note} />
             </>
           ) : null}

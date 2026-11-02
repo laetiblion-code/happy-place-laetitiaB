@@ -14,7 +14,7 @@ const MIN_LENGTH = 8;
 export const Route = createFileRoute("/mot-de-passe")({
   ssr: false,
   head: () => ({
-    meta: [{ title: "Happy Place — Choisis ton mot de passe" }],
+    meta: [{ title: "Choisis ton mot de passe · Happy Place" }],
   }),
   component: ChoisirMotDePasse,
 });
@@ -75,7 +75,7 @@ function ChoisirMotDePasse() {
   const card = (children: ReactNode) => (
     <div className="min-h-dvh w-full bg-background flex flex-col">
       <BrandHeader />
-      <main className="flex flex-1 items-center justify-center px-md py-lg">
+      <main id="contenu" className="flex flex-1 items-center justify-center px-md py-lg">
         <section className="w-[min(100%,28rem)] border border-outline-variant bg-surface-container-lowest p-lg shadow-sm">
           {children}
         </section>

@@ -3,14 +3,14 @@
  * Constante partagée par l'accueil et la gestion. Les valeurs ne changent pas (elles sont en base).
  */
 export const ALERT_STATES = {
-  OUVERT: { label: "Ouverte", icon: "error_outline", className: "bg-[#FFDAD6] text-[#C2272D]" },
+  OUVERT: { label: "Ouverte", icon: "error_outline", className: "bg-[#FFDAD6] text-[#A81E25]" },
   "EN COURS": { label: "En cours", icon: "autorenew", className: "bg-[#F0D0BC] text-[#28282D]" },
   SURVEILLANCE: {
     label: "Sous surveillance",
     icon: "visibility",
     className: "bg-[#F5D5D4] text-[#28282D]",
   },
-  RÉSOLU: { label: "Résolue", icon: "check_circle", className: "bg-[#DDF2E3] text-[#298646]" },
+  RÉSOLU: { label: "Résolue", icon: "check_circle", className: "bg-[#DDF2E3] text-[#1F6B38]" },
 } as const;
 
 export type AlertStatus = keyof typeof ALERT_STATES;

@@ -75,7 +75,7 @@ function NoticeBanner({
     }
   }
 
-  const btn = "px-sm py-1 border border-outline text-primary font-label-sm text-label-sm hover:bg-surface-container disabled:opacity-50";
+  const btn = "min-h-11 px-sm py-1 border border-outline text-primary font-label-sm text-label-sm hover:bg-surface-container disabled:opacity-50";
 
   return (
     <div
@@ -106,7 +106,7 @@ function NoticeBanner({
           {n.documents.map((d) => (
             <li key={d.path} className="flex flex-wrap items-center justify-between gap-xs text-body-sm">
               <span>
-                <span className="font-bold">{frDate(d.created_at)}</span> — {d.excerpt}
+                <span className="font-bold">{frDate(d.created_at)}</span> · {d.excerpt}
               </span>
               <button
                 type="button"
