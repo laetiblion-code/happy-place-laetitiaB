@@ -191,9 +191,7 @@ export function computeAdminGaps(
   users: { team: string | null; role: string | null; managedTeams: string[] }[],
 ): AdminGaps {
   const managed = new Set(
-    users
-      .filter((u) => u.role === "manager")
-      .flatMap((u) => u.managedTeams.map(teamKey)),
+    users.filter((u) => u.role === "manager").flatMap((u) => u.managedTeams.map(teamKey)),
   );
   const teamsWithoutManager = teams
     .filter((t) => !t.is_reserved && teamKey(t.name) !== "admin" && !managed.has(teamKey(t.name)))
@@ -209,9 +207,7 @@ export function computeAdminGaps(
 export async function fetchAdminGaps(): Promise<AdminGaps> {
   const [teamsRes, usersRes] = await Promise.all([
     supabase.from("teams").select("name, is_reserved"),
-    supabase
-      .from("allowed_users")
-      .select("team, allowed_user_roles(role), manager_teams(team)"),
+    supabase.from("allowed_users").select("team, allowed_user_roles(role), manager_teams(team)"),
   ]);
   if (teamsRes.error) throw teamsRes.error;
   if (usersRes.error) throw usersRes.error;
@@ -223,4 +219,115 @@ export async function fetchAdminGaps(): Promise<AdminGaps> {
       managedTeams: (u.manager_teams ?? []).map((m) => m.team),
     })),
   );
+}
+
+// --- Objectifs du trimestre (compteurs de l'accueil) -------------------------
+
+const DECISIONS = ["validée", "refusée"] as const;
+const LOT_IDS = 100;
+/** Fenêtre glissante des compteurs d'objectifs : les 30 derniers jours. */
+const FENETRE_MS = 30 * DAY_MS;
+
+export type DelaiValidation = {
+  /** Délai moyen en jours calendaires, une décimale. */
+  jours: number;
+  /** Nombre de demandes prises en compte. */
+  nb: number;
+};
+
+/**
+ * Délai moyen de validation sur 30 jours (même définition que K3.1) : jours calendaires entre la création
+ * d'une demande de collaborateur et sa première décision (validée ou refusée), pour les demandes décidées
+ * dans les 30 derniers jours. Les demandes de manager et d'admin sont validées dès l'envoi : elles n'ont pas
+ * d'historique « en attente », donc elles sont exclues.
+ *
+ * Décision du 2026-10-30 : une demande « à clarifier » sort du délai de validation. Toute demande dont
+ * l'historique contient un refus « à clarifier » est donc exclue, même si elle a été décidée ensuite.
+ *
+ * Périmètre : `teams` = équipes gérées par le manager, null pour l'admin. L'admin lit tout ce que la RLS
+ * lui laisse voir : la RLS ne lui montre pas les demandes privées des équipes qui ont un manager. Le délai
+ * du cabinet ne compte donc pas ces demandes-là ; il n'y a pas de règle de périmètre supplémentaire ici.
+ */
+export async function fetchDelaiValidation(
+  teams: string[] | null,
+): Promise<DelaiValidation | null> {
+  if (teams && teams.length === 0) return null;
+  const debut = new Date(Date.now() - FENETRE_MS).toISOString();
+  const { data: decidees, error: e1 } = await supabase
+    .from("submission_status_history")
+    .select("submission_id")
+    .eq("old_status", "en attente")
+    .in("new_status", [...DECISIONS])
+    .gte("changed_at", debut);
+  if (e1) throw e1;
+  const ids = [...new Set((decidees ?? []).map((h) => h.submission_id))];
+  if (ids.length === 0) return null;
+
+  // Première décision de chaque demande, depuis sa création (pas seulement depuis le début de la fenêtre)
+  const premiere = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += LOT_IDS) {
+    const { data, error } = await supabase
+      .from("submission_status_history")
+      .select("submission_id, changed_at")
+      .eq("old_status", "en attente")
+      .in("new_status", [...DECISIONS])
+      .in("submission_id", ids.slice(i, i + LOT_IDS))
+      .order("changed_at", { ascending: true });
+    if (error) throw error;
+    for (const h of data ?? [])
+      if (!premiere.has(h.submission_id)) premiere.set(h.submission_id, h.changed_at);
+  }
+
+  // Demandes passées par « à clarifier » (décision du 2026-10-30) : hors du délai, à tout moment de leur historique
+  const aClarifier = new Set<string>();
+  for (let i = 0; i < ids.length; i += LOT_IDS) {
+    const { data, error } = await supabase
+      .from("submission_status_history")
+      .select("submission_id")
+      .eq("rejection_category", "à clarifier")
+      .in("submission_id", ids.slice(i, i + LOT_IDS));
+    if (error) throw error;
+    for (const h of data ?? []) aClarifier.add(h.submission_id);
+  }
+
+  const retenues = [...premiere]
+    .filter(([id, date]) => new Date(date).getTime() >= Date.parse(debut) && !aClarifier.has(id))
+    .map(([id]) => id);
+  if (retenues.length === 0) return null;
+  const jours: number[] = [];
+  for (let i = 0; i < retenues.length; i += LOT_IDS) {
+    let q = supabase
+      .from("submissions")
+      .select("id, created_at, team")
+      .in("id", retenues.slice(i, i + LOT_IDS));
+    if (teams) q = q.in("team", teams);
+    const { data, error } = await q;
+    if (error) throw error;
+    for (const s of data ?? []) {
+      const decision = premiere.get(s.id);
+      if (decision)
+        jours.push((new Date(decision).getTime() - new Date(s.created_at).getTime()) / DAY_MS);
+    }
+  }
+  if (jours.length === 0) return null;
+  const moyenne = jours.reduce((a, b) => a + b, 0) / jours.length;
+  return { jours: Math.round(moyenne * 10) / 10, nb: jours.length };
+}
+
+export type PublicationActus = {
+  /** Actualités créées dans les 30 derniers jours, tous statuts. */
+  commencees: number;
+  /** Parmi elles, les publiées. */
+  publiees: number;
+};
+
+/** Actualités créées dans les 30 derniers jours : publiées et toutes (lecture admin). */
+export async function fetchPublicationActus(): Promise<PublicationActus> {
+  const { data, error } = await supabase
+    .from("news")
+    .select("status")
+    .gte("created_at", new Date(Date.now() - FENETRE_MS).toISOString());
+  if (error) throw error;
+  const rows = data ?? [];
+  return { commencees: rows.length, publiees: rows.filter((n) => n.status === "publiée").length };
 }

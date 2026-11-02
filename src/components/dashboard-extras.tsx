@@ -90,13 +90,13 @@ export function ValidatedSubmissions({
     <section className="col-span-12 min-w-0 rounded-lg bg-surface-container-lowest border border-outline-variant p-md">
       <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm mb-md">
         <h2 className="font-headline-sm text-headline-sm text-primary">Demandes validées</h2>
-        <label className="flex items-center gap-xs font-label-sm text-label-sm text-on-surface-variant min-w-0">
+        <label className="flex items-center gap-xs font-label-sm text-sm text-on-surface-variant min-w-0">
           <span className="sr-only">Filtrer par équipe</span>
           <select
             aria-label="Filtrer par équipe"
             value={team}
             onChange={(e) => { setTeam(e.target.value); setLimit(PAGE); }}
-            className="max-w-full bg-card border border-[#8A8A90] p-xs focus:outline-none focus:border-primary"
+            className="max-w-full min-h-11 bg-card border border-[#8A8A90] px-sm py-xs text-sm font-label-sm focus:outline-none focus:border-primary"
           >
             <option value="">Toutes les équipes</option>
             {teams.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -111,7 +111,7 @@ export function ValidatedSubmissions({
       <div className="grid gap-xs md:grid-cols-2">
         {shown.map((s) => (
           <div key={s.id} className="p-sm rounded-lg border border-outline-variant bg-card min-w-0 overflow-hidden space-y-xs">
-            <p className="text-[11px] font-label-sm text-on-surface-variant uppercase wrap-anywhere">
+            <p className="text-sm font-label-sm text-on-surface-variant uppercase wrap-anywhere">
               <span className="text-primary font-bold">{s.author_name}</span> • {s.team} •{" "}
               {s.validated_at ? (
                 <DelaiStatut status="validée" depuis={s.validated_at} />
@@ -124,7 +124,7 @@ export function ValidatedSubmissions({
               (canReadAttachment(s, { role, email, managerTeams }) ? (
                 <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
               ) : (
-                <p className="text-[11px] font-label-sm text-on-surface-variant italic">Pièce jointe réservée à l'équipe</p>
+                <p className="text-sm font-label-sm text-on-surface-variant italic">Pièce jointe réservée à l'équipe</p>
               ))}
           </div>
         ))}
@@ -133,7 +133,7 @@ export function ValidatedSubmissions({
         <button
           type="button"
           onClick={() => setLimit((l) => l + PAGE)}
-          className="mt-md font-label-sm text-label-sm text-primary underline"
+          className="mt-md inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline"
         >
           Afficher plus ({filtered.length - limit} restantes)
         </button>

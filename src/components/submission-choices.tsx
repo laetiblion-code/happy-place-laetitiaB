@@ -64,13 +64,21 @@ export function ChoiceGroup({
               <label
                 htmlFor={id}
                 className={[
-                  "relative flex min-h-[44px] cursor-pointer select-none items-center gap-xs border-2 transition-colors",
+                  "relative box-border flex min-h-[44px] cursor-pointer select-none items-center gap-xs transition-colors",
                   "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#28282D]",
                   layout === "cards"
-                    ? "flex-col justify-center p-sm text-center"
-                    : "rounded-full px-md py-xs",
-                  checked ? "border-[#28282D]" : "border-transparent",
-                  "bg-[#EDEBE6] hover:border-[#28282D]/40",
+                    ? [
+                        "flex-col justify-center rounded-[6px] p-sm text-center",
+                        // Carte : bordure grise au repos, anthracite de 2 px et fond plus foncé quand elle est choisie
+                        checked
+                          ? "border-2 border-[#28282D] bg-[#E0DDD5]"
+                          : "border border-[#8A8A90] bg-[#EDEBE6] hover:border-[#28282D] hover:bg-[#E4E1DA]",
+                      ].join(" ")
+                    : [
+                        "rounded-full border-2 px-md py-xs",
+                        checked ? "border-[#28282D]" : "border-transparent",
+                        "bg-[#EDEBE6] hover:border-[#28282D]/40",
+                      ].join(" "),
                 ].join(" ")}
               >
                 {layout === "cards" ? (
@@ -84,7 +92,12 @@ export function ChoiceGroup({
                   {o.label}
                 </span>
                 {layout === "cards" ? (
-                  checked && <Check aria-hidden="true" className="absolute right-xs top-xs h-4 w-4 text-[#28282D]" />
+                  checked && (
+                    <>
+                      <Check aria-hidden="true" className="absolute right-xs top-xs h-4 w-4 text-[#28282D]" />
+                      <span className="sr-only">choisi</span>
+                    </>
+                  )
                 ) : (
                   // Emplacement toujours réservé : la pilule garde la même largeur selon l'état
                   <span aria-hidden="true" className={`flex h-4 w-4 shrink-0 items-center justify-center ${checked ? "" : "invisible"}`}>
@@ -119,14 +132,14 @@ export function SubmissionTags({ category, visibility }: { category?: string | n
   return (
     <div className="flex flex-wrap gap-xs">
       {cat && (
-        <span className="inline-flex items-center gap-xs bg-[#EDEBE6] px-xs py-[2px] font-label-sm text-label-sm uppercase text-[#28282D]">
-          <cat.icon aria-hidden="true" className="h-3 w-3" />
+        <span className="inline-flex min-h-7 items-center gap-xs bg-[#EDEBE6] px-sm py-xs font-label-sm text-sm uppercase text-[#28282D]">
+          <cat.icon aria-hidden="true" className="h-3.5 w-3.5" />
           {cat.label}
         </span>
       )}
       {vis && (
-        <span className={`inline-flex items-center gap-xs rounded-full bg-[#EDEBE6] px-xs py-[2px] font-label-sm text-label-sm text-[#28282D] ${vis.labelClass ?? ""}`}>
-          <vis.icon aria-hidden="true" className="h-3 w-3" />
+        <span className={`inline-flex min-h-7 items-center gap-xs rounded-full bg-[#EDEBE6] px-sm py-xs font-label-sm text-sm text-[#28282D] ${vis.labelClass ?? ""}`}>
+          <vis.icon aria-hidden="true" className="h-3.5 w-3.5" />
           {vis.label}
         </span>
       )}

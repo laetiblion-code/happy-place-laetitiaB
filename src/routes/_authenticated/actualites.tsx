@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { BrandHeader } from "@/components/brand-header";
+import { SessionHeader } from "@/components/session-header";
 import { NewsReader } from "@/components/news-reader";
 import { NewsImage, NewsLinks } from "@/components/news-media";
 import { buttonVariants } from "@/components/ui/button";
@@ -42,7 +42,7 @@ function ActualitesPage() {
 
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen">
-      <BrandHeader />
+      <SessionHeader />
       <main id="contenu" className="w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-sm">
           <h1 className="font-headline-lg text-headline-lg text-primary">Actualités</h1>

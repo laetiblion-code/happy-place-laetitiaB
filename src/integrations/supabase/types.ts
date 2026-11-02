@@ -242,25 +242,31 @@ export type Database = {
       }
       metrics: {
         Row: {
+          higher_is_better: boolean
           key: string
           label: string
           on_dashboard: boolean
+          target: number | null
           unit: string | null
           updated_at: string
           value: number
         }
         Insert: {
+          higher_is_better?: boolean
           key: string
           label: string
           on_dashboard?: boolean
+          target?: number | null
           unit?: string | null
           updated_at?: string
           value: number
         }
         Update: {
+          higher_is_better?: boolean
           key?: string
           label?: string
           on_dashboard?: boolean
+          target?: number | null
           unit?: string | null
           updated_at?: string
           value?: number
@@ -468,9 +474,12 @@ export type Database = {
       metrics_with_trend: {
         Row: {
           delta: number | null
+          higher_is_better: boolean | null
           key: string | null
           label: string | null
+          on_dashboard: boolean | null
           previous_value: number | null
+          target: number | null
           trend: string | null
           unit: string | null
           updated_at: string | null
