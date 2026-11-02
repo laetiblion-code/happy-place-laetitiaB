@@ -44,7 +44,7 @@ function ManageLayout() {
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen">
       <SessionHeader />
-      <main id="contenu" className="w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
+      <main id="contenu" tabIndex={-1} className="focus:outline-none w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
         <Outlet />
       </main>
     </div>

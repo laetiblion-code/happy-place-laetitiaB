@@ -5,6 +5,7 @@ import {
   useEffect,
   useId,
   useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactElement,
   type ReactNode,
 } from "react";
@@ -97,47 +98,46 @@ export function Modal({
   const fermer = useRef(onClose);
   fermer.current = onClose;
 
-  // Focus placé dans la fenêtre, piégé pendant qu'elle est ouverte, rendu au bouton d'origine, Échap ferme.
+  // Focus placé dans la fenêtre au montage, rendu au bouton d'origine au démontage.
+  // La fenêtre n'est montée que lorsqu'elle est ouverte (les appelants font `{ouvert && <Modal …/>}`) :
+  // aucun écouteur global n'existe quand elle est fermée. Le piège du Tab et Échap sont liés à la fenêtre (onKeyDown).
   useEffect(() => {
     const origine = document.activeElement as HTMLElement | null;
-    const focusables = () =>
-      Array.from(
-        boite.current?.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ) ?? [],
-      );
     // Focus initial : premier champ du formulaire, sinon premier bouton du corps (pas « Fermer »), sinon la fenêtre elle-même.
     const corps = boite.current?.querySelector<HTMLElement>("[data-corps-modale]") ?? null;
     const dansCorps = (sel: string) => Array.from(corps?.querySelectorAll<HTMLElement>(sel) ?? []);
     const champ = dansCorps('input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])')[0];
     const bouton = dansCorps("button:not([disabled]), a[href]")[0];
     (champ ?? bouton ?? boite.current)?.focus();
-    function surTouche(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        fermer.current();
-        return;
-      }
-      if (e.key !== "Tab") return;
-      const items = focusables();
-      if (items.length === 0) return;
-      const premier = items[0];
-      const dernier = items[items.length - 1];
-      const actif = document.activeElement;
-      if (e.shiftKey && (actif === premier || !boite.current?.contains(actif))) {
-        e.preventDefault();
-        dernier.focus();
-      } else if (!e.shiftKey && (actif === dernier || !boite.current?.contains(actif))) {
-        e.preventDefault();
-        premier.focus();
-      }
-    }
-    document.addEventListener("keydown", surTouche);
     return () => {
-      document.removeEventListener("keydown", surTouche);
       origine?.focus?.();
     };
   }, []);
+
+  function surTouche(e: ReactKeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      fermer.current();
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const items = Array.from(
+      boite.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    );
+    if (items.length === 0) return;
+    const premier = items[0];
+    const dernier = items[items.length - 1];
+    const actif = document.activeElement;
+    if (e.shiftKey && (actif === premier || !boite.current?.contains(actif))) {
+      e.preventDefault();
+      dernier.focus();
+    } else if (!e.shiftKey && (actif === dernier || !boite.current?.contains(actif))) {
+      e.preventDefault();
+      premier.focus();
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-sm md:p-lg">
@@ -147,6 +147,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titreId}
         tabIndex={-1}
+        onKeyDown={surTouche}
         className="w-full max-w-2xl rounded-lg bg-surface-container-lowest border border-outline p-md space-y-md"
       >
         <div className="flex items-center justify-between border-b border-outline-variant pb-sm">

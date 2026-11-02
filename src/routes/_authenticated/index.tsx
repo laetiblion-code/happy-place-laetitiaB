@@ -277,7 +277,7 @@ function ManagerSpace() {
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
       <SessionHeader />
-      <main id="contenu" className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-lg">
+      <main id="contenu" tabIndex={-1} className="focus:outline-none flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-lg">
         <header className="flex flex-wrap items-end justify-between gap-md">
           <div className="min-w-0 space-y-xs">
             <h1 className="font-headline-lg text-headline-lg text-primary wrap-anywhere">{greeting}</h1>

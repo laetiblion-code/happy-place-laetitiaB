@@ -47,7 +47,7 @@ function DemandesPage() {
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen">
       <SessionHeader />
-      <main id="contenu" className="w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
+      <main id="contenu" tabIndex={-1} className="focus:outline-none w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-sm">
           <h1 className="font-headline-lg text-headline-lg text-primary">Demandes du cabinet</h1>
           <Link to="/" className={buttonVariants({ variant: "secondary" })}>

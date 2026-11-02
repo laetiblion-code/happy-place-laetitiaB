@@ -52,7 +52,7 @@ function AccesNonAutorise({ email }: { email: string }) {
   return (
     <div className="min-h-dvh w-full bg-background flex flex-col">
       <BrandHeader />
-      <main id="contenu" className="flex flex-1 items-center justify-center px-md py-lg">
+      <main id="contenu" tabIndex={-1} className="focus:outline-none flex flex-1 items-center justify-center px-md py-lg">
         <section className="w-[min(100%,28rem)] border border-outline-variant bg-surface-container-lowest p-lg shadow-sm">
           <h1 className="font-headline-lg text-headline-lg text-primary">Accès non autorisé</h1>
           <p className="mt-sm font-body-md text-body-md text-on-surface-variant" role="alert">
