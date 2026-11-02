@@ -56,7 +56,12 @@ export function ChipStatut({
       aria-label={label}
       className={`${SOCLE_PASTILLE} rounded-[4px] font-semibold cursor-default ${couleur} ${className}`}
     >
-      {icon && <IconeMateriel name={icon} className="h-4 w-4 shrink-0 text-[16px] leading-none" />}
+      {icon && (
+        <IconeMateriel
+          name={icon}
+          className="!flex !h-4 !w-4 shrink-0 items-center justify-center overflow-visible !text-[16px] !leading-none"
+        />
+      )}
       <span className="min-w-0 truncate">{children}</span>
     </span>
   );
