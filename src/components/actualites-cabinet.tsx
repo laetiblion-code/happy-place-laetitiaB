@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useConfirm } from "@/components/confirm-dialog";
 import { FormActions, Modal } from "@/components/manage/crud-ui";
 import { NewsAiHelper } from "@/components/news-ai-helper";
-import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
+import { NewsLinks, NewsMediaEditor, NewsVignette } from "@/components/news-media";
 import { NewsReader } from "@/components/news-reader";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -303,7 +303,7 @@ export function ActualitesCabinet({
           </p>
         )}
         <ul className="space-y-sm">
-          {published.slice(0, 4).map((n, i) => (
+          {published.slice(0, 4).map((n) => (
             <li
               key={n.id}
               className="flex min-w-0 gap-sm border-t border-outline-variant pt-sm first:border-t-0 first:pt-0"
@@ -314,12 +314,12 @@ export function ActualitesCabinet({
               >
                 {formatDateCourte(n.created_at)}
               </time>
+              {n.image_path && <NewsVignette path={n.image_path} alt={n.title} />}
               <div className="min-w-0 flex-1 space-y-xs">
                 <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
                 <p className="font-label-sm text-sm text-on-surface-variant">
                   {`Par ${nomAffiche(n.author ?? "", noms)}`}
                 </p>
-                {i === 0 && n.image_path && <NewsImage path={n.image_path} alt={n.title} />}
                 <NewsLinks links={n.links} />
                 <div className="flex flex-wrap items-center gap-sm">
                   <button

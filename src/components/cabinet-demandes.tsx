@@ -57,6 +57,8 @@ export function DemandesCabinet({
   const [equipe, setEquipe] = useState("");
   const [limite, setLimite] = useState(PAGE);
   const premiereAjoutee = useRef<HTMLTableRowElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const titreRef = useRef<HTMLHeadingElement>(null);
 
   const toutes = useMemo(() => q.data ?? [], [q.data]);
   const equipes = useMemo(
@@ -85,11 +87,17 @@ export function DemandesCabinet({
 
   return (
     <section
+      ref={sectionRef}
       aria-labelledby="titre-cabinet"
       className="min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest p-md"
     >
       <div className="space-y-xs border-b border-outline-variant pb-sm">
-        <h2 id="titre-cabinet" className="font-headline-sm text-headline-sm text-primary">
+        <h2
+          ref={titreRef}
+          id="titre-cabinet"
+          tabIndex={-1}
+          className="font-headline-sm text-headline-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
           10 dernières demandes du cabinet
         </h2>
         <p className="font-body-md text-on-surface-variant">
@@ -247,14 +255,33 @@ export function DemandesCabinet({
         </div>
       )}
 
-      {filtrees.length > limite && (
-        <button
-          type="button"
-          onClick={() => setLimite((l) => l + PAGE)}
-          className="mt-md inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline underline-offset-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          {`Voir toutes les demandes (${filtrees.length})`}
-        </button>
+      {(filtrees.length > limite || limite > PAGE) && (
+        <div className="mt-md flex flex-wrap items-center gap-md">
+          {filtrees.length > limite && (
+            <button
+              type="button"
+              onClick={() => setLimite((l) => l + PAGE)}
+              className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <span className="underline underline-offset-2">{`Voir toutes les demandes (${filtrees.length})`}</span>
+            </button>
+          )}
+          {limite > PAGE && (
+            <button
+              type="button"
+              onClick={() => {
+                setLimite(PAGE);
+                // Le focus revient au titre du bloc ; le bloc remonte à l'écran s'il est sorti vers le haut
+                titreRef.current?.focus({ preventScroll: true });
+                const haut = sectionRef.current?.getBoundingClientRect().top ?? 0;
+                if (haut < 0) sectionRef.current?.scrollIntoView({ block: "start" });
+              }}
+              className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <span className="underline underline-offset-2">Revenir aux 10 dernières</span>
+            </button>
+          )}
+        </div>
       )}
     </section>
   );

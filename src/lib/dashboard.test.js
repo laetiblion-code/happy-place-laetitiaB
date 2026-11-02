@@ -7,6 +7,7 @@ const {
   formatMetricValue,
   formatObjectif,
   libelleTendance,
+  decomposerDuree,
   ordreAccueil,
   progressionObjectif,
 } = await import("./dashboard");
@@ -85,5 +86,16 @@ describe("metric numeric formatting", () => {
   });
   test("no target, no progress", () => {
     expect(progressionObjectif({ value: 34, target: null, higher_is_better: true })).toBeNull();
+  });
+});
+
+describe("short durations", () => {
+  const now = Date.UTC(2026, 10, 2, 12, 0);
+  const il = (ms) => new Date(now - ms).toISOString();
+  test("days and hours are unit-only, minutes stay written out", () => {
+    expect(decomposerDuree(il(5 * 86_400_000), now)).toEqual({ unite: "jour", n: 5 });
+    expect(decomposerDuree(il(18 * 3_600_000), now)).toEqual({ unite: "heure", n: 18 });
+    expect(decomposerDuree(il(42 * 60_000), now)).toEqual({ unite: "minute", n: 42 });
+    expect(decomposerDuree(il(20_000), now)).toEqual({ unite: "instant" });
   });
 });

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { SessionHeader } from "@/components/session-header";
 import { NewsReader } from "@/components/news-reader";
-import { NewsImage, NewsLinks } from "@/components/news-media";
+import { NewsLinks, NewsVignette } from "@/components/news-media";
 import { buttonVariants } from "@/components/ui/button";
 import { fetchNews, timeAgo, type News } from "@/lib/dashboard";
 import { nomAffiche, useNomsAffiches } from "@/lib/noms";
@@ -69,14 +69,16 @@ function ActualitesPage() {
                 id={`actualite-${i}`}
                 onClick={() => setLu(n)}
                 aria-haspopup="dialog"
-                className="w-full text-left group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="flex w-full items-center gap-sm text-left group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
-                {n.image_path && <NewsImage path={n.image_path} alt={n.title} />}
-                <span className="block font-body-md text-primary group-hover:underline wrap-anywhere">
-                  {n.title}
-                </span>
-                <span className="block text-xs text-on-surface-variant uppercase font-label-sm">
-                  Publiée {timeAgo(n.created_at)} • Par {nomAffiche(n.author ?? "", noms)}
+                {n.image_path && <NewsVignette path={n.image_path} alt={n.title} />}
+                <span className="min-w-0 flex-1">
+                  <span className="block font-body-md text-primary group-hover:underline wrap-anywhere">
+                    {n.title}
+                  </span>
+                  <span className="block text-xs text-on-surface-variant uppercase font-label-sm">
+                    Publiée {timeAgo(n.created_at)} • Par {nomAffiche(n.author ?? "", noms)}
+                  </span>
                 </span>
               </button>
               <NewsLinks links={n.links} />

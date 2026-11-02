@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { formatNumberFr, formatObjectif } from "@/lib/dashboard";
+import { Unite } from "@/components/duree-courte";
 import {
   noun,
   plural,
@@ -21,7 +22,18 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 }
 
 /** Pilule d'information : icône et texte, jamais la couleur seule. 14 px, hauteur minimale 28 px. */
-function Chip({ icon, label, className }: { icon: string; label: string; className: string }) {
+/** `label` : texte complet, lu par les lecteurs d'écran. `visible` : version affichée (unités abrégées). */
+function Chip({
+  icon,
+  label,
+  visible,
+  className,
+}: {
+  icon: string;
+  label: string;
+  visible?: ReactNode;
+  className: string;
+}) {
   return (
     <span
       role="group"
@@ -29,7 +41,7 @@ function Chip({ icon, label, className }: { icon: string; label: string; classNa
       className={`inline-flex min-h-7 items-center gap-xs rounded-full px-sm py-xs font-label-sm text-sm ${className}`}
     >
       <Icon name={icon} className="text-base" />
-      {label}
+      {visible ?? label}
     </span>
   );
 }
@@ -58,9 +70,7 @@ function StatCard({
       className="flex flex-col gap-sm rounded-lg border border-[#CDCDD1] bg-white p-md"
     >
       <div className="flex items-start justify-between gap-sm">
-        <h2 className="font-label-md text-base font-semibold text-primary">
-          {title}
-        </h2>
+        <h2 className="font-label-md text-base font-semibold text-primary">{title}</h2>
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#F5D5D4] text-primary">
           <Icon name={icon} />
         </span>
@@ -81,7 +91,7 @@ function BigNumber({ value, label }: { value: string; label: string }) {
 }
 
 /** Ligne d'objectif : icône et texte, sous un trait séparateur. */
-function LigneObjectif({ icon, texte }: { icon: string; texte: string }) {
+function LigneObjectif({ icon, texte }: { icon: string; texte: ReactNode }) {
   return (
     <p className="flex items-start gap-xs font-label-sm text-sm text-on-surface">
       <Icon name={icon} className="text-base shrink-0" />
@@ -97,12 +107,14 @@ const ETAT_STYLE: Record<EtatObjectif, { icon: string; classe: string; accord: s
 };
 
 /** État d'un objectif : icône et texte (jamais la couleur seule). */
-function LigneEtat({ etat, objectif }: { etat: EtatObjectif; objectif: string }) {
+function LigneEtat({ etat, objectif }: { etat: EtatObjectif; objectif: ReactNode }) {
   const style = ETAT_STYLE[etat];
   return (
     <p className={`flex items-start gap-xs font-label-sm text-sm font-semibold ${style.classe}`}>
       <Icon name={style.icon} className="text-base shrink-0" />
-      <span>{`Objectif ${objectif} ${style.accord}`}</span>
+      <span>
+        Objectif {objectif} {style.accord}
+      </span>
     </p>
   );
 }
@@ -132,16 +144,31 @@ function PiedDelai({
   }
   const { delaiValidationJours } = OBJECTIFS_TRIMESTRE;
   const jours = formatNumberFr(delai.jours, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  // Accord : moins de 2 jours au singulier (« 1,4 jour »), à partir de 2 au pluriel (« 2 jours »)
-  const unite = delai.jours < 2 ? "jour" : "jours";
+  // Accord : moins de 2 jours au singulier (« 1,4 j » pour la lecture : « 1,4 jour »), à partir de 2 au pluriel
+  const pluriel = delai.jours >= 2;
   const libelle = isAdmin
-    ? "Délai de validation du cabinet sur 30 jours"
-    : "Délai de validation de tes équipes sur 30 jours";
+    ? "Délai de validation du cabinet sur "
+    : "Délai de validation de tes équipes sur ";
   const etat = etatObjectif(delai.jours, delaiValidationJours, "plusBas");
-  const objectif = `de moins de ${plural(delaiValidationJours, "jour", "jours")}`;
+  const objectif = (
+    <>
+      de moins de{" "}
+      <Unite valeur={String(delaiValidationJours)} unite="j" pluriel={delaiValidationJours >= 2} />
+    </>
+  );
   return (
     <PiedObjectif>
-      <LigneObjectif icon="flag" texte={`${libelle} : ${jours} ${unite}`} />
+      <LigneObjectif
+        icon="flag"
+        texte={
+          <>
+            {libelle}
+            <Unite valeur="30" unite="j" pluriel />
+            {" : "}
+            <Unite valeur={jours} unite="j" pluriel={pluriel} />
+          </>
+        }
+      />
       <LigneEtat etat={etat} objectif={objectif} />
     </PiedObjectif>
   );
@@ -219,6 +246,12 @@ export function ManagerCards({
             <Chip
               icon="hourglass_empty"
               label={`${formatNumberFr(old)} en attente depuis plus de 3 jours`}
+              visible={
+                <>
+                  {formatNumberFr(old)} en attente depuis plus de 3{" "}
+                  <Unite valeur="3" unite="j" pluriel />
+                </>
+              }
               className={SAND}
             />
           </div>

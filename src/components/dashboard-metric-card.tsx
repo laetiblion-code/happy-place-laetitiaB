@@ -29,9 +29,13 @@ const MOT_TENDANCE: Record<Tendance, string> = {
   stable: "",
 };
 
-/** Remplissage en dégradé dans la charte, sans jaune. Le texte de pourcentage porte aussi l'information. */
-const DEGRADE_EN_COURS = "linear-gradient(90deg, #F5D5D4, #C99695)";
-const DEGRADE_ATTEINT = "linear-gradient(90deg, #B8DCC4, #1F6B38)";
+/**
+ * Dégradé fixe sur toute la longueur de la piste : rosé, orangé, sable, puis vert (plus foncé à 100 %).
+ * La partie non atteinte est recouverte par un masque couleur piste : une barre à 40 % montre le début
+ * du dégradé, une barre à 90 % le montre presque en entier. Les couleurs ne portent pas l'information seules.
+ */
+const DEGRADE_PISTE =
+  "linear-gradient(90deg, #D9777A 0%, #E89A6B 25%, #E2C08D 50%, #4E9A62 75%, #1F6B38 100%)";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -43,11 +47,10 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 
 /**
  * Barre de progression vers l'objectif : pilule de 10 px, piste bordée, pourcentage écrit à droite dessous.
- * Le remplissage glisse au chargement, sauf si la personne préfère moins de mouvement (motion-safe).
+ * Le masque glisse du bout de la barre vers le pourcentage atteint (motion-safe : sans mouvement sinon).
  */
 function BarreObjectif({
   ratio,
-  atteint,
   libelle,
   valeurTexte,
   objectif,
@@ -61,10 +64,10 @@ function BarreObjectif({
   plusBasEstMieux: boolean;
 }) {
   const pourcent = Math.round(ratio * 100);
-  // Le remplissage part de 0 puis atteint sa valeur après le premier affichage (transition visible au chargement)
-  const [largeur, setLargeur] = useState(0);
+  // Le masque couvre tout au départ, puis se place à la valeur atteinte après le premier affichage
+  const [masque, setMasque] = useState(100);
   useEffect(() => {
-    const id = requestAnimationFrame(() => setLargeur(pourcent));
+    const id = requestAnimationFrame(() => setMasque(pourcent));
     return () => cancelAnimationFrame(id);
   }, [pourcent]);
 
@@ -81,14 +84,13 @@ function BarreObjectif({
         aria-valuemax={100}
         aria-valuenow={pourcent}
         aria-valuetext={valeurAccessible}
-        className="h-2.5 w-full overflow-hidden rounded-full border border-[#8A8A90] bg-[#EDEBE6]"
+        className="relative h-2.5 w-full overflow-hidden rounded-full border border-[#8A8A90] bg-[#EDEBE6]"
+        style={{ backgroundImage: DEGRADE_PISTE }}
       >
         <div
-          className="h-full rounded-full motion-safe:transition-[width] motion-safe:duration-700 motion-safe:ease-out"
-          style={{
-            width: `${largeur}%`,
-            backgroundImage: atteint ? DEGRADE_ATTEINT : DEGRADE_EN_COURS,
-          }}
+          aria-hidden="true"
+          className="absolute inset-y-0 right-0 bg-[#EDEBE6] motion-safe:transition-[left] motion-safe:duration-700 motion-safe:ease-out"
+          style={{ left: `${masque}%` }}
         />
       </div>
       <p aria-hidden="true" className="self-end font-label-sm text-sm tabular-nums text-[#68686D]">

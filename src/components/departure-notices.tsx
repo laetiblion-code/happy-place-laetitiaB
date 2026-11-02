@@ -422,14 +422,18 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
         </p>
       </div>
 
-      <div className={`${colonne} flex-1 space-y-xs`}>
-        {count > 0 ? (
-          <>
+      <div className={`${colonne} min-w-0 flex-1 space-y-xs`}>
+        <div className="flex flex-wrap items-center justify-between gap-sm">
+          {count > 0 ? (
             <p className={`flex items-center gap-xs font-label-sm text-sm font-semibold ${ROUGE}`}>
               <Icon name="attach_file" className="text-base shrink-0" />
               {plural(count, "document", "documents")}
             </p>
-            <div className="flex flex-wrap gap-xs">
+          ) : (
+            <p className="font-label-sm text-sm text-on-surface-variant">Aucun document requis</p>
+          )}
+          {count > 0 ? (
+            <div className="flex flex-wrap items-center gap-xs">
               <button
                 type="button"
                 className={bouton}
@@ -458,37 +462,7 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
                 J'ai téléchargé les documents
               </button>
             </div>
-            {open && (
-              <ul className="space-y-xs border-t border-outline-variant pt-xs">
-                {n.documents.map((d) => (
-                  <li
-                    key={d.path}
-                    className="flex flex-wrap items-center justify-between gap-xs text-body-sm"
-                  >
-                    <span>
-                      <span className="font-bold">{FR_LONG.format(new Date(d.created_at))}</span> ·{" "}
-                      {d.excerpt}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label={`Télécharger le document du ${FR_COURT.format(new Date(d.created_at))} de ${ligne.nom}`}
-                      className="min-h-11 text-primary underline font-label-sm text-sm"
-                      onClick={() =>
-                        downloadAttachment(d.path, d.name).catch((e) =>
-                          toast.error((e as Error).message),
-                        )
-                      }
-                    >
-                      Télécharger
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        ) : (
-          <>
-            <p className="font-label-sm text-sm text-on-surface-variant">Aucun document requis</p>
+          ) : (
             <button
               type="button"
               className={bouton}
@@ -498,7 +472,34 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
             >
               J'ai pris note
             </button>
-          </>
+          )}
+        </div>
+        {open && (
+          <ul className="space-y-xs border-t border-outline-variant pt-xs">
+            {n.documents.map((d) => (
+              <li
+                key={d.path}
+                className="flex flex-wrap items-center justify-between gap-xs text-body-sm"
+              >
+                <span>
+                  <span className="font-bold">{FR_LONG.format(new Date(d.created_at))}</span> ·{" "}
+                  {d.excerpt}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Télécharger le document du ${FR_COURT.format(new Date(d.created_at))} de ${ligne.nom}`}
+                  className="min-h-11 text-primary underline font-label-sm text-sm"
+                  onClick={() =>
+                    downloadAttachment(d.path, d.name).catch((e) =>
+                      toast.error((e as Error).message),
+                    )
+                  }
+                >
+                  Télécharger
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </li>

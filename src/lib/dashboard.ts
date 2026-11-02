@@ -428,6 +428,25 @@ export async function updateMetric(input: { key: string; value: number }) {
   if (error) throw error;
 }
 
+/**
+ * Durée écoulée, décomposée pour l'affichage court : « 5 j », « 18 h ». Les minutes et l'instant restent
+ * écrits en toutes lettres. Même arrondi que `delaiTexte`.
+ */
+export type DureeEcoulee =
+  | { unite: "instant" }
+  | { unite: "minute"; n: number }
+  | { unite: "heure"; n: number }
+  | { unite: "jour"; n: number };
+
+export function decomposerDuree(iso: string, maintenant: number = Date.now()): DureeEcoulee {
+  const min = Math.round((maintenant - new Date(iso).getTime()) / 60000);
+  if (min < 1) return { unite: "instant" };
+  if (min < 60) return { unite: "minute", n: min };
+  const h = Math.round(min / 60);
+  if (h < 24) return { unite: "heure", n: h };
+  return { unite: "jour", n: Math.round(h / 24) };
+}
+
 /** Durée écoulée depuis une date, sans préfixe : « 5 jours », « 2 heures », « moins d'une minute ». */
 export function delaiTexte(iso: string): string {
   const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);

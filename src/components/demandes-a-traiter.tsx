@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { AttachmentLink } from "@/components/attachment-link";
 import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
 import { buttonVariants } from "@/components/ui/button";
-import { delaiTexte, type Submission } from "@/lib/dashboard";
+import { type Submission } from "@/lib/dashboard";
+import { DureeCourte } from "@/components/duree-courte";
 import { initialesDe } from "@/lib/noms";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
@@ -94,28 +95,30 @@ export function DemandesATraiter({
                 <div className="flex flex-wrap items-center gap-xs">
                   <span className="inline-flex min-h-7 items-center gap-xs rounded-full bg-[#F0D0BC] px-sm py-xs font-label-sm text-sm text-[#28282D]">
                     <Icon name="hourglass_empty" className="text-base" />
-                    {`En attente chez toi depuis ${delaiTexte(depuis)}`}
+                    <span>
+                      En attente chez toi depuis <DureeCourte iso={depuis} />
+                    </span>
                   </span>
                   <VisibilityChip visibility={s.visibility} />
                 </div>
               </div>
 
-              <div className="space-y-sm rounded-md bg-[#F5F4F1] p-sm">
+              <div className="space-y-sm rounded-md border border-[#E4E2DD] bg-[#FAF9F7] p-sm">
                 <CategoryChip category={s.category} />
                 <p className="line-clamp-4 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
                   {`« ${s.content} »`}
                 </p>
-                {/* Lire en entier : toujours en bas à droite de l'encadré, avec ou sans pièce jointe */}
+                {/* Voir tout : toujours en bas à droite de l'encadré, avec ou sans pièce jointe */}
                 <div className="flex flex-wrap items-center gap-sm">
                   <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
                   <button
                     type="button"
                     onClick={() => onRead(s)}
                     aria-haspopup="dialog"
-                    aria-label={`Lire en entier la demande de ${s.author_name}`}
+                    aria-label={`Voir toute la demande de ${s.author_name}`}
                     className="ml-auto inline-flex min-h-11 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
-                    <span className="underline underline-offset-2">Lire en entier</span>
+                    <span className="underline underline-offset-2">Voir tout</span>
                   </button>
                 </div>
               </div>
