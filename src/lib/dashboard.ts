@@ -242,7 +242,7 @@ export async function fetchMySubmissions(email: string): Promise<Submission[]> {
 }
 
 // Même règle que la badge de statut : une demande refusée « à clarifier » est une clarification demandée.
-const CATEGORIE_CLARIFICATION = "à clarifier";
+export const CATEGORIE_CLARIFICATION = "à clarifier";
 
 const LIBELLES_STATUT: Record<string, string> = {
   "en attente": "En attente",

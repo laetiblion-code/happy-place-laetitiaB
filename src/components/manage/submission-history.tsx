@@ -1,19 +1,39 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { CLARIFY_CATEGORY } from "@/components/status-badge";
-import { fetchSubmissionHistory, libelleChangement } from "@/lib/dashboard";
-import { nomAffiche, useNomsAffiches } from "@/lib/noms";
+import { Linkify } from "@/components/linkify";
+import { fetchSubmissionHistory } from "@/lib/dashboard";
+import { lignesHistorique } from "@/lib/historique-demande";
+import { useNomsAffiches } from "@/lib/noms";
 
-const fmt = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
-
-export function SubmissionHistory({ submissionId }: { submissionId: string }) {
-  const [open, setOpen] = useState(false);
-  const q = useQuery({
+/** Historique d'une demande (du plus récent au plus ancien). Partagé par « Mes demandes » et la gestion. */
+export function useHistoriqueDemande(submissionId: string, enabled = true) {
+  return useQuery({
     queryKey: ["submissions", "history", submissionId],
     queryFn: () => fetchSubmissionHistory(submissionId),
-    enabled: open,
+    enabled,
   });
+}
+
+/**
+ * Historique repliable. Sans `moi` (gestion), les noms complets sont affichés ; avec `moi` (« Mes demandes »),
+ * ses actions sont « toi » et les autres personnes apparaissent par leur prénom.
+ */
+export function SubmissionHistory({
+  submissionId,
+  moi,
+  attenteChez,
+  contenu,
+}: {
+  submissionId: string;
+  moi?: string;
+  attenteChez?: string;
+  contenu?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const q = useHistoriqueDemande(submissionId, open);
   const noms = useNomsAffiches((q.data ?? []).map((h) => h.changed_by_email ?? "")).data;
+  const lignes = q.data ? lignesHistorique(q.data, { moi, attenteChez, contenu, noms }) : [];
+
   return (
     <div className="mt-xs">
       <button
@@ -31,30 +51,19 @@ export function SubmissionHistory({ submissionId }: { submissionId: string }) {
           {q.data?.length === 0 && (
             <p className="text-sm italic text-on-surface-variant">Aucun changement enregistré.</p>
           )}
-          {q.data?.map((h, i) => {
-            const auteur = h.is_automatic
-              ? "Automatique"
-              : h.changed_by_email
-                ? nomAffiche(h.changed_by_email, noms)
-                : (h.changed_by_name ?? "Non renseigné");
-            return (
-              <div key={h.id} className="text-sm">
-                <p className="text-on-surface-variant">
-                  <span className="font-bold text-primary">{fmt.format(new Date(h.changed_at))}</span>
-                  {" · "}
-                  {libelleChangement(h, q.data?.[i + 1])}
-                  {" · "}
-                  {auteur}
+          {lignes.map((l) => (
+            <div key={l.id} className="text-sm">
+              <p className="text-on-surface-variant">
+                <span className="font-bold text-primary">{l.quand}</span>
+                {` · ${l.titre}`}
+              </p>
+              {l.detail && (
+                <p className="whitespace-pre-line text-on-surface wrap-anywhere">
+                  <Linkify text={l.detail} />
                 </p>
-                {h.new_status === "refusée" && h.rejection_category && (
-                  <p className={h.rejection_category === CLARIFY_CATEGORY ? "text-on-surface" : "text-error"}>
-                    Motif : {h.rejection_category}
-                    {h.rejection_note ? ` : ${h.rejection_note}` : ""}
-                  </p>
-                )}
-              </div>
-            );
-          })}
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

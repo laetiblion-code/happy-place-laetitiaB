@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
 import { StatusBadge } from "@/components/status-badge";
-import { LienBasBloc } from "@/components/chips";
+import { EtiquetteSoi, LienBasBloc } from "@/components/chips";
 import { formatExactDate } from "@/components/expandable-card";
 import { buttonVariants } from "@/components/ui/button";
 import { AttachmentLink } from "@/components/attachment-link";
@@ -48,6 +48,10 @@ export function DemandesCabinet({
   variante?: "accueil" | "page";
 }) {
   const PAGE = variante === "page" ? PAGE_COMPLETE : PAGE_ACCUEIL;
+  /** Demande envoyée par la personne connectée. */
+  function estMoi(s: Submission) {
+    return (s.submitted_by_email ?? "").toLowerCase() === email;
+  }
   /** Même règle que le stockage : admin, auteur, ou manager de l'équipe. */
   function peutLirePiece(s: Submission) {
     if (role === "admin") return true;
@@ -72,10 +76,7 @@ export function DemandesCabinet({
   );
   const filtrees = toutes.filter(
     (s) =>
-      (filtre === "toutes" ||
-        (filtre === "mes"
-          ? (s.submitted_by_email ?? "").toLowerCase() === email
-          : !!s.attachment_path)) &&
+      (filtre === "toutes" || (filtre === "mes" ? estMoi(s) : !!s.attachment_path)) &&
       (!equipe || s.team === equipe),
   );
   const visibles = filtrees.slice(0, limite);
@@ -214,8 +215,9 @@ export function DemandesCabinet({
                     )}
                   </td>
                   <td data-label="Auteur et demande" className={`${CELLULE} ${ETIQUETTE} min-w-0`}>
-                    <p className="font-body-sm font-bold text-primary wrap-anywhere">
-                      {`${s.author_name} · ${s.team}`}
+                    <p className="flex flex-wrap items-center gap-x-xs font-body-sm font-bold text-primary wrap-anywhere">
+                      <span>{`${s.author_name} · ${s.team}`}</span>
+                      {estMoi(s) && <EtiquetteSoi>Moi</EtiquetteSoi>}
                     </p>
                     {/* Texte tronqué sur une ligne ; « Voir » juste après (après les « … » s'il y en a) */}
                     <div className="flex min-w-0 flex-wrap items-center gap-x-sm">

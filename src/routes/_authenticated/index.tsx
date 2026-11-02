@@ -346,6 +346,7 @@ function ManagerSpace() {
               isError={mine.isError}
               changes={mineChanges}
               counts={homeMine.data}
+              email={myEmail}
               exporting={exporter.isPending}
               onExport={() => exporter.mutate()}
               onRead={setReading}

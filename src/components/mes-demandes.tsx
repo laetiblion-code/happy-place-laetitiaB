@@ -3,7 +3,10 @@ import { useState } from "react";
 import { AttachmentLink } from "@/components/attachment-link";
 import { Linkify } from "@/components/linkify";
 import { CLARIFY_CATEGORY, StatusBadge } from "@/components/status-badge";
-import { SubmissionHistory } from "@/components/manage/submission-history";
+import {
+  SubmissionHistory,
+  useHistoriqueDemande,
+} from "@/components/manage/submission-history";
 import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
 import { DureeCourte } from "@/components/duree-courte";
 import { ChipStatut, COULEUR_STATUT, LienBasBloc } from "@/components/chips";
@@ -19,7 +22,7 @@ import {
 } from "@/lib/dashboard";
 import type { MyCounts } from "@/lib/home-counts";
 import { MyChips } from "@/components/home-counters";
-import { dureeEnJours } from "@/lib/noms";
+import { dureeEnJours, nomAffiche, useNomsAffiches } from "@/lib/noms";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -47,17 +50,18 @@ function listePrenoms(managers: ManagerEquipe[]) {
   return `${prenoms.slice(0, -1).join(", ")} et ${prenoms[prenoms.length - 1]}`;
 }
 
+type Cible = { s: Submission; demandeur: string; attente: string };
+
 /**
  * « Mes demandes » (collaborateur). Le nom des managers vient de managers_de_mon_equipe() : prénom et nom
  * seulement, pour la seule équipe de la personne connectée. Aucun e-mail, aucun autre accès.
  */
-type Cible = { s: Submission; demandeur: string; attente: string };
-
 export function MesDemandes({
   items,
   isError,
   changes,
   counts,
+  email,
   exporting,
   onExport,
   onRead,
@@ -66,6 +70,8 @@ export function MesDemandes({
   isError: boolean;
   changes: Map<string, { new_status: string; changed_at: string }>;
   counts: MyCounts | undefined;
+  /** Adresse de la personne connectée : ses actions s'affichent « toi » dans l'historique. */
+  email: string;
   exporting: boolean;
   onExport: () => void;
   onRead: (s: Submission) => void;
@@ -129,6 +135,7 @@ export function MesDemandes({
             s={s}
             changes={changes}
             managers={managersDeEquipe(s.team, managers)}
+            moi={email}
             onRead={onRead}
             onCompleter={(c) => setCible(c)}
           />
@@ -158,16 +165,24 @@ export function MesDemandes({
   );
 }
 
+/** Prénom d'une personne, ou rien si seule son adresse est connue (jamais d'e-mail affiché). */
+function prenomOuRien(nom: string | null) {
+  if (!nom || nom.includes("@")) return null;
+  return nom.split(/\s+/)[0] ?? null;
+}
+
 function CarteDemande({
   s,
   changes,
   managers,
+  moi,
   onRead,
   onCompleter,
 }: {
   s: Submission;
   changes: Map<string, { new_status: string; changed_at: string }>;
   managers: ManagerEquipe[];
+  moi: string;
   onRead: (s: Submission) => void;
   onCompleter: (c: Cible) => void;
 }) {
@@ -177,11 +192,21 @@ function CarteDemande({
   // Prénoms affichés : « Kesha » ou « Kesha et Sophie ». Sans manager identifiable, « ton manager ».
   const prenoms = listePrenoms(managers);
   const qui = prenoms || "ton manager";
-  const Qui = prenoms || "Ton manager";
   const pluriel = managers.length > 1;
   const envoi = managers.length
     ? `Envoyée à ${prenoms} (${pluriel ? "managers" : "manager"} ${s.team})`
     : `Envoyée au manager de l'équipe ${s.team}`;
+
+  // Qui a demandé la clarification : la personne de la ligne d'historique « refusée à clarifier » (pas tous les managers)
+  const historique = useHistoriqueDemande(s.id, clarification);
+  const ligneClarification = historique.data?.find(
+    (h) => h.new_status === "refusée" && h.rejection_category === CLARIFY_CATEGORY,
+  );
+  const noms = useNomsAffiches([ligneClarification?.changed_by_email ?? ""]).data;
+  const demandeur = ligneClarification?.changed_by_email
+    ? prenomOuRien(nomAffiche(ligneClarification.changed_by_email, noms))
+    : null;
+  const Demandeur = demandeur ?? "Ton manager";
 
   return (
     <li
@@ -203,18 +228,21 @@ function CarteDemande({
       </div>
 
       <div className="flex flex-col gap-sm rounded-md bg-[#F5F4F1] p-sm">
-        <div className="flex flex-wrap items-start gap-sm">
-          <CategoryChip category={s.category} />
-          <p className="min-w-0 flex-1 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
-            {`« ${s.content} »`}
-          </p>
-        </div>
+        {/* Étiquette de type en ligne : le texte continue à côté et passe à la ligne dessous */}
+        <p className="min-w-0 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
+          {s.category && (
+            <span className="mr-xs inline-block align-middle">
+              <CategoryChip category={s.category} />
+            </span>
+          )}
+          {`« ${s.content} »`}
+        </p>
         <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
 
         {clarification && (
           <div className="border border-[#CDCDD1] bg-white p-sm text-body-sm text-on-surface wrap-anywhere">
             <p className="whitespace-pre-line">
-              <strong>{`${Qui} :`}</strong> « <Linkify text={s.rejection_note ?? ""} /> »
+              <strong>{`${Demandeur} :`}</strong> « <Linkify text={s.rejection_note ?? ""} /> »
             </p>
           </div>
         )}
@@ -247,7 +275,9 @@ function CarteDemande({
             <button
               type="button"
               aria-haspopup="dialog"
-              onClick={() => onCompleter({ s, demandeur: Qui, attente: prenoms || "ton manager" })}
+              onClick={() =>
+                onCompleter({ s, demandeur: Demandeur, attente: prenoms || "ton manager" })
+              }
               className={buttonVariants({ variant: "default" })}
             >
               <Icon name="edit" className="text-[18px]" />
@@ -260,7 +290,7 @@ function CarteDemande({
       {clarification && (
         <p className="flex items-start gap-xs font-label-sm text-sm text-on-surface-variant">
           <Icon name="hourglass_empty" className="text-base shrink-0" />
-          <span>{`${Qui} attend ta réponse depuis ${delaiTexte(changement)}`}</span>
+          <span>{`${Demandeur} attend ta réponse depuis ${delaiTexte(changement)}`}</span>
         </p>
       )}
 
@@ -275,7 +305,12 @@ function CarteDemande({
       )}
 
       <div className="ml-auto">
-        <SubmissionHistory submissionId={s.id} />
+        <SubmissionHistory
+          submissionId={s.id}
+          moi={moi}
+          attenteChez={prenoms || undefined}
+          contenu={s.content}
+        />
       </div>
     </li>
   );

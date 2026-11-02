@@ -11,6 +11,7 @@ import {
   CLASSE_BOUTON_CARTE,
   CLASSE_LIEN_ACTION,
   CLASSE_LIEN_SUPPRIMER,
+  EtiquetteSoi,
   LienBasBloc,
   TEXTE_SOULIGNE,
 } from "@/components/chips";
@@ -282,11 +283,7 @@ export function ActualitesCabinet({
                     <span>
                       <AuteurActualite news={n} noms={noms} />
                     </span>
-                    {moi && (
-                      <span className="rounded-[4px] bg-[#F5D5D4] px-xs font-semibold leading-snug text-[12px] text-[#28282D]">
-                        Toi
-                      </span>
-                    )}
+                    {moi && <EtiquetteSoi>Toi</EtiquetteSoi>}
                     {moi && roleEquipe && <span>{`· ${roleEquipe}`}</span>}
                   </p>
                   <NewsLinks links={n.links} />

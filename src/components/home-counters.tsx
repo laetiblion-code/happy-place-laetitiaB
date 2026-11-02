@@ -147,9 +147,7 @@ function PiedDelai({
   const jours = formatNumberFr(delai.jours, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   // Accord : moins de 2 jours au singulier (« 1,4 j » pour la lecture : « 1,4 jour »), à partir de 2 au pluriel
   const pluriel = delai.jours >= 2;
-  const libelle = isAdmin
-    ? "Délai de validation du cabinet sur "
-    : "Délai de validation de tes équipes sur ";
+  const libelle = isAdmin ? "Délai de validation du cabinet sur " : "Ton délai de validation sur ";
   const etat = etatObjectif(delai.jours, delaiValidationJours, "plusBas");
   const objectif = (
     <>
@@ -159,17 +157,14 @@ function PiedDelai({
   );
   return (
     <PiedObjectif>
-      <LigneObjectif
-        icon="flag"
-        texte={
-          <>
-            {libelle}
-            <Unite valeur="30" unite="j" pluriel />
-            {" : "}
-            <Unite valeur={jours} unite="j" pluriel={pluriel} />
-          </>
-        }
-      />
+      <p className="font-label-sm text-sm text-[#68686D]">
+        {libelle}
+        <Unite valeur="30" unite="j" pluriel />
+        {" : "}
+        <span className="inline-block rounded-[4px] bg-[#EDEBE6] px-xs font-semibold text-[#28282D]">
+          <Unite valeur={jours} unite="j" pluriel={pluriel} />
+        </span>
+      </p>
       <LigneEtat etat={etat} objectif={objectif} />
     </PiedObjectif>
   );

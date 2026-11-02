@@ -83,7 +83,10 @@ export function PiluleVisibilite({
   );
 }
 
-/** Étiquette de type de demande : capitales, 22 px de haut, pastille anthracite de 16 px à icône blanche. */
+/**
+ * Étiquette de type de demande : capitales, 24 px de haut (même hauteur que les chips), pastille anthracite
+ * de 20 px à icône blanche de 14 px centrée.
+ */
 export function EtiquetteType({
   icon: Icone,
   children,
@@ -92,16 +95,25 @@ export function EtiquetteType({
   children: ReactNode;
 }) {
   return (
-    <span className="inline-flex min-h-[22px] max-w-full whitespace-nowrap items-center gap-xs rounded-[4px] bg-[#EDEBE6] py-[2px] pl-[3px] pr-[8px] text-[12px] font-bold uppercase leading-snug tracking-[0.06em] text-[#28282D]">
+    <span className="inline-flex h-6 max-w-full whitespace-nowrap items-center gap-xs rounded-[4px] bg-[#EDEBE6] pl-[2px] pr-[8px] text-[12px] font-bold uppercase leading-none tracking-[0.06em] text-[#28282D]">
       {Icone && (
         <span
           aria-hidden="true"
-          className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#28282D] text-white"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#28282D] text-white"
         >
-          <Icone aria-hidden={true} className="h-2.5 w-2.5" />
+          <Icone aria-hidden={true} className="h-3.5 w-3.5" />
         </span>
       )}
       <span className="min-w-0">{children}</span>
+    </span>
+  );
+}
+
+/** Petite étiquette « Toi » (actualités) ou « Moi » (demandes) : après le nom de la personne connectée. */
+export function EtiquetteSoi({ children }: { children: ReactNode }) {
+  return (
+    <span className="rounded-[4px] bg-[#F5D5D4] px-xs font-semibold leading-snug text-[12px] text-[#28282D]">
+      {children}
     </span>
   );
 }
