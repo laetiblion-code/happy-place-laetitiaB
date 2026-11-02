@@ -1,9 +1,8 @@
-import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { SessionHeader } from "@/components/session-header";
-import { buttonVariants } from "@/components/ui/button";
 import { processAttachmentDeletionQueue } from "@/lib/dashboard";
 
 export const Route = createFileRoute("/_authenticated/manage")({
@@ -30,15 +29,6 @@ export const Route = createFileRoute("/_authenticated/manage")({
   component: ManageLayout,
 });
 
-// Même vocabulaire que l'accueil (les noms de routes ne changent pas)
-const tabs = [
-  { to: "/manage/news", label: "Actualités" },
-  { to: "/manage/submissions", label: "Demandes" },
-  { to: "/manage/blockers", label: "Alertes opérationnelles" },
-  { to: "/manage/metrics", label: "Indicateurs clés" },
-  { to: "/manage/users", label: "Utilisateurs et équipes" },
-] as const;
-
 function ManageLayout() {
   const qc = useQueryClient();
   // Suppression silencieuse des pièces jointes échues, une fois par chargement de /manage
@@ -55,31 +45,6 @@ function ManageLayout() {
     <div className="bg-background text-on-surface font-body-md min-h-screen">
       <SessionHeader />
       <main id="contenu" className="w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-sm">
-          <div className="space-y-1">
-            <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">
-              Gestion des données
-            </p>
-            <h1 className="font-headline-lg text-headline-lg text-primary">Gestion des données</h1>
-          </div>
-          <Link to="/" className={buttonVariants({ variant: "secondary" })}>
-            ← Retour à l'accueil
-          </Link>
-        </div>
-
-        <nav aria-label="Gestion" className="flex flex-wrap gap-xs border-b border-outline-variant pb-sm">
-          {tabs.map((t) => (
-            <Link
-              key={t.to}
-              to={t.to}
-              className="inline-flex min-h-11 items-center rounded-md border border-outline-variant px-md py-xs text-sm font-medium text-on-surface-variant hover:bg-surface-container focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              activeProps={{ className: "bg-primary text-on-primary border-primary hover:bg-primary" }}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </nav>
-
         <Outlet />
       </main>
     </div>

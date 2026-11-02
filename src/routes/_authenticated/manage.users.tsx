@@ -319,6 +319,7 @@ function UsersPage() {
 
   return (
     <div className="space-y-md">
+      <h1 className="font-headline-sm text-headline-sm text-primary">Utilisateurs et équipes</h1>
       {(queue.data ?? 0) > 0 && (
         <div className="flex items-center justify-between gap-sm border border-error bg-surface-container-lowest p-sm">
           <p className="text-body-sm text-error">{queue.data} document(s) en attente de suppression</p>

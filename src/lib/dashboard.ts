@@ -68,6 +68,8 @@ export type Metric = {
   /** Vrai : plus haut est mieux (défaut). Faux : plus bas est mieux (délai). */
   higher_is_better?: boolean;
   on_dashboard?: boolean;
+  /** Position sur l'accueil, de 1 à 4 (croissant). Vide : classé en dernier, puis par libellé. */
+  dashboard_position?: number | null;
 };
 
 export const TREND_LABELS: Record<Metric["trend"], string> = {
@@ -81,12 +83,13 @@ export function formatNumberFr(value: number, options?: Intl.NumberFormatOptions
   return new Intl.NumberFormat("fr-FR", options).format(value);
 }
 
-/** Unité écrite en toutes lettres : « j » devient « jours » (espace insécable avant le mot). */
+/** Unité écrite en toutes lettres : « j » devient « jours ». Espace insécable avant toute unité. */
 function suffixeUnite(unit: string | null | undefined): string {
   if (!unit) return "";
   const u = unit.trim();
+  if (!u) return "";
   if (u === "j") return "\u00a0jours";
-  return u;
+  return `\u00a0${u}`;
 }
 
 export function deltaText(m: Pick<Metric, "delta" | "unit"> | undefined): string {
@@ -110,7 +113,7 @@ export function formatMetricValue(value: number | string, unit: string | null): 
   return `${formatted}${suffix}`;
 }
 
-/** Objectif : « 55 % », « 28 jours », « 75 ». Sans zéros inutiles, contrairement à la valeur. */
+/** Objectif : « 55 % », « 28 jours », « 75 », « 120 h ». Sans zéros inutiles, contrairement à la valeur. */
 export function formatObjectif(target: number | string, unit: string | null): string {
   const formatted = formatNumberFr(Number(target), { maximumFractionDigits: 1 });
   const suffix = unit === "%" ? "\u00a0%" : suffixeUnite(unit);
@@ -389,7 +392,21 @@ export async function fetchMetrics(): Promise<Metric[]> {
   return (data ?? []) as Metric[];
 }
 
-/** Indicateurs affichés sur l'accueil (au plus 4), triés par libellé. Même liste pour tous les rôles. */
+/**
+ * Ordre d'affichage sur l'accueil : position croissante, les indicateurs sans position en dernier,
+ * puis libellé. Deux indicateurs à la même position sont donc triés par libellé.
+ */
+export function ordreAccueil(
+  a: Pick<Metric, "label" | "dashboard_position">,
+  b: Pick<Metric, "label" | "dashboard_position">,
+): number {
+  const pa = a.dashboard_position ?? Number.POSITIVE_INFINITY;
+  const pb = b.dashboard_position ?? Number.POSITIVE_INFINITY;
+  if (pa !== pb) return pa - pb;
+  return a.label.localeCompare(b.label, "fr");
+}
+
+/** Indicateurs affichés sur l'accueil (au plus 4), dans l'ordre de `ordreAccueil`. Même liste pour tous les rôles. */
 export async function fetchDashboardMetrics(): Promise<Metric[]> {
   const [flags, rows] = await Promise.all([
     db.from("metrics").select("key").eq("on_dashboard", true),
@@ -400,7 +417,7 @@ export async function fetchDashboardMetrics(): Promise<Metric[]> {
   const cles = new Set((flags.data ?? []).map((f) => f.key));
   return ((rows.data ?? []) as Metric[])
     .filter((m) => cles.has(m.key))
-    .sort((a, b) => a.label.localeCompare(b.label, "fr"));
+    .sort(ordreAccueil);
 }
 
 /** Indicateur affiché sur l'accueil (true/false) par clé, pour la gestion. */
@@ -494,6 +511,7 @@ export type MetricInput = {
   unit: string | null;
   target: number | null;
   higher_is_better: boolean;
+  dashboard_position?: number | null;
 };
 
 export async function fetchAllNews(): Promise<News[]> {

@@ -1,9 +1,9 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import { BrandHeader } from "@/components/brand-header";
 import { AccountBar } from "@/components/account-bar";
+import { MainNav } from "@/components/main-nav";
 import { fetchOwnRole, signOut, type AppRole } from "@/lib/auth";
-import { exportMyRecentSubmissions } from "@/lib/dashboard";
+import { useExportMesDemandes } from "@/hooks/use-export-mes-demandes";
 import { supabase } from "@/integrations/supabase/client";
 
 const LIBELLE_ROLE: Record<AppRole, string> = {
@@ -14,7 +14,8 @@ const LIBELLE_ROLE: Record<AppRole, string> = {
 
 /**
  * En-tête de toutes les pages. Si une personne autorisée est connectée, le bloc du compte est affiché
- * (prénom, rôle, actions). Sinon, l'en-tête reste sans bloc utilisateur (connexion, premier accès).
+ * (prénom, rôle, avatar, déconnexion). Pour l'admin, la barre d'onglets est ajoutée sous l'en-tête.
+ * Sans session, l'en-tête reste sans bloc utilisateur (connexion, premier accès).
  */
 export function SessionHeader() {
   const session = useQuery({
@@ -34,36 +35,27 @@ export function SessionHeader() {
     retry: false,
   });
 
-  const exporter = useMutation({
-    mutationFn: (email: string) => exportMyRecentSubmissions(email),
-    onSuccess: (count) => {
-      if (count === 0) {
-        toast.info("Aucune demande sur les 30 derniers jours.");
-        return;
-      }
-      toast.success(
-        `${count} demande${count > 1 ? "s" : ""} exportée${count > 1 ? "s" : ""} au format CSV.`,
-      );
-    },
-    onError: (e: unknown) => toast.error((e as Error).message),
-  });
-
   const compte = session.data;
+  const exporter = useExportMesDemandes(compte?.email ?? "");
+
   if (!compte) return <BrandHeader />;
 
   return (
-    <BrandHeader
-      account={
-        <AccountBar
-          firstName={compte.firstName}
-          email={compte.email}
-          roleLabel={LIBELLE_ROLE[compte.role]}
-          isAdmin={compte.role === "admin"}
-          exporting={exporter.isPending}
-          onExport={() => exporter.mutate(compte.email)}
-          onSignOut={() => void signOut()}
-        />
-      }
-    />
+    <>
+      <BrandHeader
+        account={
+          <AccountBar
+            firstName={compte.firstName}
+            email={compte.email}
+            roleLabel={LIBELLE_ROLE[compte.role]}
+            showExport={compte.role !== "collaborateur"}
+            exporting={exporter.isPending}
+            onExport={() => exporter.mutate()}
+            onSignOut={() => void signOut()}
+          />
+        }
+      />
+      {compte.role === "admin" && <MainNav />}
+    </>
   );
 }

@@ -102,9 +102,9 @@ function ManageBlockers() {
   return (
     <section className="space-y-md">
       <div className="flex items-center justify-between">
-        <h2 className="font-headline-sm text-headline-sm text-primary">
+        <h1 className="font-headline-sm text-headline-sm text-primary">
           Alertes opérationnelles ({list.data?.length ?? 0})
-        </h2>
+        </h1>
         <button
           type="button"
           onClick={() => {

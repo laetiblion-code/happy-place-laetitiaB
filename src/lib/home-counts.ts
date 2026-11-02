@@ -167,58 +167,81 @@ export async function fetchMyCounts(email: string): Promise<MyCounts> {
   return { toComplete, pending, validated, refused: Math.max(0, refusedAll - toComplete) };
 }
 
-// --- Admin : écarts d'organisation -------------------------------------------
+// --- Admin : écarts d'organisation et annuaire ----------------------------
+
+/** Une personne de la liste blanche, comme l'admin la voit (RLS admin). */
+export type AdminDirectoryUser = {
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  team: string | null;
+  role: string | null;
+  managedTeams: string[];
+};
+
+export type AdminDirectory = {
+  teams: { name: string; is_reserved: boolean }[];
+  users: AdminDirectoryUser[];
+};
 
 export type AdminGaps = {
-  /** Équipes (hors réservée « Admin ») sans aucun manager. */
-  teamsWithoutManager: string[];
+  /** Équipes (hors réservée « Admin ») sans aucun manager, avec leur nombre de personnes. */
+  teamsWithoutManager: { name: string; personnes: number }[];
   /** Collaborateurs de la liste blanche sans équipe. */
   usersWithoutTeam: number;
 };
 
 /** Même normalisation que private.team_has_manager : casse et espaces de bord ignorées. */
-function teamKey(name: string) {
+export function teamKey(name: string) {
   return name.trim().toLowerCase();
 }
 
 /**
- * Calcul pur des écarts à partir des équipes et des utilisateurs lus par l'admin.
- * Une équipe a un manager seulement si une personne au rôle « manager » lui est rattachée
- * (règle de private.team_has_manager). Les rattachements d'une personne sans ce rôle ne comptent pas.
+ * Calcul pur des écarts à partir de l'annuaire. Une équipe a un manager seulement si une personne au rôle
+ * « manager » lui est rattachée (règle de private.team_has_manager).
  */
-export function computeAdminGaps(
-  teams: { name: string; is_reserved: boolean }[],
-  users: { team: string | null; role: string | null; managedTeams: string[] }[],
-): AdminGaps {
+export function computeAdminGaps(dir: AdminDirectory): AdminGaps {
   const managed = new Set(
-    users.filter((u) => u.role === "manager").flatMap((u) => u.managedTeams.map(teamKey)),
+    dir.users.filter((u) => u.role === "manager").flatMap((u) => u.managedTeams.map(teamKey)),
   );
-  const teamsWithoutManager = teams
+  const teamsWithoutManager = dir.teams
     .filter((t) => !t.is_reserved && teamKey(t.name) !== "admin" && !managed.has(teamKey(t.name)))
-    .map((t) => t.name)
-    .sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }));
-  const usersWithoutTeam = users.filter(
+    .map((t) => ({
+      name: t.name,
+      personnes: dir.users.filter((u) => u.team && teamKey(u.team) === teamKey(t.name)).length,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+  const usersWithoutTeam = dir.users.filter(
     (u) => !u.team && (u.role ?? "collaborateur") === "collaborateur",
   ).length;
   return { teamsWithoutManager, usersWithoutTeam };
 }
 
-/** Lit les équipes et les utilisateurs déjà lisibles par l'admin (RLS admin) et calcule les écarts. */
-export async function fetchAdminGaps(): Promise<AdminGaps> {
+/** Lit les équipes et les utilisateurs déjà lisibles par l'admin (RLS admin). */
+export async function fetchAdminDirectory(): Promise<AdminDirectory> {
   const [teamsRes, usersRes] = await Promise.all([
     supabase.from("teams").select("name, is_reserved"),
-    supabase.from("allowed_users").select("team, allowed_user_roles(role), manager_teams(team)"),
+    supabase
+      .from("allowed_users")
+      .select("email, first_name, last_name, team, allowed_user_roles(role), manager_teams(team)"),
   ]);
   if (teamsRes.error) throw teamsRes.error;
   if (usersRes.error) throw usersRes.error;
-  return computeAdminGaps(
-    teamsRes.data ?? [],
-    (usersRes.data ?? []).map((u) => ({
+  return {
+    teams: teamsRes.data ?? [],
+    users: (usersRes.data ?? []).map((u) => ({
+      email: u.email,
+      first_name: u.first_name,
+      last_name: u.last_name,
       team: u.team,
       role: u.allowed_user_roles?.role ?? null,
       managedTeams: (u.manager_teams ?? []).map((m) => m.team),
     })),
-  );
+  };
+}
+
+export async function fetchAdminGaps(): Promise<AdminGaps> {
+  return computeAdminGaps(await fetchAdminDirectory());
 }
 
 // --- Objectifs du trimestre (compteurs de l'accueil) -------------------------

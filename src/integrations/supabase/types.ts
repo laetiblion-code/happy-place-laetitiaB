@@ -242,6 +242,7 @@ export type Database = {
       }
       metrics: {
         Row: {
+          dashboard_position: number | null
           higher_is_better: boolean
           key: string
           label: string
@@ -252,6 +253,7 @@ export type Database = {
           value: number
         }
         Insert: {
+          dashboard_position?: number | null
           higher_is_better?: boolean
           key: string
           label: string
@@ -262,6 +264,7 @@ export type Database = {
           value: number
         }
         Update: {
+          dashboard_position?: number | null
           higher_is_better?: boolean
           key?: string
           label?: string
@@ -473,6 +476,7 @@ export type Database = {
     Views: {
       metrics_with_trend: {
         Row: {
+          dashboard_position: number | null
           delta: number | null
           higher_is_better: boolean | null
           key: string | null

@@ -31,8 +31,8 @@ import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
 import { NewsAiHelper } from "@/components/news-ai-helper";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
+import { useExportMesDemandes, EXPORT_INFO_MES_DEMANDES } from "@/hooks/use-export-mes-demandes";
 import { buttonVariants } from "@/components/ui/button";
-import { AdminGapsBanner } from "@/components/admin-gaps-banner";
 import { ALERT_STATES, alertStatusOptions } from "@/lib/alert-states";
 import { RejectionNote, StatusBadge } from "@/components/status-badge";
 import {
@@ -221,6 +221,7 @@ function ManagerSpace() {
     retry: false,
   });
   const onError = (e: unknown) => toast.error((e as Error).message);
+  const exporter = useExportMesDemandes(email ?? "");
 
   const saveDraft = useMutation({
     mutationFn: saveDraftNews,
@@ -361,7 +362,6 @@ function ManagerSpace() {
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
       <SessionHeader />
       <main id="contenu" className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
-        <AdminGapsBanner enabled={isAdmin} />
         <header className="flex flex-wrap items-end justify-between gap-md mb-lg">
           <div className="min-w-0 space-y-xs">
             <h1 className="font-headline-lg text-headline-lg text-primary wrap-anywhere">{greeting}</h1>
@@ -389,7 +389,14 @@ function ManagerSpace() {
             actus={homeActus.data}
           />
         )}
-        {email && <DepartureNotices email={email} />}
+        {email && (
+          <DepartureNotices
+            email={email}
+            role={role === "admin" || role === "manager" ? role : "collaborateur"}
+            equipesGerees={myTeams.data ?? []}
+            demandesEnAttente={toReview.data}
+          />
+        )}
 
         <div className="bento-grid">
           {/* News Management & Input */}
@@ -708,9 +715,21 @@ function ManagerSpace() {
           {/* Mes demandes : toujours affiché pour un collaborateur (même vide) */}
           {(!canReview || (mine.data && mine.data.length > 0)) && (
             <section className="col-span-12 min-w-0 rounded-lg bg-surface-container-lowest border border-outline-variant p-md">
-              <h2 className="font-headline-sm text-headline-sm text-primary border-b border-outline-variant pb-sm mb-md">
-                Mes demandes
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm mb-md">
+                <h2 className="font-headline-sm text-headline-sm text-primary">Mes demandes</h2>
+                {!canReview && (
+                  <button
+                    type="button"
+                    title={EXPORT_INFO_MES_DEMANDES}
+                    disabled={exporter.isPending}
+                    onClick={() => exporter.mutate()}
+                    className={buttonVariants({ variant: "secondary", size: "sm" })}
+                  >
+                    <span aria-hidden="true" className="material-symbols-outlined">file_download</span>{" "}
+                    {exporter.isPending ? "Export en cours…" : "Exporter mes demandes (CSV)"}
+                  </button>
+                )}
+              </div>
               {!canReview && (
                 <div className="mb-md">
                   <MyChips counts={homeMine.data} />
