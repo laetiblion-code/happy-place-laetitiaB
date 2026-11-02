@@ -95,7 +95,7 @@ export function ValidatedSubmissions({
             aria-label="Filtrer par équipe"
             value={team}
             onChange={(e) => { setTeam(e.target.value); setLimit(PAGE); }}
-            className="max-w-full bg-card border border-outline-variant p-xs focus:outline-none focus:border-primary"
+            className="max-w-full bg-card border border-[#8A8A90] p-xs focus:outline-none focus:border-primary"
           >
             <option value="">Toutes les équipes</option>
             {teams.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -112,7 +112,7 @@ export function ValidatedSubmissions({
           <div key={s.id} className="p-sm rounded-lg border border-outline-variant bg-card min-w-0 overflow-hidden space-y-xs">
             <p className="text-[11px] font-label-sm text-on-surface-variant uppercase wrap-anywhere">
               <span className="text-primary font-bold">{s.author_name}</span> • {s.team} •{" "}
-              {s.validated_at ? `Validée le ${formatExactDate(s.validated_at)}` : `Soumise le ${formatExactDate(s.created_at)}`}
+              {s.validated_at ? `Validée le ${formatExactDate(s.validated_at)}` : `Envoyée le ${formatExactDate(s.created_at)}`}
             </p>
             <SubmissionPreview content={s.content} onOpen={() => onRead(s)} />
             {s.attachment_path &&

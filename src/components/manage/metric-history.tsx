@@ -31,7 +31,7 @@ export function MetricHistory({ metricKey, unit }: { metricKey: string; unit: st
           {q.data?.map((h) => (
             <p key={h.id} className="text-body-sm text-on-surface-variant">
               <span className="font-bold text-primary">{fmt.format(new Date(h.recorded_at))}</span>
-              {" — "}
+              {" : "}
               {formatMetricValue(h.value, unit)}
             </p>
           ))}

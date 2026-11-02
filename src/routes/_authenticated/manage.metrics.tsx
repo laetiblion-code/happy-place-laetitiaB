@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { timeAgo } from "@/lib/dashboard";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -133,10 +134,11 @@ function ManageMetrics() {
           >
             <div className="min-w-0 [overflow-wrap:anywhere]">
               <p className="font-body-md text-primary font-bold">
-                {m.label} — {formatMetricValue(m.value, m.unit)}
+                {m.label} : {formatMetricValue(m.value, m.unit)}
               </p>
               <p className="text-[11px] font-label-sm text-on-surface-variant mt-xs">
                 {m.key} • {TREND_LABELS[m.trend]}
+                {m.updated_at && <> • Mis à jour {timeAgo(m.updated_at)}</>}
                 {m.previous_value != null && (
                   <>
                     {deltaText(m) && ` · ${deltaText(m)}`}

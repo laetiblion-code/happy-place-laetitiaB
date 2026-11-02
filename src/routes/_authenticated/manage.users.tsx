@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useConfirm } from "@/components/confirm-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { z } from "zod";
@@ -49,6 +50,7 @@ function connexionOf(s: LoginStatus | undefined): Connexion {
 const formatDateFr = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 function UsersPage() {
+  const [demander, dialogueConfirm] = useConfirm();
   const qc = useQueryClient();
   const { email: me } = Route.useRouteContext();
   const [email, setEmail] = useState("");
@@ -214,13 +216,16 @@ function UsersPage() {
     d.setDate(d.getDate() + 7);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   })();
-  const programDeparture = (u: Row, date: string) => {
+  const programDeparture = async (u: Row, date: string) => {
     if (
-      confirm(
-        `Programmer le départ de ${u.email} le ${formatDate(date)} ? Son accès sera supprimé à cette date. Son manager et les admins sont prévenus dès maintenant et pourront télécharger ses documents d'ici là. Tu peux annuler avec « Annuler le départ ».`,
-      )
+      !(await demander({
+        titre: "Programmer le départ",
+        message: `Programmer le départ de ${u.email} le ${formatDate(date)} ? Son accès sera supprimé à cette date. Son manager et les admins sont prévenus dès maintenant et pourront télécharger ses documents d'ici là. Tu peux annuler avec « Annuler le départ ».`,
+        libelleConfirmer: "Programmer le départ",
+      }))
     )
-      setDeparture.mutate({ id: u.id, date });
+      return;
+    setDeparture.mutate({ id: u.id, date });
   };
   const [departureInputs, setDepartureInputs] = useState<Record<string, string>>({});
   // Suppression seulement pour un utilisateur jamais connecté ET sans contenu
@@ -333,7 +338,7 @@ function UsersPage() {
           placeholder="Prénom (facultatif)"
           aria-label="Prénom"
           maxLength={100}
-          className="border border-outline-variant bg-surface px-sm py-xs font-body-md"
+          className="border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
         />
         <input
           value={lastName}
@@ -341,7 +346,7 @@ function UsersPage() {
           placeholder="Nom (facultatif)"
           aria-label="Nom"
           maxLength={100}
-          className="border border-outline-variant bg-surface px-sm py-xs font-body-md"
+          className="border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
         />
         <div className="flex-1">
           <input
@@ -349,7 +354,7 @@ function UsersPage() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="prenom.nom@gmail.com"
             aria-label="Email Google"
-            className="w-full border border-outline-variant bg-surface px-sm py-xs font-body-md"
+            className="w-full border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
           />
           {err && <p className="text-error text-sm mt-1">{err}</p>}
         </div>
@@ -357,7 +362,7 @@ function UsersPage() {
           value={role}
           onChange={(e) => { setRole(e.target.value as Row["role"]); setTeamErr(null); }}
           aria-label="Rôle"
-          className="border border-outline-variant bg-surface px-sm py-xs font-body-md"
+          className="border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
         >
           <option value="collaborateur">Collaborateur</option>
           <option value="manager">Manager</option>
@@ -370,14 +375,14 @@ function UsersPage() {
                 value={newTeam}
                 onChange={(e) => setNewTeam(e.target.value)}
                 aria-label="Équipe du collaborateur"
-                className="border border-outline-variant bg-surface px-sm py-xs font-body-md"
+                className="border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
               >
                 <option value="">Choisir une équipe</option>
                 {selectableTeams.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             ) : (
               <details className="relative">
-                <summary className="cursor-pointer list-none border border-outline-variant bg-surface px-sm py-xs font-body-md">
+                <summary className="cursor-pointer list-none border border-[#8A8A90] bg-surface px-sm py-xs font-body-md">
                   {newTeams.length ? `Équipes : ${newTeams.length} choisie(s)` : "Choisir les équipes"}
                 </summary>
                 <div className="absolute z-10 mt-xs max-h-64 min-w-56 overflow-y-auto border border-outline-variant bg-surface p-xs">
@@ -417,7 +422,7 @@ function UsersPage() {
                       placeholder="Prénom (facultatif)"
                       aria-label={`Prénom de ${u.email}`}
                       maxLength={100}
-                      className="border border-outline-variant bg-surface px-sm py-1 font-body-md"
+                      className="border border-[#8A8A90] bg-surface px-sm py-1 font-body-md"
                     />
                     <input
                       value={editingName.last}
@@ -425,7 +430,7 @@ function UsersPage() {
                       placeholder="Nom (facultatif)"
                       aria-label={`Nom de ${u.email}`}
                       maxLength={100}
-                      className="border border-outline-variant bg-surface px-sm py-1 font-body-md"
+                      className="border border-[#8A8A90] bg-surface px-sm py-1 font-body-md"
                     />
                     <button
                       type="button"
@@ -450,7 +455,7 @@ function UsersPage() {
                     <button
                       type="button"
                       onClick={() => setEditingName({ id: u.id, first: u.first_name ?? "", last: u.last_name ?? "" })}
-                      className="inline-flex items-center gap-xs px-sm py-1 border border-outline text-primary font-label-sm text-label-sm"
+                      className="inline-flex min-h-11 items-center gap-xs px-sm py-1 border border-outline text-primary font-label-sm text-label-sm"
                     >
                       <Pencil aria-hidden="true" size={14} />
                       Modifier
@@ -473,7 +478,7 @@ function UsersPage() {
                         ? { backgroundColor: "#EDEBE6" }
                         : k === "lien"
                           ? { backgroundColor: "#F0D0BC" }
-                          : { backgroundColor: "#E4F3E9", color: "#298646" };
+                          : { backgroundColor: "#E4F3E9", color: "#1F6B38" };
                     return (
                       <span className="inline-flex items-center gap-xs px-xs py-[1px] font-label-sm text-label-sm text-primary" style={style}>
                         <Icone aria-hidden="true" size={14} />
@@ -495,7 +500,7 @@ function UsersPage() {
                 }}
                 aria-label={`Rôle de ${u.email}`}
                 aria-describedby={isLastAdmin(u) ? `dernier-admin-${u.id}` : undefined}
-                className="border border-outline-variant bg-surface px-sm py-xs font-body-md disabled:opacity-50"
+                className="border border-[#8A8A90] bg-surface px-sm py-xs font-body-md disabled:opacity-50"
               >
                 <option value="collaborateur">Collaborateur</option>
                 <option value="manager">Manager</option>
@@ -506,13 +511,18 @@ function UsersPage() {
                   type="button"
                   disabled={u.email === me || removeNeverLogged.isPending}
                   title={u.email === me ? "Tu ne peux pas supprimer ton propre compte" : undefined}
-                  onClick={() => {
+                  onClick={async () => {
                     const teamsNote =
                       u.role === "manager" && u.teams.length
                         ? ` Ses équipes (${u.teams.join(", ")}) n'auront plus de manager : leurs demandes privées arriveront chez l'admin.`
                         : "";
                     if (
-                      confirm(`Supprimer ${u.email} de la liste blanche ? Il n'a jamais été connecté : rien n'est à conserver.${teamsNote}`)
+                      await demander({
+                        titre: "Supprimer ce compte",
+                        message: `Supprimer ${u.email} de la liste blanche ? Il n'a jamais été connecté : rien n'est à conserver.${teamsNote}`,
+                        libelleConfirmer: "Supprimer",
+                        destructive: true,
+                      })
                     )
                       removeNeverLogged.mutate(u.id);
                   }}
@@ -528,7 +538,7 @@ function UsersPage() {
                 Dernier admin : il faut au moins un admin.
               </p>
             )}
-            {(!canDelete(u) || u.departure_date) && (() => {
+            {(!canDelete(u) || isLastAdmin(u)) && (() => {
               const dateValue = departureInputs[u.id] ?? u.departure_date ?? "";
               return (
             <div className="flex flex-wrap items-center gap-xs border-t border-outline-variant pt-sm">
@@ -541,7 +551,7 @@ function UsersPage() {
                 min={minDeparture}
                 value={dateValue}
                 onChange={(e) => setDepartureInputs((c) => ({ ...c, [u.id]: e.target.value }))}
-                className="border border-outline-variant bg-surface px-sm py-1 font-body-md"
+                className="border border-[#8A8A90] bg-surface px-sm py-1 font-body-md"
               />
               <button
                 type="button"
@@ -577,7 +587,7 @@ function UsersPage() {
             value={memberTeams[u.id] ?? u.team ?? ""}
             onChange={(e) => setMemberTeams((c) => ({ ...c, [u.id]: e.target.value }))}
             aria-label={`Équipe de ${u.email}`}
-            className="border border-outline-variant bg-surface px-sm py-1 font-body-md"
+            className="border border-[#8A8A90] bg-surface px-sm py-1 font-body-md"
           >
             <option value="">Choisir une équipe</option>
             {(u.team && !selectableTeams.includes(u.team) ? [u.team, ...selectableTeams] : selectableTeams).map((t) => <option key={t} value={t}>{t}</option>)}
@@ -627,7 +637,7 @@ function UsersPage() {
             value={teamInputs[u.id] ?? ""}
             onChange={(e) => setTeamInputs((current) => ({ ...current, [u.id]: e.target.value }))}
             aria-label={`Ajouter une équipe à ${u.email}`}
-            className="border border-outline-variant bg-surface px-sm py-1 font-body-md"
+            className="border border-[#8A8A90] bg-surface px-sm py-1 font-body-md"
           >
             <option value="">Choisir une équipe</option>
             {selectableTeams.filter((t) => !u.teams.includes(t)).map((t) => <option key={t} value={t}>{t}</option>)}
@@ -655,7 +665,7 @@ function UsersPage() {
             value={roleDialog?.team ?? ""}
             onChange={(e) => roleDialog && setRoleDialog({ ...roleDialog, team: e.target.value })}
             aria-label="Équipe du collaborateur"
-            className="w-full border border-outline-variant bg-surface px-sm py-xs font-body-md"
+            className="w-full border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
           >
             <option value="">Choisir une équipe</option>
             {selectableTeams.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -680,11 +690,13 @@ function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {dialogueConfirm}
     </div>
   );
 }
 
 function TeamsSection({ users, teams, onChanged }: { users: Row[]; teams: { name: string; is_reserved: boolean }[]; onChanged: () => void }) {
+  const [demander, dialogueConfirm] = useConfirm();
   const [name, setName] = useState("");
   const [editing, setEditing] = useState<{ from: string; to: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -737,13 +749,15 @@ function TeamsSection({ users, teams, onChanged }: { users: Row[]; teams: { name
         <div>
           <input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); setErr(null); }}
             placeholder="Nouvelle équipe"
             aria-label="Nouvelle équipe"
+            aria-invalid={err ? true : undefined}
+            aria-describedby={err ? "nouvelle-equipe-erreur" : undefined}
             maxLength={60}
-            className="border border-outline-variant bg-surface px-sm py-xs font-body-md"
+            className="border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
           />
-          {err && <p className="text-error text-sm mt-1">{err}</p>}
+          {err && <p id="nouvelle-equipe-erreur" role="alert" className="text-error text-sm mt-1">{err}</p>}
         </div>
         <button disabled={create.isPending} className={buttonVariants({ variant: "default" })}>Ajouter</button>
       </form>
@@ -757,7 +771,7 @@ function TeamsSection({ users, teams, onChanged }: { users: Row[]; teams: { name
                   onChange={(e) => setEditing({ ...editing, to: e.target.value })}
                   aria-label={`Nouveau nom pour ${t.name}`}
                   maxLength={60}
-                  className="border border-outline-variant bg-surface px-sm py-1 font-body-md"
+                  className="border border-[#8A8A90] bg-surface px-sm py-1 font-body-md"
                 />
                 <button
                   type="button"
@@ -786,7 +800,17 @@ function TeamsSection({ users, teams, onChanged }: { users: Row[]; teams: { name
                   type="button"
                   className={`${btn} text-error`}
                   disabled={del.isPending}
-                  onClick={() => confirm(`Supprimer l'équipe « ${t.name} » ?`) && del.mutate(t.name)}
+                  onClick={async () => {
+                    if (
+                      await demander({
+                        titre: "Supprimer l'équipe",
+                        message: `Supprimer l'équipe « ${t.name} » ?`,
+                        libelleConfirmer: "Supprimer",
+                        destructive: true,
+                      })
+                    )
+                      del.mutate(t.name);
+                  }}
                 >
                   Supprimer
                 </button>
@@ -795,6 +819,7 @@ function TeamsSection({ users, teams, onChanged }: { users: Row[]; teams: { name
           </li>
         ))}
       </ul>
+      {dialogueConfirm}
     </section>
   );
 }

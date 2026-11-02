@@ -40,6 +40,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
+      { title: "Happy Place" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "author", content: "Happy Place" },
       { property: "og:type", content: "website" },
@@ -78,6 +79,12 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <a
+          href="#contenu"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-sm focus:top-sm focus:z-50 focus:bg-primary focus:px-sm focus:py-xs focus:text-on-primary"
+        >
+          Aller au contenu
+        </a>
         {children}
         <Scripts />
       </body>

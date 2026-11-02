@@ -39,7 +39,7 @@ export const Route = createFileRoute("/_authenticated/manage/submissions")({
       { title: "Demandes · Happy Place" },
       { name: "description", content: "Créez, modifiez et supprimez les demandes dans Happy Place." },
       { property: "og:title", content: "Demandes · Happy Place" },
-      { property: "og:description", content: "Gérez les propositions des pôles du cabinet dans Happy Place." },
+      { property: "og:description", content: "Gérez les demandes des pôles du cabinet dans Happy Place." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -47,7 +47,6 @@ export const Route = createFileRoute("/_authenticated/manage/submissions")({
   component: ManageSubmissions,
 });
 
-const empty: SubmissionInput = { author_name: "", team: "", content: "", status: "en attente" };
 
 function ManageSubmissions() {
   const qc = useQueryClient();
@@ -110,17 +109,7 @@ function ManageSubmissions() {
         <h2 className="font-headline-sm text-headline-sm text-primary">
           Demandes ({list.data?.length ?? 0})
         </h2>
-        <button
-          onClick={() => {
-            setEditing(null);
-            setErrors({});
-            setForm({ ...empty });
-          }}
-          type="button"
-          className={buttonVariants({ variant: "default" })}
-        >
-          <span aria-hidden="true" className="material-symbols-outlined">add</span> Nouvelle demande
-        </button>
+
       </div>
 
       {list.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
@@ -136,7 +125,7 @@ function ManageSubmissions() {
           >
             <div className="min-w-0 flex-1">
               <p className="font-body-md text-primary font-bold wrap-anywhere">
-                {s.author_name} — {s.team}
+                {s.author_name} · {s.team}
               </p>
               <p className="text-body-sm text-on-surface-variant italic line-clamp-3 whitespace-pre-line wrap-anywhere">“<Linkify text={s.content} />”</p>
               <button
@@ -188,7 +177,7 @@ function ManageSubmissions() {
         onClose={() => setReading(null)}
       />
       {form && (
-        <Modal title={editing ? "Modifier la demande" : "Nouvelle demande"} onClose={close}>
+        <Modal title="Modifier la demande" onClose={close}>
           <form onSubmit={submit} className="space-y-sm" noValidate>
             <ErrorSummary errors={errors} />
             <Field label="Auteur" error={errors.author_name}>
@@ -219,7 +208,7 @@ function ManageSubmissions() {
                 value={form.category ?? ""}
                 onChange={(e) => setForm({ ...form, category: e.target.value || null })}
               >
-                <option value="">— Non renseigné (demande antérieure) —</option>
+                <option value="">Non renseigné (demande antérieure)</option>
                 {SUBMISSION_CATEGORY_OPTIONS.map((c) => (
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
@@ -252,7 +241,7 @@ function ManageSubmissions() {
                     value={form.rejection_category ?? ""}
                     onChange={(e) => setForm({ ...form, rejection_category: e.target.value })}
                   >
-                    <option value="">— Choisir un motif —</option>
+                    <option value="">Choisir un motif</option>
                     {REJECTION_CATEGORIES.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}

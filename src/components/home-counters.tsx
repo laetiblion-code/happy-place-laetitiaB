@@ -33,8 +33,8 @@ function Chip({ icon, label, className }: { icon: string; label: string; classNa
 
 const SAND = "bg-[#F0D0BC] text-[#28282D]";
 const ROSE = "bg-[#F5D5D4] text-[#28282D]";
-const GREEN = "bg-[#DDF2E3] text-[#298646]";
-const RED = "bg-[#FFDAD6] text-[#C2272D]";
+const GREEN = "bg-[#DDF2E3] text-[#1F6B38]";
+const RED = "bg-[#FFDAD6] text-[#A81E25]";
 
 function StatCard({
   title,

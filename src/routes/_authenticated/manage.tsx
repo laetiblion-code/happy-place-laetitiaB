@@ -9,13 +9,13 @@ import { processAttachmentDeletionQueue } from "@/lib/dashboard";
 export const Route = createFileRoute("/_authenticated/manage")({
   head: () => ({
     meta: [
-      { title: "Gestion des données — Happy Place" },
+      { title: "Gestion des données · Happy Place" },
       {
         name: "description",
         content:
-          "Gérer les actualités du cabinet, les propositions internes, les alertes sur les recrutements et les indicateurs de performance.",
+          "Gérer les actualités du cabinet, les demandes internes, les alertes sur les recrutements et les indicateurs de performance.",
       },
-      { property: "og:title", content: "Gestion des données — Happy Place" },
+      { property: "og:title", content: "Gestion des données · Happy Place" },
       {
         property: "og:description",
         content: "Gestion de l'activité d'un cabinet de recrutement spécialisé dans l'IT et le digital.",
@@ -54,7 +54,7 @@ function ManageLayout() {
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen">
       <BrandHeader />
-      <main className="w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
+      <main id="contenu" className="w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-sm">
           <div className="space-y-1">
             <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">

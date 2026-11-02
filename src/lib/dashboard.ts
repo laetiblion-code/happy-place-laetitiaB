@@ -61,6 +61,7 @@ export type Metric = {
   unit: string | null;
   trend: "hausse" | "baisse" | "stable";
   previous_value: number | null;
+  updated_at?: string | null;
   delta: number | string | null;
 };
 
@@ -179,7 +180,6 @@ export async function exportMyRecentSubmissions(email: string): Promise<number> 
     .from("submissions")
     .select("created_at,author_name,submitted_by_email,team,content,status")
     .ilike("submitted_by_email", email)
-    .in("status", ["en attente", "validée"])
     .gte("created_at", since.toISOString())
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -187,7 +187,7 @@ export async function exportMyRecentSubmissions(email: string): Promise<number> 
   const rows = data ?? [];
   if (rows.length === 0) return 0;
 
-  const header = ["Date", "Auteur", "E-mail", "Équipe", "Question soumise", "Statut"];
+  const header = ["Date", "Auteur", "E-mail", "Équipe", "Demande", "Statut"];
   const csv = [
     header.map(csvCell).join(";"),
     ...rows.map((row) =>

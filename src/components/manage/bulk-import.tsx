@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useConfirm } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 import { buttonVariants } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -116,6 +117,7 @@ function downloadReport(rows: ResultRow[]) {
 }
 
 export function BulkImport({ onImported }: { onImported: () => void }) {
+  const [demander, dialogueConfirm] = useConfirm();
   const [sent, setSent] = useState<ImportRow[]>([]);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -151,7 +153,14 @@ export function BulkImport({ onImported }: { onImported: () => void }) {
   async function confirmImport() {
     if (!result) return;
     const validLines = new Set(result.rows.filter((r) => r.status === "valide").map((r) => r.line));
-    if (!confirm(`Importer ${validLines.size} utilisateur(s) ?`)) return;
+    if (
+      !(await demander({
+        titre: "Importer les utilisateurs",
+        message: `Importer ${validLines.size} utilisateur(s) ?`,
+        libelleConfirmer: "Importer",
+      }))
+    )
+      return;
     const toSend = sent.filter((r) => validLines.has(r.line));
     setBusy(true);
     const { data, error: e } = await supabase.rpc("bulk_import_allowed_users", { _rows: toSend, _dry_run: false });
@@ -243,6 +252,7 @@ export function BulkImport({ onImported }: { onImported: () => void }) {
           </div>
         </div>
       )}
+      {dialogueConfirm}
     </section>
   );
 }

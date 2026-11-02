@@ -11,7 +11,7 @@ export function ManageIcon({ name, className = "" }: { name: string; className?:
 }
 
 const inputBase =
-  "w-full rounded-md bg-card border border-outline-variant focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary p-sm font-body-md text-on-surface";
+  "w-full rounded-md bg-card border border-[#8A8A90] focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary p-sm font-body-md text-on-surface";
 
 export function Field({
   label,

@@ -32,15 +32,15 @@ export function SubmissionHistory({ submissionId }: { submissionId: string }) {
             <div key={h.id} className="text-body-sm">
               <p className="text-on-surface-variant">
                 <span className="font-bold text-primary">{fmt.format(new Date(h.changed_at))}</span>
-                {" — "}
+                {" · "}
                 {h.old_status ?? "Création"} → {h.new_status}
-                {" — "}
-                {h.is_automatic ? "Automatique" : (h.changed_by_name ?? h.changed_by_email ?? "—")}
+                {" · "}
+                {h.is_automatic ? "Automatique" : (h.changed_by_name ?? h.changed_by_email ?? "Non renseigné")}
               </p>
               {h.new_status === "refusée" && h.rejection_category && (
                 <p className="text-error">
                   Motif : {h.rejection_category}
-                  {h.rejection_note ? ` — ${h.rejection_note}` : ""}
+                  {h.rejection_note ? ` : ${h.rejection_note}` : ""}
                 </p>
               )}
             </div>
