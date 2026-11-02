@@ -240,10 +240,6 @@ export async function fetchAdminDirectory(): Promise<AdminDirectory> {
   };
 }
 
-export async function fetchAdminGaps(): Promise<AdminGaps> {
-  return computeAdminGaps(await fetchAdminDirectory());
-}
-
 // --- Objectifs du trimestre (compteurs de l'accueil) -------------------------
 
 const DECISIONS = ["validée", "refusée"] as const;

@@ -351,31 +351,18 @@ export async function fetchResolvedBlockers(): Promise<Blocker[]> {
   return (data ?? []) as Blocker[];
 }
 
-export type ValidatedSubmission = Submission & { validated_at: string | null };
-
-/** Demandes validées, toutes équipes (filtrées par les règles d'accès de la base). */
-export async function fetchValidatedSubmissions(): Promise<ValidatedSubmission[]> {
+/**
+ * Demandes du cabinet pour « 10 dernières demandes du cabinet » : tous statuts, de la plus récente à la plus
+ * ancienne. Les règles d'accès (RLS) décident de ce qui est renvoyé ; rien n'est filtré côté client.
+ */
+export async function fetchCabinetSubmissions(): Promise<Submission[]> {
   const { data, error } = await db
     .from("submissions")
     .select("*")
-    .eq("status", "validée")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(200);
   if (error) throw error;
-  const rows = (data ?? []) as Submission[];
-  const dates = new Map<string, string>();
-  if (rows.length) {
-    // L'historique peut ne pas être lisible pour tous : dans ce cas, date de soumission.
-    const { data: hist } = await db
-      .from("submission_status_history")
-      .select("submission_id, changed_at")
-      .eq("new_status", "validée")
-      .in("submission_id", rows.map((r) => r.id))
-      .order("changed_at", { ascending: false });
-    for (const h of hist ?? []) if (!dates.has(h.submission_id)) dates.set(h.submission_id, h.changed_at);
-  }
-  return rows
-    .map((r) => ({ ...r, validated_at: dates.get(r.id) ?? null }))
-    .sort((a, b) => (b.validated_at ?? b.created_at).localeCompare(a.validated_at ?? a.created_at));
+  return (data ?? []) as Submission[];
 }
 
 export async function updateBlockerStatus(input: { id: string; status: string }) {

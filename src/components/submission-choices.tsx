@@ -125,24 +125,36 @@ export function ChoiceGroup({
 }
 
 /** Étiquette de catégorie et pilule de visibilité, pour les cartes et la fenêtre de lecture. */
-export function SubmissionTags({ category, visibility }: { category?: string | null; visibility?: string | null }) {
+/** Puce de catégorie (question, idée, problème, amélioration). Rien si la catégorie est absente (anciennes demandes). */
+export function CategoryChip({ category }: { category?: string | null }) {
   const cat = SUBMISSION_CATEGORY_OPTIONS.find((o) => o.value === category);
+  if (!cat) return null;
+  return (
+    <span className="inline-flex min-h-7 items-center gap-xs bg-[#EDEBE6] px-sm py-xs font-label-sm text-sm uppercase text-[#28282D]">
+      <cat.icon aria-hidden="true" className="h-3.5 w-3.5" />
+      {cat.label}
+    </span>
+  );
+}
+
+/** Puce de visibilité (privée, équipe, entreprise). Rien si la visibilité est absente. */
+export function VisibilityChip({ visibility }: { visibility?: string | null }) {
   const vis = SUBMISSION_VISIBILITY_OPTIONS.find((o) => o.value === visibility);
-  if (!cat && !vis) return null;
+  if (!vis) return null;
+  return (
+    <span className={`inline-flex min-h-7 items-center gap-xs rounded-full bg-[#EDEBE6] px-sm py-xs font-label-sm text-sm text-[#28282D] ${vis.labelClass ?? ""}`}>
+      <vis.icon aria-hidden="true" className="h-3.5 w-3.5" />
+      {vis.label}
+    </span>
+  );
+}
+
+export function SubmissionTags({ category, visibility }: { category?: string | null; visibility?: string | null }) {
+  if (!SUBMISSION_CATEGORY_OPTIONS.some((o) => o.value === category) && !SUBMISSION_VISIBILITY_OPTIONS.some((o) => o.value === visibility)) return null;
   return (
     <div className="flex flex-wrap gap-xs">
-      {cat && (
-        <span className="inline-flex min-h-7 items-center gap-xs bg-[#EDEBE6] px-sm py-xs font-label-sm text-sm uppercase text-[#28282D]">
-          <cat.icon aria-hidden="true" className="h-3.5 w-3.5" />
-          {cat.label}
-        </span>
-      )}
-      {vis && (
-        <span className={`inline-flex min-h-7 items-center gap-xs rounded-full bg-[#EDEBE6] px-sm py-xs font-label-sm text-sm text-[#28282D] ${vis.labelClass ?? ""}`}>
-          <vis.icon aria-hidden="true" className="h-3.5 w-3.5" />
-          {vis.label}
-        </span>
-      )}
+      <CategoryChip category={category} />
+      <VisibilityChip visibility={visibility} />
     </div>
   );
 }

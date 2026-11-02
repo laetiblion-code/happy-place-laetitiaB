@@ -12,13 +12,13 @@ import {
   type Submission,
 } from "@/lib/dashboard";
 import {
+  computeAdminGaps,
   fetchAdminDirectory,
-  fetchAdminGaps,
   plural,
   teamKey,
   type AdminDirectory,
 } from "@/lib/home-counts";
-import { nomAffiche, useNomsAffiches } from "@/lib/noms";
+import { initialesDe, nomAffiche, useNomsAffiches } from "@/lib/noms";
 
 const ROUGE = "text-[#A81E25]";
 /** Départ dans ce délai (jours) : date et chip en rouge, avec un texte pour les lecteurs d'écran. */
@@ -58,15 +58,6 @@ function joursAvant(ymd: string) {
 function dateLimite(n: DepartureNotice) {
   if (n.kind === "préavis") return dateDepart(n.departure_date);
   return new Date(new Date(n.created_at).getTime() + 7 * 86_400_000);
-}
-
-/** Initiales pour le cercle (décoratif) : prénom et nom, ou première lettre d'une adresse. */
-function initiales(libelle: string) {
-  if (libelle.includes("@")) return libelle.charAt(0).toUpperCase();
-  const mots = libelle.trim().split(/\s+/).filter(Boolean);
-  const premiere = mots[0]?.charAt(0) ?? "";
-  const derniere = mots.length > 1 ? (mots[mots.length - 1]?.charAt(0) ?? "") : "";
-  return `${premiere}${derniere}`.toUpperCase();
 }
 
 /** Prénom seul : premier mot du nom affiché, ou l'adresse si aucun nom n'existe. */
@@ -120,7 +111,7 @@ function lignesDepart(
     return {
       notice: n,
       nom,
-      initiales: initiales(nom),
+      initiales: initialesDe(nom),
       equipe,
       managers,
       jours: joursAvant(n.departure_date),
@@ -152,12 +143,8 @@ export function DepartureNotices({
     enabled: isAdmin,
     retry: false,
   });
-  const gaps = useQuery({
-    queryKey: ["home-admin-gaps"],
-    queryFn: fetchAdminGaps,
-    enabled: isAdmin,
-    retry: false,
-  });
+  // Écarts d'organisation calculés sur le même annuaire que les départs (une seule lecture)
+  const gaps = annuaire.data ? computeAdminGaps(annuaire.data) : undefined;
   const libelles = [...(q.data?.map((n) => n.departing_label) ?? []), email];
   const noms = useNomsAffiches(libelles).data;
   const lignes = lignesDepart(q.data ?? [], noms, role, { email, equipesGerees }, annuaire.data);
@@ -166,8 +153,8 @@ export function DepartureNotices({
     return (
       <BlocAdmin
         lignes={lignes}
-        gaps={gaps.data}
-        gapsError={gaps.isError}
+        gaps={gaps}
+        gapsError={annuaire.isError}
         demandesEnAttente={demandesEnAttente ?? []}
         email={email}
       />

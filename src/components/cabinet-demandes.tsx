@@ -1,0 +1,238 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
+import { StatusBadge } from "@/components/status-badge";
+import { formatExactDate } from "@/components/expandable-card";
+import { buttonVariants } from "@/components/ui/button";
+import { fetchCabinetSubmissions, type Submission } from "@/lib/dashboard";
+import { ilYaCourt } from "@/lib/noms";
+
+function Icon({ name, className = "" }: { name: string; className?: string }) {
+  return (
+    <span aria-hidden="true" className={`material-symbols-outlined ${className}`}>
+      {name}
+    </span>
+  );
+}
+
+/** Lignes par page : au départ, puis 10 de plus à chaque clic. */
+const PAGE = 10;
+
+type Filtre = "toutes" | "mes" | "pj";
+const FILTRES: { valeur: Filtre; libelle: string }[] = [
+  { valeur: "toutes", libelle: "Toutes" },
+  { valeur: "mes", libelle: "Mes demandes" },
+  { valeur: "pj", libelle: "Avec pièce jointe" },
+];
+
+const CELLULE = "block px-sm py-xs align-top md:table-cell md:px-sm md:py-sm";
+/** Sur petit écran, chaque cellule affiche son nom de colonne avant la valeur. */
+const ETIQUETTE =
+  "before:mb-xs before:block before:font-label-sm before:text-xs before:uppercase before:text-on-surface-variant before:content-[attr(data-label)] md:before:hidden";
+
+/**
+ * « 10 dernières demandes du cabinet » : tous statuts, les plus récentes d'abord. Les règles d'accès (RLS)
+ * décident de ce qui est visible : les demandes privées des autres équipes n'apparaissent pas.
+ */
+export function DemandesCabinet({
+  email,
+  onRead,
+}: {
+  /** Adresse de la personne connectée, pour le filtre « Mes demandes ». */
+  email: string;
+  onRead: (s: Submission) => void;
+}) {
+  const q = useQuery({
+    queryKey: ["submissions", "cabinet"],
+    queryFn: fetchCabinetSubmissions,
+    retry: false,
+  });
+  const [filtre, setFiltre] = useState<Filtre>("toutes");
+  const [equipe, setEquipe] = useState("");
+  const [limite, setLimite] = useState(PAGE);
+  const premiereAjoutee = useRef<HTMLTableRowElement>(null);
+
+  const toutes = useMemo(() => q.data ?? [], [q.data]);
+  const equipes = useMemo(
+    () => [...new Set(toutes.map((s) => s.team))].sort((a, b) => a.localeCompare(b, "fr")),
+    [toutes],
+  );
+  const filtrees = toutes.filter(
+    (s) =>
+      (filtre === "toutes" ||
+        (filtre === "mes"
+          ? (s.submitted_by_email ?? "").toLowerCase() === email
+          : !!s.attachment_path)) &&
+      (!equipe || s.team === equipe),
+  );
+  const visibles = filtrees.slice(0, limite);
+
+  // Après « Voir toutes les demandes », le focus va sur la première ligne ajoutée
+  useEffect(() => {
+    if (limite > PAGE) premiereAjoutee.current?.focus();
+  }, [limite]);
+
+  function changerFiltre(f: Filtre) {
+    setFiltre(f);
+    setLimite(PAGE);
+  }
+
+  return (
+    <section
+      aria-labelledby="titre-cabinet"
+      className="min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest p-md"
+    >
+      <div className="space-y-xs border-b border-outline-variant pb-sm">
+        <h2 id="titre-cabinet" className="font-headline-sm text-headline-sm text-primary">
+          10 dernières demandes du cabinet
+        </h2>
+        <p className="font-body-md text-on-surface-variant">
+          Les tiennes, celles de ton équipe et celles ouvertes à toute l'entreprise. Les demandes
+          privées des autres équipes restent entre leur auteur et leur manager.
+        </p>
+      </div>
+
+      <div className="mt-md flex flex-wrap items-center justify-between gap-sm">
+        <div role="group" aria-label="Filtrer les demandes" className="flex flex-wrap gap-xs">
+          {FILTRES.map((f) => (
+            <button
+              key={f.valeur}
+              type="button"
+              aria-pressed={filtre === f.valeur}
+              onClick={() => changerFiltre(f.valeur)}
+              className={`${buttonVariants({ variant: filtre === f.valeur ? "default" : "secondary", size: "sm" })} min-h-11`}
+            >
+              {f.libelle}
+            </button>
+          ))}
+        </div>
+        <label className="flex min-h-11 items-center gap-xs font-label-sm text-sm text-on-surface">
+          <span>Équipe :</span>
+          <select
+            value={equipe}
+            onChange={(e) => {
+              setEquipe(e.target.value);
+              setLimite(PAGE);
+            }}
+            className="min-h-11 max-w-full border border-[#8A8A90] bg-card px-sm py-xs font-label-sm text-sm focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            <option value="">Toutes</option>
+            {equipes.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {q.isError && (
+        <p className="mt-md text-body-sm text-error">Les demandes du cabinet sont indisponibles.</p>
+      )}
+      {q.isSuccess && filtrees.length === 0 && (
+        <p className="mt-md text-body-sm italic text-on-surface-variant">
+          Aucune demande ne correspond à ces filtres.
+        </p>
+      )}
+
+      {visibles.length > 0 && (
+        <div className="mt-md">
+          <table className="w-full table-auto border-collapse text-left">
+            <caption className="sr-only">
+              Dix dernières demandes du cabinet, de la plus récente à la plus ancienne
+            </caption>
+            <thead className="sr-only md:not-sr-only">
+              <tr className="border-b border-outline-variant font-label-sm text-sm text-on-surface-variant">
+                <th scope="col" className="px-sm py-xs font-semibold">
+                  Catégorie
+                </th>
+                <th scope="col" className="px-sm py-xs font-semibold">
+                  Auteur et demande
+                </th>
+                <th scope="col" className="px-sm py-xs font-semibold">
+                  Statut
+                </th>
+                <th scope="col" className="px-sm py-xs font-semibold">
+                  Visibilité
+                </th>
+                <th scope="col" className="px-sm py-xs font-semibold">
+                  Date
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibles.map((s, i) => (
+                <tr
+                  key={s.id}
+                  ref={i === limite - PAGE ? premiereAjoutee : undefined}
+                  tabIndex={-1}
+                  className="block border-b border-outline-variant py-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary md:table-row md:py-0"
+                >
+                  <td data-label="Catégorie" className={`${CELLULE} ${ETIQUETTE}`}>
+                    {s.category ? (
+                      <CategoryChip category={s.category} />
+                    ) : (
+                      <span className="text-on-surface-variant">Non renseignée</span>
+                    )}
+                  </td>
+                  <td
+                    data-label="Auteur et demande"
+                    className={`${CELLULE} ${ETIQUETTE} min-w-0 md:max-w-md`}
+                  >
+                    <p className="font-body-sm font-bold text-primary wrap-anywhere">
+                      {`${s.author_name} · ${s.team}`}
+                    </p>
+                    <p className="line-clamp-2 font-body-sm text-on-surface wrap-anywhere">
+                      {s.content}
+                    </p>
+                    <div className="mt-xs flex flex-wrap items-center gap-sm">
+                      <button
+                        type="button"
+                        onClick={() => onRead(s)}
+                        aria-haspopup="dialog"
+                        aria-label={`Lire la demande de ${s.author_name}`}
+                        className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline underline-offset-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      >
+                        Lire
+                      </button>
+                      {s.attachment_path && (
+                        <span className="inline-flex items-center gap-xs font-label-sm text-sm text-on-surface-variant">
+                          <Icon name="attach_file" className="text-base" />
+                          Pièce jointe
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td data-label="Statut" className={`${CELLULE} ${ETIQUETTE}`}>
+                    <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
+                  </td>
+                  <td data-label="Visibilité" className={`${CELLULE} ${ETIQUETTE}`}>
+                    <VisibilityChip visibility={s.visibility} />
+                  </td>
+                  <td
+                    data-label="Date"
+                    className={`${CELLULE} ${ETIQUETTE} font-label-sm text-sm text-on-surface-variant whitespace-nowrap`}
+                  >
+                    <time dateTime={s.created_at} title={formatExactDate(s.created_at)}>
+                      {ilYaCourt(s.created_at)}
+                    </time>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {filtrees.length > limite && (
+        <button
+          type="button"
+          onClick={() => setLimite((l) => l + PAGE)}
+          className="mt-md inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline underline-offset-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          {`Voir toutes les demandes (${filtrees.length})`}
+        </button>
+      )}
+    </section>
+  );
+}
