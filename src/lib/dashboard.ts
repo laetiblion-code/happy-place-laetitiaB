@@ -199,6 +199,7 @@ export async function saveDraftNews(input: {
     : await db.from("news").insert(payload).select("id").single();
   if (error) throw error;
   await applyNewsImage(data.id, input.media);
+  return data.id as string;
 }
 
 export async function publishDraftNews(id: string) {
@@ -505,7 +506,15 @@ export function timeAgo(iso: string): string {
  * CRUD complet — news / submissions / blockers / metrics
  * ========================================================== */
 
-export type NewsInput = { title: string; body: string; author: string; status: string; links?: NewsLink[] };
+export type NewsInput = {
+  title: string;
+  body: string;
+  author: string;
+  /** Autrice choisie (admin : publication au nom d'un manager). La base calcule la délégation. */
+  author_email?: string;
+  status: string;
+  links?: NewsLink[];
+};
 export type SubmissionInput = {
   author_name: string;
   team: string;

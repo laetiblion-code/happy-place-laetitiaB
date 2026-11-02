@@ -2,10 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/confirm-dialog";
-import { FormActions, Modal } from "@/components/manage/crud-ui";
 import { AuteurActualite } from "@/components/news-author";
-import { NewsAiHelper } from "@/components/news-ai-helper";
-import { NewsLinks, NewsMediaEditor, NewsVignette } from "@/components/news-media";
+import { NewsEditor } from "@/components/news-editor";
+import { NewsLinks, NewsVignette } from "@/components/news-media";
 import { NewsReader } from "@/components/news-reader";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -23,18 +22,8 @@ import {
   fetchNews,
   formatDateCourte,
   publishDraftNews,
-  saveDraftNews,
-  timeAgo,
-  updateNews,
   type News,
 } from "@/lib/dashboard";
-import {
-  emptyMedia,
-  linkErrors,
-  mediaFromNews,
-  toNewsLinks,
-  type MediaDraft,
-} from "@/lib/news-media";
 import { nomAffiche, useNomsAffiches } from "@/lib/noms";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
@@ -59,8 +48,6 @@ const ROLE_LIBELLE = {
   manager: "Manager",
   collaborateur: "Collaborateur",
 } as const;
-
-type Brouillon = { id: string | null; publiee: boolean };
 
 /**
  * « Actualités du cabinet » : liste des dernières publications, brouillons (manager et admin) et rédaction
@@ -98,26 +85,15 @@ export function ActualitesCabinet({
   ).data;
 
   const [lue, setLue] = useState<News | null>(null);
-  const [brouillon, setBrouillon] = useState<Brouillon | null>(null);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  // Vrai tant que le titre et le texte viennent d'une proposition de l'IA non enregistrée
-  const [propositionIA, setPropositionIA] = useState(false);
-  const [media, setMedia] = useState<MediaDraft>(emptyMedia);
-  const [showLinkErrs, setShowLinkErrs] = useState(false);
-  const linkErrs = showLinkErrs ? linkErrors(media.links) : {};
+  // Fenêtre de rédaction ouverte : news null = nouvelle actualité
+  const [editeur, setEditeur] = useState<{ news: News | null } | null>(null);
 
   function ouvrir(n: News | null) {
-    setTitle(n?.title ?? "");
-    setBody(n?.body ?? "");
-    setMedia(n ? mediaFromNews(n) : emptyMedia());
-    setPropositionIA(false);
-    setShowLinkErrs(false);
-    setBrouillon(n ? { id: n.id, publiee: n.status === "publiée" } : { id: null, publiee: false });
+    setEditeur({ news: n });
   }
 
   function fermer() {
-    setBrouillon(null);
+    setEditeur(null);
   }
 
   // Ouverture demandée depuis l'en-tête : seulement quand le compteur change, pas au premier affichage
@@ -135,38 +111,6 @@ export function ActualitesCabinet({
     qc.invalidateQueries({ queryKey: ["home-counts"] });
   };
   const onError = (e: unknown) => toast.error((e as Error).message);
-
-  const enregistrer = useMutation({
-    mutationFn: (v: {
-      id: string | null;
-      publiee: boolean;
-      title: string;
-      body: string;
-      links: ReturnType<typeof toNewsLinks>;
-      media: MediaDraft;
-    }) =>
-      v.publiee && v.id
-        ? updateNews(
-            v.id,
-            { title: v.title, body: v.body, author: auteur, status: "publiée", links: v.links },
-            v.media,
-          )
-        : saveDraftNews({
-            id: v.id ?? undefined,
-            title: v.title,
-            body: v.body,
-            author: auteur,
-            author_email: email,
-            links: v.links,
-            media: v.media,
-          }),
-    onSuccess: (_d, v) => {
-      toast.success(v.publiee ? "Actualité modifiée" : "Brouillon enregistré");
-      fermer();
-      invaliderActus();
-    },
-    onError,
-  });
 
   const publier = useMutation({
     mutationFn: publishDraftNews,
@@ -186,25 +130,6 @@ export function ActualitesCabinet({
     },
     onError,
   });
-
-  function envoyer(e: React.FormEvent) {
-    e.preventDefault();
-    if (!brouillon) return;
-    if (!title.trim()) return;
-    setShowLinkErrs(true);
-    if (Object.keys(linkErrors(media.links)).length) {
-      toast.error("Corrige les liens invalides avant d'enregistrer.");
-      return;
-    }
-    enregistrer.mutate({
-      id: brouillon.id,
-      publiee: brouillon.publiee,
-      title: title.trim(),
-      body,
-      links: toNewsLinks(media.links),
-      media,
-    });
-  }
 
   async function confirmerSuppression(n: News) {
     const publiee = n.status === "publiée";
@@ -410,82 +335,15 @@ export function ActualitesCabinet({
         )}
       </div>
 
-      {brouillon && (
-        <Modal
-          title={
-            brouillon.id
-              ? brouillon.publiee
-                ? "Modifier l'actualité"
-                : "Modifier le brouillon"
-              : "Nouvelle actualité"
-          }
-          onClose={fermer}
-        >
-          <form data-corps-modale onSubmit={envoyer} noValidate className="space-y-md">
-            {propositionIA && (
-              <p className="inline-flex items-center gap-xs bg-[#F0D0BC] px-sm py-xs font-label-sm text-sm text-on-surface">
-                <Icon name="auto_awesome" className="text-sm" />
-                Proposition de l'IA, à relire
-              </p>
-            )}
-            <div className="space-y-xs">
-              <label
-                htmlFor="actu-titre"
-                className="block font-label-md text-label-md text-on-surface-variant"
-              >
-                TITRE
-              </label>
-              <input
-                id="actu-titre"
-                autoFocus
-                type="text"
-                value={title}
-                placeholder="Saisis un titre…"
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full border-b border-[#8A8A90] bg-transparent px-0 py-xs font-headline-sm text-headline-sm focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              />
-            </div>
-            <div className="space-y-xs">
-              <label
-                htmlFor="actu-contenu"
-                className="block font-label-md text-label-md text-on-surface-variant"
-              >
-                CONTENU
-              </label>
-              <textarea
-                id="actu-contenu"
-                rows={5}
-                value={body}
-                placeholder="Rédige l'actualité…"
-                onChange={(e) => setBody(e.target.value)}
-                className="w-full rounded-md border border-[#8A8A90] bg-card p-sm font-body-md focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              />
-            </div>
-            <NewsMediaEditor
-              value={media}
-              onChange={setMedia}
-              linkErrs={linkErrs}
-              disabled={enregistrer.isPending}
-              title={title}
-            />
-            <NewsAiHelper
-              titre={title}
-              texte={body}
-              onProposition={(p) => {
-                setTitle(p.titre);
-                setBody(p.texte);
-                setPropositionIA(true);
-              }}
-            />
-            <FormActions
-              pending={enregistrer.isPending}
-              submitLabel={
-                brouillon.publiee ? "Enregistrer les modifications" : "Enregistrer le brouillon"
-              }
-              onCancel={fermer}
-            />
-          </form>
-        </Modal>
+      {editeur && (
+        <NewsEditor
+          news={editeur.news}
+          isAdmin={isAdmin}
+          email={email}
+          auteur={auteur}
+          roleEquipe={[ROLE_LIBELLE[role], equipe].filter(Boolean).join(" ")}
+          onFermer={fermer}
+        />
       )}
 
       <NewsReader news={lue} onClose={() => setLue(null)} />
