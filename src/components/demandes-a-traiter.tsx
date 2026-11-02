@@ -2,17 +2,11 @@ import { useMemo } from "react";
 import { AttachmentLink } from "@/components/attachment-link";
 import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
 import { buttonVariants } from "@/components/ui/button";
+import { ChipStatut, COULEUR_STATUT, CLASSE_BOUTON_CARTE } from "@/components/chips";
+import { cn } from "@/lib/utils";
 import { type Submission } from "@/lib/dashboard";
 import { DureeCourte } from "@/components/duree-courte";
 import { initialesDe } from "@/lib/noms";
-
-function Icon({ name, className = "" }: { name: string; className?: string }) {
-  return (
-    <span aria-hidden="true" className={`material-symbols-outlined ${className}`}>
-      {name}
-    </span>
-  );
-}
 
 /** Demandes à traiter (manager et admin) : une carte par demande, les plus anciennes d'abord. */
 export function DemandesATraiter({
@@ -93,12 +87,9 @@ export function DemandesATraiter({
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-xs">
-                  <span className="inline-flex min-h-7 items-center gap-xs rounded-full bg-[#F0D0BC] px-sm py-xs font-label-sm text-sm text-[#28282D]">
-                    <Icon name="hourglass_empty" className="text-base" />
-                    <span>
-                      Attend chez toi depuis <DureeCourte iso={depuis} />
-                    </span>
-                  </span>
+                  <ChipStatut icon="hourglass_empty" couleur={COULEUR_STATUT.sable}>
+                    Attend chez toi depuis <DureeCourte iso={depuis} />
+                  </ChipStatut>
                   <VisibilityChip visibility={s.visibility} />
                 </div>
               </div>
@@ -129,7 +120,7 @@ export function DemandesATraiter({
                   type="button"
                   onClick={() => onRefuser(s)}
                   aria-label={`Refuser la demande de ${s.author_name}`}
-                  className={`${buttonVariants({ variant: "destructive" })} min-h-11`}
+                  className={cn(buttonVariants({ variant: "destructive" }), CLASSE_BOUTON_CARTE)}
                 >
                   Refuser
                 </button>
@@ -137,7 +128,7 @@ export function DemandesATraiter({
                   type="button"
                   onClick={() => onClarifier(s)}
                   aria-label={`Clarifier la demande de ${s.author_name}`}
-                  className={`${buttonVariants({ variant: "secondary" })} min-h-11`}
+                  className={cn(buttonVariants({ variant: "secondary" }), CLASSE_BOUTON_CARTE)}
                 >
                   Clarifier
                 </button>
@@ -146,7 +137,7 @@ export function DemandesATraiter({
                   onClick={() => onValider(s)}
                   disabled={validant}
                   aria-label={`Valider la demande de ${s.author_name}`}
-                  className={`${buttonVariants({ variant: "default" })} min-h-11`}
+                  className={cn(buttonVariants({ variant: "default" }), CLASSE_BOUTON_CARTE)}
                 >
                   Valider
                 </button>

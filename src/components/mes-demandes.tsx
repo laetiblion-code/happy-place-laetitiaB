@@ -6,6 +6,7 @@ import { CLARIFY_CATEGORY, StatusBadge } from "@/components/status-badge";
 import { SubmissionHistory } from "@/components/manage/submission-history";
 import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
 import { DureeCourte } from "@/components/duree-courte";
+import { ChipStatut, COULEUR_STATUT, LienBasBloc } from "@/components/chips";
 import { buttonVariants } from "@/components/ui/button";
 import { EXPORT_INFO_MES_DEMANDES } from "@/hooks/use-export-mes-demandes";
 import {
@@ -118,15 +119,10 @@ export function MesDemandes({
       </ul>
 
       {toutes.length > APERCU && (
-        <div className="mt-md flex justify-center">
-          <button
-            type="button"
-            onClick={() => setDeplie((d) => !d)}
-            aria-expanded={deplie}
-            className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline underline-offset-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            {deplie ? "Replier la liste" : `Voir toutes mes demandes (${toutes.length}) →`}
-          </button>
+        <div className="mt-md">
+          <LienBasBloc onClick={() => setDeplie((d) => !d)} align="centre">
+            {deplie ? "Replier la liste" : `Voir toutes mes demandes (${toutes.length})`}
+          </LienBasBloc>
         </div>
       )}
     </section>
@@ -164,13 +160,10 @@ function CarteDemande({
         <p className="min-w-0 font-body-md text-primary wrap-anywhere">{envoi}</p>
         <div className="flex flex-wrap items-center gap-xs">
           {enAttente ? (
-            <span className="inline-flex min-h-7 items-center gap-xs rounded-md bg-[#F0D0BC] px-xs py-[2px] font-label-sm text-sm font-semibold text-[#28282D]">
-              <Icon name="hourglass_empty" className="text-sm" />
-              <span>
-                En attente chez {managers.length ? prenoms : "ton manager"} depuis{" "}
-                <DureeCourte iso={changement} />
-              </span>
-            </span>
+            <ChipStatut icon="hourglass_empty" couleur={COULEUR_STATUT.sable}>
+              En attente chez {managers.length ? prenoms : "ton manager"} depuis{" "}
+              <DureeCourte iso={changement} />
+            </ChipStatut>
           ) : (
             <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
           )}

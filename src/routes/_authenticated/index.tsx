@@ -13,6 +13,7 @@ import { ManagerCards } from "@/components/home-counters";
 import { fetchAlertCounts, fetchDelaiValidation, fetchDraftCounts, fetchMyCounts, fetchPublicationActus, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
 import { AlertsKanban } from "@/components/alerts-kanban";
 import { buttonVariants } from "@/components/ui/button";
+import { LienBasBloc } from "@/components/chips";
 import { DepartureNotices } from "@/components/departure-notices";
 import { ActualitesCabinet } from "@/components/actualites-cabinet";
 import { DemandesATraiter } from "@/components/demandes-a-traiter";
@@ -335,7 +336,7 @@ function ManagerSpace() {
               onClarifier={(s) => startReject(s, "clarification")}
               onValider={(s) => review.mutate({ id: s.id, status: "validée" })}
             />
-            <ActualitesCabinet role={roleAffiche} email={myEmail} auteur={myName} ouvertureDemandee={ouvertureActu} />
+            <ActualitesCabinet role={roleAffiche} email={myEmail} auteur={myName} equipe={profile.data?.team ?? ""} ouvertureDemandee={ouvertureActu} />
           </div>
         ) : (
           /* Collaborateur : ses demandes, puis les actualités du cabinet */
@@ -349,7 +350,7 @@ function ManagerSpace() {
               onExport={() => exporter.mutate()}
               onRead={setReading}
             />
-            <ActualitesCabinet role={roleAffiche} email={myEmail} auteur={myName} ouvertureDemandee={ouvertureActu} />
+            <ActualitesCabinet role={roleAffiche} email={myEmail} auteur={myName} equipe={profile.data?.team ?? ""} ouvertureDemandee={ouvertureActu} />
           </>
         )}
 
@@ -384,14 +385,9 @@ function ManagerSpace() {
               ))}
             </div>
             {isAdmin && (
-              <div className="flex justify-end">
-                <Link
-                  to="/manage/metrics"
-                  className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline underline-offset-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                >
-                  Gérer les indicateurs
-                </Link>
-              </div>
+              <LienBasBloc to="/manage/metrics" align="droite">
+                Gérer les indicateurs
+              </LienBasBloc>
             )}
           </section>
       </main>

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
 import { StatusBadge } from "@/components/status-badge";
+import { LienBasBloc } from "@/components/chips";
 import { formatExactDate } from "@/components/expandable-card";
 import { buttonVariants } from "@/components/ui/button";
 import { AttachmentLink } from "@/components/attachment-link";
@@ -268,25 +268,18 @@ export function DemandesCabinet({
       )}
 
       {variante === "accueil" && filtrees.length > 0 && (
-        <div className="mt-md flex justify-center">
-          <Link
-            to={role === "admin" ? "/manage/submissions" : "/demandes"}
-            className="inline-flex min-h-11 items-center font-label-sm text-sm font-bold text-primary underline underline-offset-4 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            {`Voir toutes les demandes (${filtrees.length}) →`}
-          </Link>
+        <div className="mt-md">
+          <LienBasBloc to={role === "admin" ? "/manage/submissions" : "/demandes"} align="centre">
+            {`Voir toutes les demandes (${filtrees.length})`}
+          </LienBasBloc>
         </div>
       )}
 
       {variante === "page" && filtrees.length > limite && (
-        <div className="mt-md flex justify-center">
-          <button
-            type="button"
-            onClick={() => setLimite((l) => l + PAGE)}
-            className="inline-flex min-h-11 items-center font-label-sm text-sm font-bold text-primary underline underline-offset-4 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
+        <div className="mt-md">
+          <LienBasBloc onClick={() => setLimite((l) => l + PAGE)} align="centre">
             {`Afficher ${Math.min(PAGE, filtrees.length - limite)} de plus`}
-          </button>
+          </LienBasBloc>
         </div>
       )}
     </section>

@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -8,6 +7,8 @@ import { NewsAiHelper } from "@/components/news-ai-helper";
 import { NewsLinks, NewsMediaEditor, NewsVignette } from "@/components/news-media";
 import { NewsReader } from "@/components/news-reader";
 import { buttonVariants } from "@/components/ui/button";
+import { CLASSE_BOUTON_CARTE, LienBasBloc } from "@/components/chips";
+import { ilYAShort } from "@/lib/duree-libelles";
 import { cn } from "@/lib/utils";
 import {
   deleteDraftNews,
@@ -37,9 +38,18 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
-/** Lien d'action : le soulignement porte sur le texte seulement (les icônes ne sont pas soulignées). */
+/** Lien texte d'une ligne : souligné au survol et au focus seulement, icône non soulignée. */
 const LIEN_ACTION =
-  "inline-flex min-h-11 items-center gap-xs font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "inline-flex min-h-11 items-center gap-xs text-sm font-semibold text-primary hover:underline focus:outline-none focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+
+const LIEN_SUPPRIMER =
+  "inline-flex min-h-11 items-center gap-xs text-sm font-semibold text-[#C2272D] hover:underline focus:outline-none focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50";
+
+const ROLE_LIBELLE = {
+  admin: "Admin",
+  manager: "Manager",
+  collaborateur: "Collaborateur",
+} as const;
 
 type Brouillon = { id: string | null; publiee: boolean };
 
@@ -51,6 +61,7 @@ export function ActualitesCabinet({
   role,
   email,
   auteur,
+  equipe = "",
   ouvertureDemandee = 0,
 }: {
   role: "admin" | "manager" | "collaborateur";
@@ -58,6 +69,8 @@ export function ActualitesCabinet({
   email: string;
   /** Nom enregistré comme auteur des actualités. */
   auteur: string;
+  /** Équipe de la personne connectée (affichée à côté de son rôle sur ses propres actualités). */
+  equipe?: string;
   /** Compteur incrémenté depuis l'en-tête pour ouvrir la rédaction (« Nouvelle actualité »). */
   ouvertureDemandee?: number;
 }) {
@@ -228,64 +241,74 @@ export function ActualitesCabinet({
           {drafts.length === 0 ? (
             <p className="font-body-sm italic text-on-surface-variant">Aucun brouillon en cours.</p>
           ) : (
-            // Conteneur : toutes les cartes changent de disposition ensemble, selon la largeur de la liste
-            <ul className="@container space-y-xs">
-              {drafts.map((n) => (
-                <li
-                  key={n.id}
-                  className="flex flex-col gap-sm rounded-md border border-outline-variant bg-card p-sm @[36rem]:flex-row @[36rem]:items-center @[36rem]:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
-                    <p className="font-label-sm text-sm text-on-surface-variant">
-                      {`Rédigé par ${nomAffiche(n.author ?? "", noms)} · Créé ${timeAgo(n.created_at)}`}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-xs @[36rem]:shrink-0 @[36rem]:justify-end">
-                    <button
-                      type="button"
-                      disabled={supprimer.isPending}
-                      onClick={() => confirmerSuppression(n)}
-                      aria-label={`Supprimer le brouillon « ${n.title} »`}
-                      className="inline-flex min-h-11 items-center gap-xs px-sm font-label-sm text-sm text-error"
-                    >
-                      <Icon name="delete" />
-                      <span className="underline underline-offset-2">Supprimer</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => ouvrir(n)}
-                      aria-label={`Modifier le brouillon « ${n.title} »`}
-                      className={cn(
-                        buttonVariants({ variant: "secondary", size: "sm" }),
-                        "text-sm",
-                      )}
-                    >
-                      <Icon name="edit" /> Modifier
-                    </button>
-                    <button
-                      type="button"
-                      disabled={publier.isPending}
-                      onClick={async () => {
-                        if (
-                          await demander({
-                            titre: "Publier l'actualité",
-                            message: `Publier l'actualité « ${n.title} » ? Elle sera visible par tous.`,
-                            libelleConfirmer: "Publier",
-                          })
-                        )
-                          publier.mutate(n.id);
-                      }}
-                      aria-label={`Publier « ${n.title} »`}
-                      className={cn(buttonVariants({ variant: "default", size: "sm" }), "text-sm")}
-                    >
-                      Publier
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <>
+              // Conteneur : toutes les cartes changent de disposition ensemble, selon la largeur de
+              la liste
+              <ul className="@container space-y-xs">
+                {drafts.map((n) => (
+                  <li
+                    key={n.id}
+                    className="flex flex-col gap-sm rounded-md border border-outline-variant bg-card p-sm @[36rem]:flex-row @[36rem]:items-center @[36rem]:justify-between"
+                  >
+                    <div className="min-w-0 space-y-xs">
+                      <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
+                      <p className="font-label-sm text-sm text-on-surface-variant">
+                        {`Rédigé par ${nomAffiche(n.author ?? "", noms)} · Créé ${ilYAShort(n.created_at)}`}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-md">
+                        <button
+                          type="button"
+                          disabled={supprimer.isPending}
+                          onClick={() => confirmerSuppression(n)}
+                          aria-label={`Supprimer le brouillon « ${n.title} »`}
+                          className={LIEN_SUPPRIMER}
+                        >
+                          <Icon name="delete" className="text-base" />
+                          Supprimer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => ouvrir(n)}
+                          aria-label={`Modifier le brouillon « ${n.title} »`}
+                          className={LIEN_ACTION}
+                        >
+                          <Icon name="edit" className="text-base" />
+                          Modifier
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-xs @[36rem]:shrink-0 @[36rem]:justify-end">
+                      <button
+                        type="button"
+                        disabled={publier.isPending}
+                        onClick={async () => {
+                          if (
+                            await demander({
+                              titre: "Publier l'actualité",
+                              message: `Publier l'actualité « ${n.title} » ? Elle sera visible par tous.`,
+                              libelleConfirmer: "Publier",
+                            })
+                          )
+                            publier.mutate(n.id);
+                        }}
+                        aria-label={`Publier « ${n.title} »`}
+                        className={cn(
+                          buttonVariants({ variant: "default", size: "sm" }),
+                          CLASSE_BOUTON_CARTE,
+                          "text-sm",
+                        )}
+                      >
+                        Publier
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
+          <LienBasBloc to="/actualites" align="centre">
+            Voir toutes mes actualités
+          </LienBasBloc>
         </div>
       )}
 
@@ -303,37 +326,36 @@ export function ActualitesCabinet({
           </p>
         )}
         <ul className="space-y-sm">
-          {published.slice(0, 4).map((n) => (
-            <li
-              key={n.id}
-              className="flex min-w-0 gap-sm border-t border-outline-variant pt-sm first:border-t-0 first:pt-0"
-            >
-              <time
-                dateTime={n.created_at}
-                className="w-14 shrink-0 font-label-sm text-sm text-on-surface-variant"
+          {published.slice(0, 4).map((n) => {
+            // Ses propres actualités : badge « Toi » et, à côté, son rôle et son équipe (connus pour soi seulement)
+            const moi = !!email && (n.author_email ?? "").toLowerCase() === email.toLowerCase();
+            const roleEquipe = moi ? [ROLE_LIBELLE[role], equipe].filter(Boolean).join(" ") : "";
+            return (
+              <li
+                key={n.id}
+                className="flex min-w-0 gap-sm border-t border-outline-variant pt-sm first:border-t-0 first:pt-0"
               >
-                {formatDateCourte(n.created_at)}
-              </time>
-              {n.image_path && <NewsVignette path={n.image_path} alt={n.title} />}
-              <div className="min-w-0 flex-1 space-y-xs">
-                <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
-                <p className="font-label-sm text-sm text-on-surface-variant">
-                  {`Par ${nomAffiche(n.author ?? "", noms)}`}
-                </p>
-                <NewsLinks links={n.links} />
-                <div className="flex flex-wrap items-center gap-sm">
-                  <button
-                    type="button"
-                    onClick={() => setLue(n)}
-                    aria-haspopup="dialog"
-                    aria-label={`Lire l'actualité « ${n.title} »`}
-                    className={LIEN_ACTION}
-                  >
-                    <span className="underline underline-offset-2">Lire</span>
-                    <Icon name="arrow_forward" className="text-base" />
-                  </button>
+                <time
+                  dateTime={n.created_at}
+                  className="w-14 shrink-0 font-label-sm text-sm text-on-surface-variant"
+                >
+                  {formatDateCourte(n.created_at)}
+                </time>
+                {n.image_path && <NewsVignette path={n.image_path} alt={n.title} />}
+                <div className="min-w-0 flex-1 space-y-xs">
+                  <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
+                  <p className="flex flex-wrap items-center gap-x-xs font-label-sm text-sm text-on-surface-variant">
+                    <span>{`Par ${nomAffiche(n.author ?? "", noms)}`}</span>
+                    {moi && (
+                      <span className="rounded-[4px] bg-[#F5D5D4] px-xs font-semibold leading-snug text-[12px] text-[#28282D]">
+                        Toi
+                      </span>
+                    )}
+                    {moi && roleEquipe && <span>{`· ${roleEquipe}`}</span>}
+                  </p>
+                  <NewsLinks links={n.links} />
                   {isAdmin && (
-                    <>
+                    <div className="flex flex-wrap items-center gap-md">
                       <button
                         type="button"
                         onClick={() => ouvrir(n)}
@@ -341,29 +363,39 @@ export function ActualitesCabinet({
                         className={LIEN_ACTION}
                       >
                         <Icon name="edit" className="text-base" />
-                        <span className="underline underline-offset-2">Modifier</span>
+                        Modifier
                       </button>
                       <button
                         type="button"
                         disabled={supprimer.isPending}
                         onClick={() => confirmerSuppression(n)}
                         aria-label={`Supprimer l'actualité « ${n.title} »`}
-                        className="inline-flex min-h-11 items-center gap-xs font-label-sm text-sm text-error focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        className={LIEN_SUPPRIMER}
                       >
                         <Icon name="delete" className="text-base" />
-                        <span className="underline underline-offset-2">Supprimer</span>
+                        Supprimer
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
-              </div>
-            </li>
-          ))}
+                <button
+                  type="button"
+                  onClick={() => setLue(n)}
+                  aria-haspopup="dialog"
+                  aria-label={`Lire l'actualité « ${n.title} »`}
+                  className={`${LIEN_ACTION} shrink-0 self-start`}
+                >
+                  Lire
+                  <Icon name="chevron_right" className="text-base" />
+                </button>
+              </li>
+            );
+          })}
         </ul>
         {published.length > 0 && (
-          <Link to="/actualites" className={LIEN_ACTION}>
-            <span className="underline underline-offset-2">Voir toutes les actualités</span>
-          </Link>
+          <LienBasBloc to="/actualites" align="centre">
+            Voir toutes les actualités
+          </LienBasBloc>
         )}
       </div>
 

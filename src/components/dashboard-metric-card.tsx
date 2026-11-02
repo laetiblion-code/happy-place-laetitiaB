@@ -142,10 +142,10 @@ export function DashboardMetricCard({ metric: m }: { metric: Metric }) {
         <>
           <p className="flex items-start gap-xs font-label-sm text-sm text-on-surface">
             <Icon name="track_changes" className="text-base shrink-0" />
-            {/* « Objectif 55 % » et « en fin de semestre » ne se coupent pas : la ligne ne casse qu'avant la seconde partie */}
-            <span>
-              <span className="whitespace-nowrap">{`Objectif ${objectif}`}</span>{" "}
-              <span className="whitespace-nowrap">en fin de semestre</span>
+            {/* « en fin de semestre » est toujours sur sa propre ligne, sous « Objectif … » */}
+            <span className="flex flex-col">
+              <span className="block">{`Objectif ${objectif}`}</span>
+              <span className="block">en fin de semestre</span>
             </span>
           </p>
           <BarreObjectif

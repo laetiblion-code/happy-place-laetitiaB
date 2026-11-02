@@ -1,4 +1,5 @@
 import { Building2, Check, CircleHelp, Lightbulb, Lock, Sparkles, TriangleAlert, Users, type LucideIcon } from "lucide-react";
+import { EtiquetteType, PiluleVisibilite } from "@/components/chips";
 
 type Choice = { value: string; label: string; help: string; icon: LucideIcon; labelClass?: string; libelleCourt?: string };
 
@@ -125,29 +126,18 @@ export function ChoiceGroup({
   );
 }
 
-/** Étiquette de catégorie et pilule de visibilité, pour les cartes et la fenêtre de lecture. */
-/** Puce de catégorie (question, idée, problème, amélioration). Rien si la catégorie est absente (anciennes demandes). */
+/** Étiquette de type (question, idée, problème, amélioration). Rien si la catégorie est absente (anciennes demandes). */
 export function CategoryChip({ category }: { category?: string | null }) {
   const cat = SUBMISSION_CATEGORY_OPTIONS.find((o) => o.value === category);
   if (!cat) return null;
-  return (
-    <span className="inline-flex min-h-7 items-center gap-xs bg-[#EDEBE6] px-sm py-xs font-label-sm text-sm uppercase text-[#28282D]">
-      <cat.icon aria-hidden="true" className="h-3.5 w-3.5" />
-      {cat.libelleCourt ?? cat.label}
-    </span>
-  );
+  return <EtiquetteType icon={cat.icon}>{cat.libelleCourt ?? cat.label}</EtiquetteType>;
 }
 
-/** Puce de visibilité (privée, équipe, entreprise). Rien si la visibilité est absente. */
+/** Pilule de visibilité (privée, équipe, entreprise). Rien si la visibilité est absente. */
 export function VisibilityChip({ visibility }: { visibility?: string | null }) {
   const vis = SUBMISSION_VISIBILITY_OPTIONS.find((o) => o.value === visibility);
   if (!vis) return null;
-  return (
-    <span className={`inline-flex min-h-7 items-center gap-xs rounded-full bg-[#EDEBE6] px-sm py-xs font-label-sm text-sm text-[#28282D] ${vis.labelClass ?? ""}`}>
-      <vis.icon aria-hidden="true" className="h-3.5 w-3.5" />
-      {vis.label}
-    </span>
-  );
+  return <PiluleVisibilite icon={vis.icon}>{vis.label}</PiluleVisibilite>;
 }
 
 export function SubmissionTags({ category, visibility }: { category?: string | null; visibility?: string | null }) {

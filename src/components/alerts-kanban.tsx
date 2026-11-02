@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type DragEvent } from "react";
 import { toast } from "sonner";
 import { BlockerArchive } from "@/components/dashboard-extras";
-import { buttonVariants } from "@/components/ui/button";
+import { ChipStatut, COULEUR_STATUT, LienBasBloc } from "@/components/chips";
+import { joursEntre, libelleResolution } from "@/lib/duree-libelles";
 import {
   ALERT_STATES,
   ALERT_TRANSITIONS,
@@ -29,9 +30,9 @@ const COLONNES: { etat: AlertStatus; titre: string }[] = [
 
 /** Couleurs de sévérité propres au tableau : critique en rouge, avertissement en sable, information en gris. */
 const SEVERITE = {
-  critical: { label: "Critique", icon: "error", classe: "bg-[#FFDAD6] text-[#A81E25]" },
-  warning: { label: "Avertissement", icon: "warning", classe: "bg-[#F0D0BC] text-[#28282D]" },
-  info: { label: "Information", icon: "info", classe: "bg-[#EDEBE6] text-[#28282D]" },
+  critical: { label: "Critique", icon: "error", classe: COULEUR_STATUT.rouge },
+  warning: { label: "Avertissement", icon: "warning", classe: COULEUR_STATUT.sable },
+  info: { label: "Information", icon: "info", classe: COULEUR_STATUT.gris },
 } as const;
 
 type Severite = keyof typeof SEVERITE;
@@ -116,10 +117,9 @@ export function AlertsKanban({ isAdmin }: { isAdmin: boolean }) {
           <h2 id="titre-alertes" className="font-headline-sm text-headline-sm text-primary">
             Alertes opérationnelles
           </h2>
-          <span className="inline-flex items-center gap-xs rounded-full bg-error-container px-sm py-[2px] font-label-sm text-sm text-on-error-container">
-            <Icon name="priority_high" className="text-base" />
+          <ChipStatut icon="priority_high" couleur="bg-error-container text-on-error-container">
             Priorité haute
-          </span>
+          </ChipStatut>
         </div>
         {isAdmin && (
           <p className="font-body-sm text-sm text-on-surface-variant">
@@ -201,15 +201,10 @@ export function AlertsKanban({ isAdmin }: { isAdmin: boolean }) {
         })}
       </div>
 
-      <div className="mt-md flex justify-end">
-        <button
-          type="button"
-          aria-haspopup="dialog"
-          onClick={() => setArchiveOuverte(true)}
-          className="inline-flex min-h-11 items-center font-label-sm text-sm font-bold text-primary underline underline-offset-4 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          Voir les alertes archivées →
-        </button>
+      <div className="mt-md">
+        <LienBasBloc icone="history" align="droite" onClick={() => setArchiveOuverte(true)}>
+          Voir les alertes archivées
+        </LienBasBloc>
       </div>
 
       <BlockerArchive open={archiveOuverte} onClose={() => setArchiveOuverte(false)} />
@@ -250,15 +245,12 @@ function CarteAlerte({
       onDragStart={modifiable ? onDragStart : undefined}
       onDragEnd={modifiable ? onDragEnd : undefined}
       aria-busy={enCours || undefined}
-      className={`flex min-w-0 flex-col gap-xs rounded-md border border-outline-variant p-sm shadow-sm ${critique ? "bg-[#FDF0EF]" : "bg-white"} ${resolue ? "border-t-4 border-t-[#1F6B38]" : ""} ${modifiable ? "cursor-grab" : ""}`}
+      className={`flex min-w-0 flex-col gap-xs rounded-md border border-outline-variant p-sm shadow-sm ${critique ? "bg-[#FDF0EF]" : "bg-white"} ${resolue ? "border-t-[3px] border-t-[#7FBF94]" : ""} ${modifiable ? "cursor-grab" : ""}`}
     >
       <div className="flex items-start justify-between gap-xs">
-        <span
-          className={`inline-flex min-h-7 items-center gap-xs rounded-full px-sm py-xs font-label-sm text-sm font-semibold ${sev.classe}`}
-        >
-          <Icon name={sev.icon} className="text-base" />
+        <ChipStatut icon={sev.icon} couleur={sev.classe}>
           {sev.label}
-        </span>
+        </ChipStatut>
         {modifiable && <Icon name="drag_indicator" className="text-on-surface-variant" />}
       </div>
 
@@ -271,19 +263,32 @@ function CarteAlerte({
         {`Créé le ${formatDateCourte(b.created_at)} · Mis à jour le ${formatDateCourte(b.updated_at)}`}
       </p>
 
+      {resolue && (
+        <p className="flex flex-wrap items-center gap-xs">
+          <ChipStatut icon="check_circle" couleur={COULEUR_STATUT.vert}>
+            Résolue
+          </ChipStatut>
+          <span className="font-label-sm text-sm font-semibold text-[#1F6B38]">
+            {libelleResolution(joursEntre(b.created_at, b.updated_at))}
+          </span>
+        </p>
+      )}
+
       {modifiable && (
         <div className="space-y-xs">
-          <button
-            type="button"
-            aria-expanded={menuOuvert}
-            aria-controls={idMenu}
-            onClick={onToggleMenu}
-            disabled={enCours}
-            className={`${buttonVariants({ variant: "secondary", size: "sm" })} min-h-11 w-full`}
-          >
-            <Icon name="swap_horiz" className="text-base" />
-            {enCours ? "Changement…" : "Changer l'état"}
-          </button>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              aria-expanded={menuOuvert}
+              aria-controls={idMenu}
+              onClick={onToggleMenu}
+              disabled={enCours}
+              className="inline-flex min-h-11 items-center gap-xs text-sm font-bold text-primary hover:underline focus:outline-none focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+            >
+              <Icon name="swap_horiz" className="text-[18px]" />
+              {enCours ? "Changement…" : "Changer l'état"}
+            </button>
+          </div>
           {menuOuvert && (
             <ul id={idMenu} aria-label="États autorisés" className="space-y-xs">
               {transitions.map((etatCible) => (
