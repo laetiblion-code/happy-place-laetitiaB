@@ -1,3 +1,4 @@
+import { TEXTE_SOULIGNE } from "@/components/chips";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type DragEvent } from "react";
 import { toast } from "sonner";
@@ -283,10 +284,10 @@ function CarteAlerte({
               aria-controls={idMenu}
               onClick={onToggleMenu}
               disabled={enCours}
-              className="inline-flex min-h-11 items-center gap-xs text-sm font-bold text-primary hover:underline focus:outline-none focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+              className="group inline-flex min-h-11 items-center gap-xs text-sm font-bold text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
             >
               <Icon name="swap_horiz" className="text-[18px]" />
-              {enCours ? "Changement…" : "Changer l'état"}
+              <span className={TEXTE_SOULIGNE}>{enCours ? "Changement…" : "Changer l'état"}</span>
             </button>
           </div>
           {menuOuvert && (

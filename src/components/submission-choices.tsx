@@ -10,7 +10,7 @@ export const SUBMISSION_CATEGORY_OPTIONS: Choice[] = [
   {
     value: "amélioration de Happy Place",
     label: "Amélioration de Happy Place",
-    libelleCourt: "Amélioration Happy Place",
+    libelleCourt: "Améliorer Happy Place",
     help: "Tu proposes un changement de l'outil Happy Place.",
     icon: Sparkles,
   },

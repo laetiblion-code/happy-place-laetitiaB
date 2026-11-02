@@ -14,8 +14,11 @@ export type News = {
   body: string | null;
   author: string;
   author_email?: string | null;
+  /** Renseigné par la base quand un admin a publié au nom d'un manager (jamais saisi par le navigateur). */
+  delegated_by_email?: string | null;
   status: string;
   created_at: string;
+  updated_at?: string;
   image_path?: string | null;
   links?: unknown;
 };

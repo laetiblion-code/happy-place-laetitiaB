@@ -3,11 +3,18 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/confirm-dialog";
 import { FormActions, Modal } from "@/components/manage/crud-ui";
+import { AuteurActualite } from "@/components/news-author";
 import { NewsAiHelper } from "@/components/news-ai-helper";
 import { NewsLinks, NewsMediaEditor, NewsVignette } from "@/components/news-media";
 import { NewsReader } from "@/components/news-reader";
 import { buttonVariants } from "@/components/ui/button";
-import { CLASSE_BOUTON_CARTE, LienBasBloc } from "@/components/chips";
+import {
+  CLASSE_BOUTON_CARTE,
+  CLASSE_LIEN_ACTION,
+  CLASSE_LIEN_SUPPRIMER,
+  LienBasBloc,
+  TEXTE_SOULIGNE,
+} from "@/components/chips";
 import { ilYAShort } from "@/lib/duree-libelles";
 import { cn } from "@/lib/utils";
 import {
@@ -38,12 +45,14 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
-/** Lien texte d'une ligne : souligné au survol et au focus seulement, icône non soulignée. */
-const LIEN_ACTION =
-  "inline-flex min-h-11 items-center gap-xs text-sm font-semibold text-primary hover:underline focus:outline-none focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
-
-const LIEN_SUPPRIMER =
-  "inline-flex min-h-11 items-center gap-xs text-sm font-semibold text-[#C2272D] hover:underline focus:outline-none focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50";
+/** Auteur d'un brouillon : « Rédigé par Kesha » ou, si délégué, « Rédigé par Olivia pour Kesha ». */
+function libelleBrouillon(n: News, noms: Map<string, string> | undefined): string {
+  const auteur = nomAffiche(n.author ?? "", noms);
+  const qui = n.delegated_by_email
+    ? `Rédigé par ${nomAffiche(n.delegated_by_email, noms)} pour ${auteur}`
+    : `Rédigé par ${auteur}`;
+  return `${qui} · Dernière modif ${ilYAShort(n.updated_at ?? n.created_at)}`;
+}
 
 const ROLE_LIBELLE = {
   admin: "Admin",
@@ -84,7 +93,9 @@ export function ActualitesCabinet({
   const drafts = (news.data ?? []).filter(
     (n) => n.status === "brouillon" && (isAdmin || (n.author_email ?? "").toLowerCase() === email),
   );
-  const noms = useNomsAffiches((news.data ?? []).map((n) => n.author ?? "")).data;
+  const noms = useNomsAffiches(
+    (news.data ?? []).flatMap((n) => [n.author ?? "", n.delegated_by_email ?? ""]),
+  ).data;
 
   const [lue, setLue] = useState<News | null>(null);
   const [brouillon, setBrouillon] = useState<Brouillon | null>(null);
@@ -241,70 +252,66 @@ export function ActualitesCabinet({
           {drafts.length === 0 ? (
             <p className="font-body-sm italic text-on-surface-variant">Aucun brouillon en cours.</p>
           ) : (
-            <>
-              // Conteneur : toutes les cartes changent de disposition ensemble, selon la largeur de
-              la liste
-              <ul className="@container space-y-xs">
-                {drafts.map((n) => (
-                  <li
-                    key={n.id}
-                    className="flex flex-col gap-sm rounded-md border border-outline-variant bg-card p-sm @[36rem]:flex-row @[36rem]:items-center @[36rem]:justify-between"
-                  >
-                    <div className="min-w-0 space-y-xs">
-                      <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
-                      <p className="font-label-sm text-sm text-on-surface-variant">
-                        {`Rédigé par ${nomAffiche(n.author ?? "", noms)} · Créé ${ilYAShort(n.created_at)}`}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-md">
-                        <button
-                          type="button"
-                          disabled={supprimer.isPending}
-                          onClick={() => confirmerSuppression(n)}
-                          aria-label={`Supprimer le brouillon « ${n.title} »`}
-                          className={LIEN_SUPPRIMER}
-                        >
-                          <Icon name="delete" className="text-base" />
-                          Supprimer
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => ouvrir(n)}
-                          aria-label={`Modifier le brouillon « ${n.title} »`}
-                          className={LIEN_ACTION}
-                        >
-                          <Icon name="edit" className="text-base" />
-                          Modifier
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-xs @[36rem]:shrink-0 @[36rem]:justify-end">
+            <ul className="space-y-xs">
+              {drafts.map((n) => (
+                <li
+                  key={n.id}
+                  className="flex flex-col gap-sm rounded-md border border-outline-variant bg-card p-sm"
+                >
+                  <div className="min-w-0 space-y-xs">
+                    <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
+                    <p className="font-label-sm text-sm text-on-surface-variant">
+                      {libelleBrouillon(n, noms)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-sm">
+                    <div className="flex flex-wrap items-center gap-md">
                       <button
                         type="button"
-                        disabled={publier.isPending}
-                        onClick={async () => {
-                          if (
-                            await demander({
-                              titre: "Publier l'actualité",
-                              message: `Publier l'actualité « ${n.title} » ? Elle sera visible par tous.`,
-                              libelleConfirmer: "Publier",
-                            })
-                          )
-                            publier.mutate(n.id);
-                        }}
-                        aria-label={`Publier « ${n.title} »`}
-                        className={cn(
-                          buttonVariants({ variant: "default", size: "sm" }),
-                          CLASSE_BOUTON_CARTE,
-                          "text-sm",
-                        )}
+                        disabled={supprimer.isPending}
+                        onClick={() => confirmerSuppression(n)}
+                        aria-label={`Supprimer le brouillon « ${n.title} »`}
+                        className={CLASSE_LIEN_SUPPRIMER}
                       >
-                        Publier
+                        <Icon name="delete" className="text-base" />
+                        <span className={TEXTE_SOULIGNE}>Supprimer</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => ouvrir(n)}
+                        aria-label={`Modifier le brouillon « ${n.title} »`}
+                        className={CLASSE_LIEN_ACTION}
+                      >
+                        <Icon name="edit" className="text-base" />
+                        <span className={TEXTE_SOULIGNE}>Modifier</span>
                       </button>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            </>
+                    <button
+                      type="button"
+                      disabled={publier.isPending}
+                      onClick={async () => {
+                        if (
+                          await demander({
+                            titre: "Publier l'actualité",
+                            message: `Publier l'actualité « ${n.title} » ? Elle sera visible par tous.`,
+                            libelleConfirmer: "Publier",
+                          })
+                        )
+                          publier.mutate(n.id);
+                      }}
+                      aria-label={`Publier « ${n.title} »`}
+                      className={cn(
+                        buttonVariants({ variant: "default", size: "sm" }),
+                        CLASSE_BOUTON_CARTE,
+                        "text-sm",
+                      )}
+                    >
+                      Publier
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
           <LienBasBloc to="/actualites" align="centre">
             Voir toutes mes actualités
@@ -330,6 +337,8 @@ export function ActualitesCabinet({
             // Ses propres actualités : badge « Toi » et, à côté, son rôle et son équipe (connus pour soi seulement)
             const moi = !!email && (n.author_email ?? "").toLowerCase() === email.toLowerCase();
             const roleEquipe = moi ? [ROLE_LIBELLE[role], equipe].filter(Boolean).join(" ") : "";
+            // Admin : toutes ; manager : ses propres actualités (la base refuse le reste)
+            const peutModifier = isAdmin || (canWrite && moi);
             return (
               <li
                 key={n.id}
@@ -345,7 +354,9 @@ export function ActualitesCabinet({
                 <div className="min-w-0 flex-1 space-y-xs">
                   <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
                   <p className="flex flex-wrap items-center gap-x-xs font-label-sm text-sm text-on-surface-variant">
-                    <span>{`Par ${nomAffiche(n.author ?? "", noms)}`}</span>
+                    <span>
+                      <AuteurActualite news={n} noms={noms} />
+                    </span>
                     {moi && (
                       <span className="rounded-[4px] bg-[#F5D5D4] px-xs font-semibold leading-snug text-[12px] text-[#28282D]">
                         Toi
@@ -354,26 +365,26 @@ export function ActualitesCabinet({
                     {moi && roleEquipe && <span>{`· ${roleEquipe}`}</span>}
                   </p>
                   <NewsLinks links={n.links} />
-                  {isAdmin && (
+                  {peutModifier && (
                     <div className="flex flex-wrap items-center gap-md">
                       <button
                         type="button"
                         onClick={() => ouvrir(n)}
                         aria-label={`Modifier l'actualité « ${n.title} »`}
-                        className={LIEN_ACTION}
+                        className={CLASSE_LIEN_ACTION}
                       >
                         <Icon name="edit" className="text-base" />
-                        Modifier
+                        <span className={TEXTE_SOULIGNE}>Modifier</span>
                       </button>
                       <button
                         type="button"
                         disabled={supprimer.isPending}
                         onClick={() => confirmerSuppression(n)}
                         aria-label={`Supprimer l'actualité « ${n.title} »`}
-                        className={LIEN_SUPPRIMER}
+                        className={CLASSE_LIEN_SUPPRIMER}
                       >
                         <Icon name="delete" className="text-base" />
-                        Supprimer
+                        <span className={TEXTE_SOULIGNE}>Supprimer</span>
                       </button>
                     </div>
                   )}
@@ -383,9 +394,9 @@ export function ActualitesCabinet({
                   onClick={() => setLue(n)}
                   aria-haspopup="dialog"
                   aria-label={`Lire l'actualité « ${n.title} »`}
-                  className={`${LIEN_ACTION} shrink-0 self-start`}
+                  className={`${CLASSE_LIEN_ACTION} shrink-0 self-start`}
                 >
-                  Lire
+                  <span className={TEXTE_SOULIGNE}>Lire</span>
                   <Icon name="chevron_right" className="text-base" />
                 </button>
               </li>

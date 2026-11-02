@@ -26,6 +26,13 @@ export const COULEUR_STATUT = {
 } as const;
 
 /**
+ * Socle commun des chips et des pilules : 24 px de haut exactement, texte de 13 px, interligne de 16 px,
+ * marge intérieure verticale de 2 px. Toute pastille de statut ou de visibilité part de cette classe.
+ */
+const SOCLE_PASTILLE =
+  "inline-flex h-6 max-w-full items-center gap-xs px-[8px] py-[2px] text-[13px] leading-[16px] whitespace-nowrap";
+
+/**
  * Chip de statut : rectangle à coins de 4 px, 24 px de haut, icône de 16 px, texte de 13 px semi-gras.
  * `label` (optionnel) : texte complet pour les lecteurs d'écran, quand l'affichage est abrégé.
  */
@@ -47,10 +54,10 @@ export function ChipStatut({
     <span
       role={label ? "group" : undefined}
       aria-label={label}
-      className={`inline-flex min-h-6 max-w-full items-center gap-xs rounded-[4px] px-[8px] py-[2px] text-[13px] font-semibold leading-snug cursor-default ${couleur} ${className}`}
+      className={`${SOCLE_PASTILLE} rounded-[4px] font-semibold cursor-default ${couleur} ${className}`}
     >
-      {icon && <IconeMateriel name={icon} className="text-[16px]" />}
-      <span className="min-w-0">{children}</span>
+      {icon && <IconeMateriel name={icon} className="h-4 w-4 shrink-0 text-[16px] leading-none" />}
+      <span className="min-w-0 truncate">{children}</span>
     </span>
   );
 }
@@ -64,9 +71,9 @@ export function PiluleVisibilite({
   children: ReactNode;
 }) {
   return (
-    <span className="inline-flex min-h-6 max-w-full items-center gap-xs rounded-full bg-[#EDEBE6] px-[8px] py-[2px] text-[13px] font-medium leading-snug text-[#28282D]">
+    <span className={`${SOCLE_PASTILLE} rounded-full bg-[#EDEBE6] font-medium text-[#28282D]`}>
       {Icone && <Icone aria-hidden={true} className="h-4 w-4 shrink-0" />}
-      <span className="min-w-0">{children}</span>
+      <span className="min-w-0 truncate">{children}</span>
     </span>
   );
 }
@@ -80,7 +87,7 @@ export function EtiquetteType({
   children: ReactNode;
 }) {
   return (
-    <span className="inline-flex min-h-[22px] max-w-full items-center gap-xs rounded-[4px] bg-[#EDEBE6] py-[2px] pl-[3px] pr-[8px] text-[12px] font-bold uppercase leading-snug tracking-[0.06em] text-[#28282D]">
+    <span className="inline-flex min-h-[22px] max-w-full whitespace-nowrap items-center gap-xs rounded-[4px] bg-[#EDEBE6] py-[2px] pl-[3px] pr-[8px] text-[12px] font-bold uppercase leading-snug tracking-[0.06em] text-[#28282D]">
       {Icone && (
         <span
           aria-hidden="true"
@@ -94,9 +101,22 @@ export function EtiquetteType({
   );
 }
 
+/**
+ * Soulignement des liens : porté par le texte seul (dans un span), jamais par l'icône qui l'accompagne.
+ * Le lien ou le bouton parent porte la classe `group`.
+ */
+export const TEXTE_SOULIGNE = "group-hover:underline group-focus-visible:underline";
+
+/** Lien d'action d'une ligne ou d'une carte : texte semi-gras souligné au survol et au focus, icône à côté. */
+export const CLASSE_LIEN_ACTION =
+  "group inline-flex min-h-11 items-center gap-xs text-sm font-semibold text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50";
+
+/** Variante destructive (suppression) de CLASSE_LIEN_ACTION. */
+export const CLASSE_LIEN_SUPPRIMER = CLASSE_LIEN_ACTION.replace("text-primary", "text-[#C2272D]");
+
 /** Classe commune des liens de bas de bloc : gras, sans soulignement, souligné au survol et au focus. */
 const CLASSE_LIEN_BAS =
-  "inline-flex min-h-11 items-center gap-xs text-sm font-bold text-primary no-underline hover:underline focus:outline-none focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "group inline-flex min-h-11 items-center gap-xs text-sm font-bold text-primary no-underline focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 /**
  * Lien de bas de bloc : texte gras suivi d'une flèche (icône 18 px). `align` : « centre » pour les listes,
@@ -124,7 +144,7 @@ export function LienBasBloc({
   const contenu = (
     <>
       {icone && <IconeMateriel name={icone} className="text-[18px]" />}
-      <span>{children}</span>
+      <span className={TEXTE_SOULIGNE}>{children}</span>
       <IconeMateriel name="arrow_forward" className="text-[18px]" />
     </>
   );

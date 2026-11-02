@@ -1,13 +1,14 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Linkify } from "@/components/linkify";
 import { formatExactDate } from "@/components/expandable-card";
+import { AuteurActualite } from "@/components/news-author";
 import { NewsImage, NewsLinks } from "@/components/news-media";
 import type { News } from "@/lib/dashboard";
-import { nomAffiche, useNomsAffiches } from "@/lib/noms";
+import { useNomsAffiches } from "@/lib/noms";
 
 /** Fenêtre de lecture d'une actualité publiée (lecture seule, Échap, clic fond). */
 export function NewsReader({ news: n, onClose }: { news: News | null; onClose: () => void }) {
-  const noms = useNomsAffiches([n?.author ?? ""]).data;
+  const noms = useNomsAffiches([n?.author ?? "", n?.delegated_by_email ?? ""]).data;
   return (
     <DialogPrimitive.Root open={!!n} onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal>
@@ -22,7 +23,7 @@ export function NewsReader({ news: n, onClose }: { news: News | null; onClose: (
                   {n.title}
                 </DialogPrimitive.Title>
                 <DialogPrimitive.Description className="font-label-sm text-label-sm text-on-surface-variant">
-                  Publiée le {formatExactDate(n.created_at)} • Par {nomAffiche(n.author ?? "", noms)}
+                  Publiée le {formatExactDate(n.created_at)} • <AuteurActualite news={n} noms={noms} />
                 </DialogPrimitive.Description>
               </div>
               <DialogPrimitive.Close

@@ -303,36 +303,42 @@ export type Database = {
           author_email: string | null
           body: string | null
           created_at: string
+          delegated_by_email: string | null
           id: string
           image_path: string | null
           links: Json
           revalidate_at: string | null
           status: Database["public"]["Enums"]["news_status"]
           title: string
+          updated_at: string
         }
         Insert: {
           author?: string
           author_email?: string | null
           body?: string | null
           created_at?: string
+          delegated_by_email?: string | null
           id?: string
           image_path?: string | null
           links?: Json
           revalidate_at?: string | null
           status?: Database["public"]["Enums"]["news_status"]
           title: string
+          updated_at?: string
         }
         Update: {
           author?: string
           author_email?: string | null
           body?: string | null
           created_at?: string
+          delegated_by_email?: string | null
           id?: string
           image_path?: string | null
           links?: Json
           revalidate_at?: string | null
           status?: Database["public"]["Enums"]["news_status"]
           title?: string
+          updated_at?: string
         }
         Relationships: []
       }

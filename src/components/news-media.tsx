@@ -77,9 +77,9 @@ export function NewsLinks({ links }: { links: unknown }) {
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-start gap-1 max-w-full text-primary underline underline-offset-2 font-body-sm text-body-sm wrap-anywhere"
+            className="inline-flex items-start gap-1 max-w-full text-primary font-body-sm text-body-sm wrap-anywhere"
           >
-            <span className="wrap-anywhere">{linkDisplay(l)}</span>
+            <span className="wrap-anywhere underline underline-offset-2">{linkDisplay(l)}</span>
             <I name="open_in_new" className="text-sm shrink-0" />
           </a>
         </li>

@@ -2,11 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { SessionHeader } from "@/components/session-header";
+import { AuteurActualite } from "@/components/news-author";
 import { NewsReader } from "@/components/news-reader";
 import { NewsLinks, NewsVignette } from "@/components/news-media";
 import { buttonVariants } from "@/components/ui/button";
 import { fetchNews, timeAgo, type News } from "@/lib/dashboard";
-import { nomAffiche, useNomsAffiches } from "@/lib/noms";
+import { useNomsAffiches } from "@/lib/noms";
 
 export const Route = createFileRoute("/_authenticated/actualites")({
   head: () => ({
@@ -26,7 +27,9 @@ const TAILLE_PAGE = 10;
 function ActualitesPage() {
   const news = useQuery({ queryKey: ["news"], queryFn: fetchNews, retry: false });
   const publiees = news.data?.filter((n) => n.status === "publiée") ?? [];
-  const noms = useNomsAffiches(publiees.map((n) => n.author ?? "")).data;
+  const noms = useNomsAffiches(
+    publiees.flatMap((n) => [n.author ?? "", n.delegated_by_email ?? ""]),
+  ).data;
   const [affichees, setAffichees] = useState(TAILLE_PAGE);
   const [lu, setLu] = useState<News | null>(null);
   // Index de la première actualité ajoutée : le focus y est placé après « Afficher 10 de plus »
@@ -77,7 +80,7 @@ function ActualitesPage() {
                     {n.title}
                   </span>
                   <span className="block text-xs text-on-surface-variant uppercase font-label-sm">
-                    Publiée {timeAgo(n.created_at)} • Par {nomAffiche(n.author ?? "", noms)}
+                    Publiée {timeAgo(n.created_at)} • <AuteurActualite news={n} noms={noms} />
                   </span>
                 </span>
               </button>
