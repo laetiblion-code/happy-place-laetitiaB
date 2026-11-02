@@ -191,9 +191,7 @@ export function computeAdminGaps(
   users: { team: string | null; role: string | null; managedTeams: string[] }[],
 ): AdminGaps {
   const managed = new Set(
-    users
-      .filter((u) => u.role === "manager")
-      .flatMap((u) => u.managedTeams.map(teamKey)),
+    users.filter((u) => u.role === "manager").flatMap((u) => u.managedTeams.map(teamKey)),
   );
   const teamsWithoutManager = teams
     .filter((t) => !t.is_reserved && teamKey(t.name) !== "admin" && !managed.has(teamKey(t.name)))
@@ -209,9 +207,7 @@ export function computeAdminGaps(
 export async function fetchAdminGaps(): Promise<AdminGaps> {
   const [teamsRes, usersRes] = await Promise.all([
     supabase.from("teams").select("name, is_reserved"),
-    supabase
-      .from("allowed_users")
-      .select("team, allowed_user_roles(role), manager_teams(team)"),
+    supabase.from("allowed_users").select("team, allowed_user_roles(role), manager_teams(team)"),
   ]);
   if (teamsRes.error) throw teamsRes.error;
   if (usersRes.error) throw usersRes.error;
@@ -223,4 +219,101 @@ export async function fetchAdminGaps(): Promise<AdminGaps> {
       managedTeams: (u.manager_teams ?? []).map((m) => m.team),
     })),
   );
+}
+
+// --- Objectifs du trimestre (compteurs de l'accueil) -------------------------
+
+const DECISIONS = ["validée", "refusée"] as const;
+const DECISION_CLARIFICATION = "à clarifier";
+const LOT_IDS = 100;
+
+/** Premier jour du mois courant, à minuit (heure locale). */
+function debutDuMois(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+export type DelaiValidation = {
+  /** Délai moyen en jours calendaires, une décimale. */
+  jours: number;
+  /** Nombre de demandes prises en compte. */
+  nb: number;
+};
+
+/**
+ * Délai moyen de validation (même définition que K3.1) : jours calendaires entre la création d'une demande
+ * de collaborateur et sa première décision (validée ou refusée, hors « à clarifier »), pour les demandes
+ * décidées depuis le 1er du mois. Les demandes de manager et d'admin sont validées dès l'envoi : elles n'ont pas
+ * d'historique « en attente », donc elles sont exclues. `teams` : équipes gérées (null pour l'admin).
+ */
+export async function fetchDelaiValidation(
+  teams: string[] | null,
+): Promise<DelaiValidation | null> {
+  if (teams && teams.length === 0) return null;
+  const debut = debutDuMois().toISOString();
+  const { data: decidees, error: e1 } = await supabase
+    .from("submission_status_history")
+    .select("submission_id")
+    .eq("old_status", "en attente")
+    .in("new_status", [...DECISIONS])
+    .gte("changed_at", debut);
+  if (e1) throw e1;
+  const ids = [...new Set((decidees ?? []).map((h) => h.submission_id))];
+  if (ids.length === 0) return null;
+
+  // Première décision de chaque demande, depuis sa création (pas seulement depuis le 1er du mois)
+  const premiere = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += LOT_IDS) {
+    const { data, error } = await supabase
+      .from("submission_status_history")
+      .select("submission_id, rejection_category, changed_at")
+      .eq("old_status", "en attente")
+      .in("new_status", [...DECISIONS])
+      .in("submission_id", ids.slice(i, i + LOT_IDS))
+      .order("changed_at", { ascending: true });
+    if (error) throw error;
+    for (const h of data ?? []) {
+      if (h.rejection_category === DECISION_CLARIFICATION) continue;
+      if (!premiere.has(h.submission_id)) premiere.set(h.submission_id, h.changed_at);
+    }
+  }
+
+  const retenues = [...premiere].filter(([, date]) => date >= debut).map(([id]) => id);
+  if (retenues.length === 0) return null;
+  const jours: number[] = [];
+  for (let i = 0; i < retenues.length; i += LOT_IDS) {
+    let q = supabase
+      .from("submissions")
+      .select("id, created_at, team")
+      .in("id", retenues.slice(i, i + LOT_IDS));
+    if (teams) q = q.in("team", teams);
+    const { data, error } = await q;
+    if (error) throw error;
+    for (const s of data ?? []) {
+      const decision = premiere.get(s.id);
+      if (decision)
+        jours.push((new Date(decision).getTime() - new Date(s.created_at).getTime()) / DAY_MS);
+    }
+  }
+  if (jours.length === 0) return null;
+  const moyenne = jours.reduce((a, b) => a + b, 0) / jours.length;
+  return { jours: Math.round(moyenne * 10) / 10, nb: jours.length };
+}
+
+export type PublicationActus = {
+  /** Actualités créées ce mois-ci, toutes statuts. */
+  commencees: number;
+  /** Parmi elles, les publiées. */
+  publiees: number;
+};
+
+/** Actualités créées depuis le 1er du mois : publiées et toutes (lecture admin). */
+export async function fetchPublicationActus(): Promise<PublicationActus> {
+  const { data, error } = await supabase
+    .from("news")
+    .select("status")
+    .gte("created_at", debutDuMois().toISOString());
+  if (error) throw error;
+  const rows = data ?? [];
+  return { commencees: rows.length, publiees: rows.filter((n) => n.status === "publiée").length };
 }

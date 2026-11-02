@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { BrandHeader } from "@/components/brand-header";
+import { SessionHeader } from "@/components/session-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -74,7 +74,7 @@ function ChoisirMotDePasse() {
 
   const card = (children: ReactNode) => (
     <div className="min-h-dvh w-full bg-background flex flex-col">
-      <BrandHeader />
+      <SessionHeader />
       <main id="contenu" className="flex flex-1 items-center justify-center px-md py-lg">
         <section className="w-[min(100%,28rem)] border border-outline-variant bg-surface-container-lowest p-lg shadow-sm">
           {children}

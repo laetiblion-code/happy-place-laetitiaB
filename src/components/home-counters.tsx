@@ -1,13 +1,16 @@
 import type { ReactNode } from "react";
-import { formatNumberFr } from "@/lib/dashboard";
+import { formatNumberFr, formatObjectif } from "@/lib/dashboard";
 import {
   noun,
   plural,
   type AlertCounts,
+  type DelaiValidation,
   type DraftCounts,
   type MyCounts,
+  type PublicationActus,
   type ReviewCounts,
 } from "@/lib/home-counts";
+import { etatObjectif, OBJECTIFS_TRIMESTRE, type EtatObjectif } from "@/lib/objectifs";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -17,13 +20,13 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
-/** Pilule d'information : icône et texte, jamais la couleur seule. */
+/** Pilule d'information : icône et texte, jamais la couleur seule. 14 px, hauteur minimale 28 px. */
 function Chip({ icon, label, className }: { icon: string; label: string; className: string }) {
   return (
     <span
       role="group"
       aria-label={label}
-      className={`inline-flex items-center gap-xs rounded-full px-sm py-[2px] font-label-sm text-label-sm ${className}`}
+      className={`inline-flex min-h-7 items-center gap-xs rounded-full px-sm py-xs font-label-sm text-sm ${className}`}
     >
       <Icon name={icon} className="text-base" />
       {label}
@@ -77,17 +80,112 @@ function BigNumber({ value, label }: { value: string; label: string }) {
   );
 }
 
+/** Ligne d'objectif : icône et texte, sous un trait séparateur. */
+function LigneObjectif({ icon, texte }: { icon: string; texte: string }) {
+  return (
+    <p className="flex items-start gap-xs font-label-sm text-sm text-on-surface">
+      <Icon name={icon} className="text-base shrink-0" />
+      <span>{texte}</span>
+    </p>
+  );
+}
+
+const ETAT_STYLE: Record<EtatObjectif, { icon: string; classe: string; accord: string }> = {
+  atteint: { icon: "check", classe: "text-[#1F6B38]", accord: "atteint" },
+  presque: { icon: "info", classe: "text-[#68686D]", accord: "presque atteint" },
+  non: { icon: "trending_down", classe: "text-[#A81E25]", accord: "non atteint" },
+};
+
+/** État d'un objectif : icône et texte (jamais la couleur seule). */
+function LigneEtat({ etat, objectif }: { etat: EtatObjectif; objectif: string }) {
+  const style = ETAT_STYLE[etat];
+  return (
+    <p className={`flex items-start gap-xs font-label-sm text-sm font-semibold ${style.classe}`}>
+      <Icon name={style.icon} className="text-base shrink-0" />
+      <span>{`Objectif ${objectif} ${style.accord}`}</span>
+    </p>
+  );
+}
+
+/** Pied de carte : trait séparateur, puis les lignes d'objectif. */
+function PiedObjectif({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-xs border-t border-[#CDCDD1] pt-sm">{children}</div>;
+}
+
+/** Délai de validation (admin : cabinet ; manager : ses équipes), avec son état face à l'objectif. */
+function PiedDelai({
+  isAdmin,
+  delai,
+}: {
+  isAdmin: boolean;
+  delai: DelaiValidation | null | undefined;
+}) {
+  if (delai === undefined) return null;
+  if (delai === null) {
+    return (
+      <PiedObjectif>
+        <p className="font-label-sm text-sm text-on-surface-variant">
+          Pas encore de demande traitée ce mois-ci
+        </p>
+      </PiedObjectif>
+    );
+  }
+  const { delaiValidationJours } = OBJECTIFS_TRIMESTRE;
+  const jours = formatNumberFr(delai.jours, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const unite = noun(delai.jours, "jour", "jours");
+  const libelle = isAdmin ? "Délai de validation du cabinet" : "Délai de validation de tes équipes";
+  const etat = etatObjectif(delai.jours, delaiValidationJours, "plusBas");
+  const objectif = `de moins de ${plural(delaiValidationJours, "jour", "jours")}`;
+  return (
+    <PiedObjectif>
+      <LigneObjectif icon="flag" texte={`${libelle} : ${jours} ${unite}`} />
+      <LigneEtat etat={etat} objectif={objectif} />
+    </PiedObjectif>
+  );
+}
+
+/** Taux de publication des actualités créées ce mois-ci (admin seulement). */
+function PiedActus({ actus }: { actus: PublicationActus | undefined }) {
+  if (!actus) return null;
+  if (actus.commencees === 0) {
+    return (
+      <PiedObjectif>
+        <p className="font-label-sm text-sm text-on-surface-variant">
+          Aucune actualité commencée ce mois-ci
+        </p>
+      </PiedObjectif>
+    );
+  }
+  const pourcentage = Math.round((100 * actus.publiees) / actus.commencees);
+  const etat = etatObjectif(pourcentage, OBJECTIFS_TRIMESTRE.tauxPublicationActus, "plusHaut");
+  return (
+    <PiedObjectif>
+      <p className="font-label-sm text-sm text-on-surface">
+        {`${plural(actus.publiees, "actu publiée", "actus publiées")} sur ${formatNumberFr(actus.commencees)} commencée${actus.commencees > 1 ? "s" : ""} ce mois-ci, soit ${formatObjectif(pourcentage, "%")}`}
+      </p>
+      <LigneEtat
+        etat={etat}
+        objectif={`de ${formatObjectif(OBJECTIFS_TRIMESTRE.tauxPublicationActus, "%")}`}
+      />
+    </PiedObjectif>
+  );
+}
+
 /** Trois cartes du haut de page pour le manager et l'admin. */
 export function ManagerCards({
   isAdmin,
   review,
   drafts,
   alerts,
+  delai,
+  actus,
 }: {
   isAdmin: boolean;
   review: ReviewCounts | undefined;
   drafts: DraftCounts | undefined;
   alerts: AlertCounts | undefined;
+  delai: DelaiValidation | null | undefined;
+  actus: PublicationActus | undefined;
 }) {
   const pending = review?.pending ?? 0;
   const old = review?.pendingOverThreeDays ?? 0;
@@ -107,6 +205,7 @@ export function ManagerCards({
         title="Demandes en attente"
         icon="pending_actions"
         ariaLabel={plural(pending, "demande à valider", "demandes à valider")}
+        footer={<PiedDelai isAdmin={isAdmin} delai={delai} />}
       >
         <BigNumber
           value={formatNumberFr(pending)}
@@ -136,6 +235,7 @@ export function ManagerCards({
         title="Actualités en attente"
         icon="edit_note"
         ariaLabel={plural(draftCount, "brouillon à finaliser", "brouillons à finaliser")}
+        footer={isAdmin ? <PiedActus actus={actus} /> : undefined}
       >
         <BigNumber
           value={formatNumberFr(draftCount)}
@@ -155,20 +255,23 @@ export function ManagerCards({
         footer={
           <a
             href="#alertes"
-            className="font-label-sm text-label-sm text-primary underline focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             {isAdmin ? "Gérer les alertes" : "Voir les alertes"}
           </a>
         }
       >
-        <BigNumber value={formatNumberFr(alertTotal)} label={noun(alertTotal, "alerte", "alertes")} />
+        <BigNumber
+          value={formatNumberFr(alertTotal)}
+          label={noun(alertTotal, "alerte", "alertes")}
+        />
         {parts.length > 0 && (
           <div className="flex flex-wrap gap-xs">
             <Chip icon="warning" label={parts.join(", ")} className={ROSE} />
           </div>
         )}
         {isAdmin && (alerts?.critical ?? 0) > 0 && (
-          <p className="font-label-sm text-label-sm text-[#C2272D]">
+          <p className="font-label-sm text-sm text-[#C2272D]">
             {`dont ${plural(alerts?.critical ?? 0, "critique", "critiques")}`}
           </p>
         )}
@@ -183,7 +286,11 @@ export function MyChips({ counts }: { counts: MyCounts | undefined }) {
   return (
     <div className="flex flex-wrap gap-xs">
       <Chip icon="help" label={`${formatNumberFr(c.toComplete)} à compléter`} className={ROSE} />
-      <Chip icon="hourglass_empty" label={`${formatNumberFr(c.pending)} en attente`} className={SAND} />
+      <Chip
+        icon="hourglass_empty"
+        label={`${formatNumberFr(c.pending)} en attente`}
+        className={SAND}
+      />
       <Chip icon="check" label={plural(c.validated, "validée", "validées")} className={GREEN} />
       <Chip icon="close" label={plural(c.refused, "refusée", "refusées")} className={RED} />
     </div>

@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { signOut } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { ErrorSummary, Field, FormActions, Modal, TextArea, TextInput } from "@/components/manage/crud-ui";
 import { rejectionSchema, submissionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
-import { BrandHeader } from "@/components/brand-header";
+import { SessionHeader } from "@/components/session-header";
+import { DashboardMetricCard } from "@/components/dashboard-metric-card";
 import { AttachmentLink } from "@/components/attachment-link";
 import { CharCounter, SubmissionPreview, rejectionErrorMessage } from "@/components/expandable-card";
 import { SubmissionReader } from "@/components/submission-reader";
@@ -18,13 +18,20 @@ import { DelaiStatut } from "@/components/delai-statut";
 import { SubmissionHistory } from "@/components/manage/submission-history";
 import { DepartureNotices } from "@/components/departure-notices";
 import { ManagerCards, MyChips } from "@/components/home-counters";
-import { fetchAlertCounts, fetchDraftCounts, fetchMyCounts, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
+import {
+  fetchAlertCounts,
+  fetchDelaiValidation,
+  fetchDraftCounts,
+  fetchMyCounts,
+  fetchPublicationActus,
+  fetchReviewCounts,
+  fetchReviewList,
+} from "@/lib/home-counts";
 import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
 import { NewsAiHelper } from "@/components/news-ai-helper";
 import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
 import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
 import { buttonVariants } from "@/components/ui/button";
-import { AccountBar } from "@/components/account-bar";
 import { AdminGapsBanner } from "@/components/admin-gaps-banner";
 import { ALERT_STATES, alertStatusOptions } from "@/lib/alert-states";
 import { RejectionNote, StatusBadge } from "@/components/status-badge";
@@ -32,11 +39,8 @@ import {
   fetchBlockers,
   fetchDashboardMetrics,
   fetchLastStatusChanges,
-  deltaText,
-  formatMetricValue,
   fetchNews,
   fetchMySubmissions,
-  exportMyRecentSubmissions,
   REJECTION_CATEGORIES,
   type News,
   type Submission,
@@ -47,7 +51,6 @@ import {
   submitIdea,
   timeAgo,
   updateBlockerStatus,
-  TREND_LABELS,
   type SubmissionInput,
 } from "@/lib/dashboard";
 
@@ -72,9 +75,6 @@ export const Route = createFileRoute("/_authenticated/")({
   }),
   component: ManagerSpace,
 });
-
-const PERF_IMAGE =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAz-Y4URSqOCzUaVC6vomdu54tTiFPC_bF9A_h0SjxJ1mq2OlNfOyeKTNkPIgtPRloYwE5JrWFm2FHBNUq0GScs0ALDVMiq16FLu95dHNGPjmybEoIb2uyz1OGozRn0XkudSMukcPY4gKfeOJMR_KAnhYbkZifswTCbpCs_aHZyMuoZRz_oc4KsWtWiryTdwVD0EKyvxScj3palbDIM2wMlnH0njPGj912mRwhMmTo3Yu07l6xfVv2Zuw";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -207,22 +207,20 @@ function ManagerSpace() {
     queryFn: () => fetchMyCounts(myEmail),
     retry: false,
   });
-  const onError = (e: unknown) => toast.error((e as Error).message);
-
-  const exportReport = useMutation({
-    mutationFn: () => {
-      if (!email) throw new Error("Votre adresse e-mail est indisponible.");
-      return exportMyRecentSubmissions(email);
-    },
-    onSuccess: (count) => {
-      if (count === 0) {
-        toast.info("Aucune demande sur les 30 derniers jours.");
-        return;
-      }
-      toast.success(`${count} demande${count > 1 ? "s" : ""} exportée${count > 1 ? "s" : ""} au format CSV.`);
-    },
-    onError,
+  // Objectifs du trimestre : délai de validation (cabinet ou équipes gérées) et publication des actualités (admin)
+  const homeDelai = useQuery({
+    queryKey: ["home-counts", "delai", role, myEmail, myTeams.data],
+    enabled: canReview && !!email && (isAdmin || myTeams.isSuccess),
+    queryFn: () => fetchDelaiValidation(isAdmin ? null : (myTeams.data ?? [])),
+    retry: false,
   });
+  const homeActus = useQuery({
+    queryKey: ["home-counts", "actus"],
+    enabled: isAdmin,
+    queryFn: fetchPublicationActus,
+    retry: false,
+  });
+  const onError = (e: unknown) => toast.error((e as Error).message);
 
   const saveDraft = useMutation({
     mutationFn: saveDraftNews,
@@ -314,7 +312,6 @@ function ManagerSpace() {
   const drafts = visibleDrafts.length;
   const published = news.data?.filter((n) => n.status === "publiée") ?? [];
   const nomsAuteurs = useNomsAffiches((news.data ?? []).map((n) => n.author ?? "")).data;
-  const roleLabel = role === "admin" ? "Admin" : role === "manager" ? "Manager" : "Collaborateur";
   const roleIntro =
     role === "manager"
       ? "Gère les validations prioritaires de ton équipe et consulte les actualités du cabinet."
@@ -362,19 +359,7 @@ function ManagerSpace() {
 
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
-      <BrandHeader
-        actions={
-          <AccountBar
-            firstName={firstName}
-            email={email ?? ""}
-            roleLabel={roleLabel}
-            isAdmin={isAdmin}
-            exporting={exportReport.isPending}
-            onExport={() => exportReport.mutate()}
-            onSignOut={() => void signOut()}
-          />
-        }
-      />
+      <SessionHeader />
       <main id="contenu" className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
         <AdminGapsBanner enabled={isAdmin} />
         <header className="flex flex-wrap items-end justify-between gap-md mb-lg">
@@ -400,6 +385,8 @@ function ManagerSpace() {
             review={homeReview.data}
             drafts={homeDrafts.data}
             alerts={homeAlerts.data}
+            delai={homeDelai.data}
+            actus={homeActus.data}
           />
         )}
         {email && <DepartureNotices email={email} />}
@@ -689,9 +676,9 @@ function ManagerSpace() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-body-sm text-primary font-bold wrap-anywhere">{s.author_name}</p>
-                      <p className="text-[10px] text-on-surface-variant font-label-sm wrap-anywhere">{s.team}</p>
+                      <p className="text-sm text-on-surface-variant font-label-sm wrap-anywhere">{s.team}</p>
                     </div>
-                    <span className="text-[10px] text-on-surface-variant font-label-sm whitespace-nowrap">
+                    <span className="text-sm text-on-surface-variant font-label-sm whitespace-nowrap">
                       <DelaiStatut status="en attente" depuis={reviewChanges.get(s.id)?.changed_at ?? s.created_at} />
                     </span>
                   </div>
@@ -740,7 +727,7 @@ function ManagerSpace() {
                     <SubmissionTags category={s.category} visibility={s.visibility} />
                     <SubmissionPreview content={s.content} onOpen={() => setReading(s)} />
                     <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-                    <div className="mt-xs flex flex-wrap items-center gap-xs text-body-sm text-[#68686D]">
+                    <div className="mt-xs flex flex-wrap items-center gap-xs text-sm text-[#68686D]">
                       <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
                       <span>{s.team} · </span>
                       <DelaiStatut
@@ -870,23 +857,9 @@ function ManagerSpace() {
                 {isAdmin ? " Choisis-en jusqu'à quatre dans la gestion des indicateurs." : ""}
               </p>
             )}
-            <div className="grid grid-cols-2 gap-sm mb-md">
+            <div className="grid grid-cols-1 gap-sm mb-md sm:grid-cols-2">
               {dashMetrics.data?.map((m) => (
-                <div key={m.key} className="p-sm rounded-md bg-card border border-outline-variant text-center">
-                  <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">{m.label}</p>
-                  <p className="font-body-md text-[32px] font-semibold leading-tight tabular-nums text-primary">
-                    {formatMetricValue(m.value, m.unit)}
-                  </p>
-                  <p className="text-xs text-on-surface-variant font-label-sm">
-                    {TREND_LABELS[m.trend]}
-                    {deltaText(m) && ` · ${deltaText(m)}`}
-                  </p>
-                  {m.updated_at && (
-                    <p className="text-xs text-on-surface-variant font-label-sm">
-                      Mis à jour {timeAgo(m.updated_at)}
-                    </p>
-                  )}
-                </div>
+                <DashboardMetricCard key={m.key} metric={m} />
               ))}
             </div>
             {isAdmin && (
@@ -894,14 +867,6 @@ function ManagerSpace() {
                 Gérer les indicateurs
               </Link>
             )}
-            <div className="mt-auto pt-md">
-              <img
-                src={PERF_IMAGE}
-                 alt="Graphiques minimalistes à barres et à lignes dans un tableau de bord anthracite et blanc"
-                loading="lazy"
-                className="w-full h-24 rounded-md object-cover border border-outline-variant"
-              />
-            </div>
           </section>
         </div>
       </main>

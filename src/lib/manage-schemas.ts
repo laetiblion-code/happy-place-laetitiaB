@@ -69,6 +69,11 @@ export const metricSchema = z.object({
     .number({ invalid_type_error: "Valeur numérique requise" })
     .finite("Valeur numérique requise"),
   unit: z.string().trim().max(8, "8 caractères maximum").nullable(),
+  target: z
+    .number({ invalid_type_error: "Objectif numérique requis" })
+    .finite("Objectif numérique requis")
+    .nullable(),
+  higher_is_better: z.boolean(),
 });
 
 export type FieldErrors = Record<string, string>;

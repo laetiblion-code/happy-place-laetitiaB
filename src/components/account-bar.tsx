@@ -24,7 +24,7 @@ const FOCUS =
 
 /**
  * Identité et actions du compte, dans la barre du haut.
- * Bureau : avatar, prénom, rôle et boutons. Mobile : un menu accessible au clavier (Radix).
+ * Grand écran (1280 px et plus) : avatar, prénom, rôle et boutons. Plus petit : un menu accessible au clavier (Radix).
  */
 export function AccountBar({
   firstName,
@@ -56,7 +56,7 @@ export function AccountBar({
   return (
     <div className="flex min-w-0 items-center gap-md">
       {/* Bureau */}
-      <div className="hidden min-w-0 items-center gap-md md:flex">
+      <div className="hidden min-w-0 items-center gap-md xl:flex">
         <div className="flex min-w-0 items-center gap-sm">
           {avatar}
           <div className="min-w-0 text-right">
@@ -95,7 +95,7 @@ export function AccountBar({
       </div>
 
       {/* Mobile : menu */}
-      <div className="md:hidden">
+      <div className="xl:hidden">
         <DropdownMenu>
           <DropdownMenuTrigger
             aria-label={`Menu du compte, ${name}`}

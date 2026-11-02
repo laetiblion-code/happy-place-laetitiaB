@@ -63,6 +63,11 @@ export type Metric = {
   previous_value: number | null;
   updated_at?: string | null;
   delta: number | string | null;
+  /** Objectif de fin de semestre, facultatif. */
+  target?: number | null;
+  /** Vrai : plus haut est mieux (défaut). Faux : plus bas est mieux (délai). */
+  higher_is_better?: boolean;
+  on_dashboard?: boolean;
 };
 
 export const TREND_LABELS: Record<Metric["trend"], string> = {
@@ -76,24 +81,84 @@ export function formatNumberFr(value: number, options?: Intl.NumberFormatOptions
   return new Intl.NumberFormat("fr-FR", options).format(value);
 }
 
+/** Unité écrite en toutes lettres : « j » devient « jours » (espace insécable avant le mot). */
+function suffixeUnite(unit: string | null | undefined): string {
+  if (!unit) return "";
+  const u = unit.trim();
+  if (u === "j") return "\u00a0jours";
+  return u;
+}
+
 export function deltaText(m: Pick<Metric, "delta" | "unit"> | undefined): string {
   if (!m || m.delta == null) return "";
   const delta = Number(m.delta);
   if (!Number.isFinite(delta) || delta === 0) return "";
   const abs = formatNumberFr(Math.abs(delta), { maximumFractionDigits: 1 });
   const sign = delta > 0 ? "+" : "−";
-  const suffix = m.unit === "%" ? " pts" : m.unit ? ` ${m.unit.trim()}` : "";
+  const unite = m.unit?.trim();
+  const suffix = m.unit === "%" ? " pts" : unite === "j" ? " jours" : unite ? ` ${unite}` : "";
   return `${sign}${abs}${suffix}`;
 }
 
-/** Valeur d'indicateur : « 40,6 % » (espace insécable avant le %), « 1 250 ». */
+/** Valeur d'indicateur : « 40,6 % » (espace insécable avant le %), « 31 jours », « 1 250 ». */
 export function formatMetricValue(value: number | string, unit: string | null): string {
   const formatted = formatNumberFr(Number(value), {
     minimumFractionDigits: unit === "%" ? 1 : 0,
     maximumFractionDigits: 1,
   });
-  const suffix = unit === "%" ? "\u00a0%" : (unit ?? "");
+  const suffix = unit === "%" ? "\u00a0%" : suffixeUnite(unit);
   return `${formatted}${suffix}`;
+}
+
+/** Objectif : « 55 % », « 28 jours », « 75 ». Sans zéros inutiles, contrairement à la valeur. */
+export function formatObjectif(target: number | string, unit: string | null): string {
+  const formatted = formatNumberFr(Number(target), { maximumFractionDigits: 1 });
+  const suffix = unit === "%" ? "\u00a0%" : suffixeUnite(unit);
+  return `${formatted}${suffix}`;
+}
+
+/** Date courte, absolue : « 27 oct. ». */
+export function formatDateCourte(iso: string): string {
+  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(new Date(iso));
+}
+
+export type Tendance = "favorable" | "defavorable" | "stable";
+
+/** Tendance favorable ou défavorable selon le sens de l'indicateur (higher_is_better). Stable est neutre. */
+export function evaluerTendance(m: Pick<Metric, "trend" | "higher_is_better">): Tendance {
+  if (m.trend === "stable") return "stable";
+  const monte = m.trend === "hausse";
+  return monte === (m.higher_is_better ?? true) ? "favorable" : "defavorable";
+}
+
+/** Ligne de tendance sans le mot « favorable » : « En hausse, +2 pts », « Stable ». */
+export function libelleTendance(m: Pick<Metric, "trend" | "delta" | "unit">): string {
+  if (m.trend === "stable") return "Stable";
+  const sens = m.trend === "hausse" ? "En hausse" : "En baisse";
+  const delta = deltaText(m);
+  return delta ? `${sens}, ${delta}` : sens;
+}
+
+/**
+ * Avancement vers l'objectif : ratio entre 0 et 1 (plafonné), et atteint ou non.
+ * Plus bas est mieux : remplissage = objectif / valeur, plein dès que la valeur est au niveau de l'objectif.
+ */
+export function progressionObjectif(
+  m: Pick<Metric, "value" | "target" | "higher_is_better">,
+): { ratio: number; atteint: boolean } | null {
+  if (m.target == null) return null;
+  const valeur = Number(m.value);
+  const cible = Number(m.target);
+  if (!Number.isFinite(valeur) || !Number.isFinite(cible)) return null;
+  const hautEstMieux = m.higher_is_better ?? true;
+  if (hautEstMieux) {
+    const atteint = valeur >= cible;
+    const ratio = atteint ? 1 : cible > 0 ? Math.max(0, valeur / cible) : 0;
+    return { ratio: Math.min(1, ratio), atteint };
+  }
+  const atteint = valeur <= cible;
+  const ratio = atteint ? 1 : valeur > 0 ? cible / valeur : 0;
+  return { ratio: Math.min(1, Math.max(0, ratio)), atteint };
 }
 
 export async function fetchNews(): Promise<News[]> {
@@ -181,6 +246,24 @@ const LIBELLES_STATUT: Record<string, string> = {
 export function libelleStatutExport(status: string, rejectionCategory: string | null | undefined) {
   if (status === "refusée" && rejectionCategory === CATEGORIE_CLARIFICATION) return "Clarification demandée";
   return LIBELLES_STATUT[status] ?? status;
+}
+
+/**
+ * « Création → En attente », « En attente → Validée », « En attente → Clarification demandée » (refus « à clarifier »).
+ * Le statut précédent est celui du changement d'avant : sa catégorie de refus est lue sur ce changement.
+ */
+export function libelleChangement(
+  h: Pick<SubmissionStatusHistory, "old_status" | "new_status" | "rejection_category">,
+  precedent?: Pick<SubmissionStatusHistory, "new_status" | "rejection_category">,
+): string {
+  const avant = h.old_status
+    ? libelleStatutExport(
+        h.old_status,
+        precedent?.new_status === h.old_status ? precedent.rejection_category : null,
+      )
+    : "Création";
+  const apres = libelleStatutExport(h.new_status, h.rejection_category);
+  return `${avant} → ${apres}`;
 }
 
 function csvCell(value: string) {
@@ -409,6 +492,8 @@ export type MetricInput = {
   label: string;
   value: number;
   unit: string | null;
+  target: number | null;
+  higher_is_better: boolean;
 };
 
 export async function fetchAllNews(): Promise<News[]> {

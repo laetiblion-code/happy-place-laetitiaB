@@ -21,6 +21,7 @@ import {
   fetchMetrics,
   deltaText,
   formatMetricValue,
+  formatObjectif,
   setMetricOnDashboard,
   updateMetricRow,
   TREND_LABELS,
@@ -52,9 +53,18 @@ export const Route = createFileRoute("/_authenticated/manage/metrics")({
 /** Nombre maximal d'indicateurs affichés sur l'accueil (contrôlé aussi par la base). */
 const MAX_ACCUEIL = 4;
 
-type FormState = { cle: string; label: string; value: string; unit: string };
+type FormState = {
+  cle: string;
+  label: string;
+  value: string;
+  unit: string;
+  /** Objectif facultatif, saisi comme la valeur (vide : pas d'objectif). */
+  target: string;
+  /** Coché : plus bas est mieux (ex. délai moyen). */
+  plusBas: boolean;
+};
 
-const empty: FormState = { cle: "", label: "", value: "", unit: "" };
+const empty: FormState = { cle: "", label: "", value: "", unit: "", target: "", plusBas: false };
 
 /** Clé déduite du libellé : minuscules, sans accent, séparateurs remplacés par « _ ». */
 function cleDepuisLibelle(libelle: string) {
@@ -126,11 +136,19 @@ function ManageMetrics() {
     // À la création, la clé vient des options avancées ou du libellé ; sur un indicateur existant elle ne change pas.
     const cle = editing ? editing.key : form.cle.trim() || cleDepuisLibelle(form.label);
     const raw = form.value.trim().replace(",", ".");
+    const rawObjectif = form.target.trim().replace(",", ".");
     const candidate = {
       key: cle,
       label: form.label,
       value: raw === "" || Number.isNaN(Number(raw)) ? Number.NaN : Number(raw),
       unit: form.unit.trim() === "" ? null : form.unit,
+      target:
+        rawObjectif === ""
+          ? null
+          : Number.isNaN(Number(rawObjectif))
+            ? Number.NaN
+            : Number(rawObjectif),
+      higher_is_better: !form.plusBas,
     };
     const res = validate(metricSchema, candidate);
     if (!res.ok) {
@@ -191,6 +209,12 @@ function ManageMetrics() {
                 <p className="font-body-md text-primary font-bold">
                   {m.label} : {formatMetricValue(m.value, m.unit)}
                 </p>
+                {m.target != null && (
+                  <p className="text-sm font-label-sm text-on-surface-variant mt-xs">
+                    {`Objectif ${formatObjectif(m.target, m.unit)} en fin de semestre`}
+                    {m.higher_is_better === false ? ", plus bas est mieux" : ""}
+                  </p>
+                )}
                 <p className="text-[11px] font-label-sm text-on-surface-variant mt-xs">
                   {TREND_LABELS[m.trend]}
                   {m.updated_at && <> • Mis à jour {timeAgo(m.updated_at)}</>}
@@ -230,6 +254,8 @@ function ManageMetrics() {
                     label: m.label,
                     value: String(m.value),
                     unit: m.unit ?? "",
+                    target: m.target != null ? String(m.target) : "",
+                    plusBas: m.higher_is_better === false,
                   });
                 }}
                 onDelete={() => setToDelete(m)}
@@ -291,6 +317,23 @@ function ManageMetrics() {
                 onChange={(e) => setForm({ ...form, unit: e.target.value })}
               />
             </Field>
+            <Field label="Objectif (facultatif)" error={errors.target}>
+              <TextInput
+                value={form.target}
+                inputMode="decimal"
+                placeholder="Ex. 55"
+                onChange={(e) => setForm({ ...form, target: e.target.value })}
+              />
+            </Field>
+            <label className="flex min-h-11 items-center gap-sm font-label-sm text-sm text-on-surface">
+              <input
+                type="checkbox"
+                checked={form.plusBas}
+                onChange={(e) => setForm({ ...form, plusBas: e.target.checked })}
+                className="size-5 accent-[#28282D]"
+              />
+              Plus bas est mieux
+            </label>
             <FormActions pending={save.isPending} onCancel={close} />
           </form>
         </Modal>
