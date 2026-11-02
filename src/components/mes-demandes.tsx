@@ -8,6 +8,7 @@ import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
 import { DureeCourte } from "@/components/duree-courte";
 import { ChipStatut, COULEUR_STATUT, LienBasBloc } from "@/components/chips";
 import { buttonVariants } from "@/components/ui/button";
+import { CompleterDemande } from "@/components/completer-demande";
 import { EXPORT_INFO_MES_DEMANDES } from "@/hooks/use-export-mes-demandes";
 import {
   delaiTexte,
@@ -30,6 +31,8 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 
 /** Nombre de demandes affichées avant « Voir toutes mes demandes ». */
 const APERCU = 4;
+/** Identifiant du titre de la section : destination du focus après un envoi. */
+const ID_TITRE = "titre-mes-demandes";
 
 /** Managers de l'équipe d'une demande : « Kesha », « Kesha et Sophie », ou rien. */
 function managersDeEquipe(team: string, managers: ManagerEquipe[]) {
@@ -48,6 +51,8 @@ function listePrenoms(managers: ManagerEquipe[]) {
  * « Mes demandes » (collaborateur). Le nom des managers vient de managers_de_mon_equipe() : prénom et nom
  * seulement, pour la seule équipe de la personne connectée. Aucun e-mail, aucun autre accès.
  */
+type Cible = { s: Submission; demandeur: string; attente: string };
+
 export function MesDemandes({
   items,
   isError,
@@ -66,6 +71,8 @@ export function MesDemandes({
   onRead: (s: Submission) => void;
 }) {
   const [deplie, setDeplie] = useState(false);
+  const [cible, setCible] = useState<Cible | null>(null);
+  const [annonce, setAnnonce] = useState("");
   const managersQuery = useQuery({
     queryKey: ["managers-mon-equipe"],
     queryFn: fetchManagersMonEquipe,
@@ -77,11 +84,15 @@ export function MesDemandes({
 
   return (
     <section
-      aria-labelledby="titre-mes-demandes"
+      aria-labelledby={ID_TITRE}
       className="min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest p-md"
     >
       <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm">
-        <h2 id="titre-mes-demandes" className="font-headline-sm text-headline-sm text-primary">
+        <h2
+          id={ID_TITRE}
+          tabIndex={-1}
+          className="font-headline-sm text-headline-sm text-primary focus:outline-none"
+        >
           Mes demandes
         </h2>
         <button
@@ -99,6 +110,11 @@ export function MesDemandes({
         <p className="font-label-sm text-sm text-on-surface-variant">Tri : Plus récentes d'abord</p>
       </div>
 
+      {/* Annonce des envois réussis (lecteurs d'écran) */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {annonce}
+      </p>
+
       {isError && <p className="text-body-sm text-error">Les demandes sont indisponibles.</p>}
       {items && toutes.length === 0 && (
         <p className="text-body-sm italic text-on-surface-variant">
@@ -114,9 +130,22 @@ export function MesDemandes({
             changes={changes}
             managers={managersDeEquipe(s.team, managers)}
             onRead={onRead}
+            onCompleter={(c) => setCible(c)}
           />
         ))}
       </ul>
+
+      <CompleterDemande
+        submission={cible?.s ?? null}
+        demandeur={cible?.demandeur ?? "Ton manager"}
+        attente={cible?.attente ?? "ton manager"}
+        idRetour={ID_TITRE}
+        onClose={() => setCible(null)}
+        onEnvoyee={() => {
+          setAnnonce(`Réponse envoyée à ${cible?.attente ?? "ton manager"}.`);
+          setCible(null);
+        }}
+      />
 
       {toutes.length > APERCU && (
         <div className="mt-md">
@@ -134,11 +163,13 @@ function CarteDemande({
   changes,
   managers,
   onRead,
+  onCompleter,
 }: {
   s: Submission;
   changes: Map<string, { new_status: string; changed_at: string }>;
   managers: ManagerEquipe[];
   onRead: (s: Submission) => void;
+  onCompleter: (c: Cible) => void;
 }) {
   const changement = changes.get(s.id)?.changed_at ?? s.created_at;
   const clarification = s.status === "refusée" && s.rejection_category === CLARIFY_CATEGORY;
@@ -201,8 +232,8 @@ function CarteDemande({
             </p>
           </div>
         )}
-        {/* Lire ma demande en entier : même place que dans « Demandes à traiter » */}
-        <div className="flex justify-end">
+        {/* Pied : lire la demande en entier, et « Compléter ma demande » quand une clarification attend */}
+        <div className="flex flex-wrap items-center justify-end gap-sm">
           <button
             type="button"
             onClick={() => onRead(s)}
@@ -212,6 +243,17 @@ function CarteDemande({
           >
             <span className="underline underline-offset-2">Lire ma demande en entier</span>
           </button>
+          {clarification && (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => onCompleter({ s, demandeur: Qui, attente: prenoms || "ton manager" })}
+              className={buttonVariants({ variant: "default" })}
+            >
+              <Icon name="edit" className="text-[18px]" />
+              Compléter ma demande
+            </button>
+          )}
         </div>
       </div>
 

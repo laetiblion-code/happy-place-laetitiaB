@@ -336,6 +336,19 @@ export async function reviewSubmission(
   if (error) throw error;
 }
 
+/**
+ * « Compléter ma demande » : seul l'auteur d'une demande refusée « à clarifier » peut l'appeler. La réponse est
+ * ajoutée au texte et la demande repasse « en attente ». Les messages d'erreur viennent du serveur, en français.
+ */
+export async function completerMaDemande(input: { id: string; reponse: string; contenu: string }) {
+  const { error } = await db.rpc("completer_ma_demande", {
+    _id: input.id,
+    _reponse: input.reponse.trim(),
+    _contenu: input.contenu.trim(),
+  });
+  if (error) throw error;
+}
+
 export async function fetchBlockers(): Promise<Blocker[]> {
   const { data, error } = await db
     .from("blockers")

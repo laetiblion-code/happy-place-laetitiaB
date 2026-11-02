@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   MAX_NEWS_LINKS,
   NEWS_IMAGE_TYPES,
@@ -39,7 +40,7 @@ export function NewsImage({
     <img
       src={q.data}
       alt={alt}
-      className={`w-full max-h-60 object-cover border border-outline-variant ${className}`}
+      className={cn("w-full max-h-60 object-cover border border-outline-variant", className)}
     />
   );
 }

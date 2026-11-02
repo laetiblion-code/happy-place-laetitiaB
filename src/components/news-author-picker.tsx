@@ -181,12 +181,7 @@ export function ChoixAuteur({
                 >
                   {o.initiales}
                 </span>
-                <span className="min-w-0">
-                  <span className="block font-body-md text-on-surface">{o.libelle}</span>
-                  <span className="block text-[12px] text-on-surface-variant wrap-anywhere">
-                    {o.email}
-                  </span>
-                </span>
+                <span className="block min-w-0 font-body-md text-on-surface">{o.libelle}</span>
               </li>
             ))}
             {filtrees.length === 0 && (

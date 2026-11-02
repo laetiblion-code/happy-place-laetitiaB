@@ -538,6 +538,10 @@ export type Database = {
         Args: never
         Returns: { team: string; prenom: string; nom: string }[]
       }
+      completer_ma_demande: {
+        Args: { _id: string; _reponse: string; _contenu?: string | null }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "collaborateur"

@@ -32,6 +32,9 @@ const CLASSE_CHAMP =
   "w-full min-h-11 rounded-[6px] border bg-card px-sm py-xs font-body-md text-on-surface placeholder:text-[#68686D] focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60";
 const CLASSE_LABEL =
   "block text-[13px] font-bold uppercase tracking-[0.04em] text-on-surface-variant";
+/** Aperçu de l'image d'illustration : vignette fixe de 160 × 120 px, coins de 6 px. */
+const VIGNETTE_IMAGE =
+  "h-[120px] w-[160px] max-w-full max-h-none rounded-[6px] border border-outline-variant object-cover";
 const CLASSE_ERREUR = "flex items-start gap-xs text-[13px] text-[#A81E25]";
 
 function Icone({ name, className = "" }: { name: string; className?: string }) {
@@ -42,7 +45,7 @@ function Icone({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
-type Confirmation = null | "publier" | "fermer";
+type Confirmation = null | "fermer";
 
 /** Empreinte du contenu saisi : sert à savoir si une fermeture perdrait des modifications. */
 function empreinte(titre: string, corps: string, media: MediaDraft, auteurEmail: string) {
@@ -179,11 +182,7 @@ export function NewsEditor({
     setMontrerErreurs(true);
     setTentative((t) => t + 1);
     if (nbErreurs > 0) return;
-    // Publier une nouvelle actualité ou un brouillon demande la confirmation de la liste ; modifier une publiée non
-    if (statut === "publiée" && !estPubliee) {
-      setConfirmation("publier");
-      return;
-    }
+    // « Publier » publie directement ; la confirmation de la liste des brouillons reste dans actualites-cabinet
     sauver.mutate(statut);
   }
 
@@ -372,62 +371,30 @@ export function NewsEditor({
               {confirmation && (
                 <div
                   role="group"
-                  aria-label={
-                    confirmation === "publier"
-                      ? "Confirmer la publication"
-                      : "Confirmer la fermeture"
-                  }
+                  aria-label="Confirmer la fermeture"
                   className="flex flex-wrap items-center justify-between gap-sm border-t border-outline-variant bg-card px-md py-sm"
                 >
                   <p className="min-w-0 text-body-sm font-semibold text-on-surface wrap-anywhere">
-                    {confirmation === "publier"
-                      ? `Publier l'actualité « ${titre.trim()} » ? Elle sera visible par tous.`
-                      : estPubliee || news
-                        ? "Abandonner les modifications ? Les changements non enregistrés seront perdus."
-                        : "Abandonner l'actualité en cours ? Ce que tu as saisi ne sera pas enregistré."}
+                    {estPubliee || news
+                      ? "Abandonner les modifications ? Les changements non enregistrés seront perdus."
+                      : "Abandonner l'actualité en cours ? Ce que tu as saisi ne sera pas enregistré."}
                   </p>
                   <div className="flex flex-wrap gap-xs">
-                    {confirmation === "publier" ? (
-                      <>
-                        <button
-                          type="button"
-                          autoFocus
-                          disabled={sauver.isPending}
-                          onClick={() => {
-                            setConfirmation(null);
-                            sauver.mutate("publiée");
-                          }}
-                          className={buttonVariants({ variant: "default", size: "sm" })}
-                        >
-                          Publier
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmation(null)}
-                          className={buttonVariants({ variant: "secondary", size: "sm" })}
-                        >
-                          Annuler
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          autoFocus
-                          onClick={() => setConfirmation(null)}
-                          className={buttonVariants({ variant: "secondary", size: "sm" })}
-                        >
-                          Continuer la rédaction
-                        </button>
-                        <button
-                          type="button"
-                          onClick={onFermer}
-                          className={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
-                        >
-                          Abandonner
-                        </button>
-                      </>
-                    )}
+                    <button
+                      type="button"
+                      autoFocus
+                      onClick={() => setConfirmation(null)}
+                      className={buttonVariants({ variant: "secondary", size: "sm" })}
+                    >
+                      Continuer la rédaction
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onFermer}
+                      className={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
+                    >
+                      Abandonner
+                    </button>
                   </div>
                 </div>
               )}
@@ -562,15 +529,11 @@ function ChampImage({
           {apercu ? (
             <img
               src={apercu}
-              alt={titre ? `Aperçu : ${titre}` : "Aperçu de l'image"}
-              className="max-h-40 w-full max-w-xs border border-outline-variant object-cover"
+              alt="Aperçu de l'image"
+              className={VIGNETTE_IMAGE}
             />
           ) : (
-            <NewsImage
-              path={existante!}
-              alt={titre || "Image de l'actualité"}
-              className="max-h-40 max-w-xs"
-            />
+            <NewsImage path={existante!} alt="Aperçu de l'image" className={VIGNETTE_IMAGE} />
           )}
           <div className="flex flex-wrap items-center gap-md">
             <button
