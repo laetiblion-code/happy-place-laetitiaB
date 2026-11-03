@@ -57,6 +57,8 @@ export const blockerSchema = z.object({
   }),
 });
 
+const POSITION_MESSAGE = "Choisis une position entre 1 et 4 sur l'accueil.";
+
 export const metricSchema = z.object({
   key: z
     .string()
@@ -74,6 +76,13 @@ export const metricSchema = z.object({
     .finite("Objectif numérique requis")
     .nullable(),
   higher_is_better: z.boolean(),
+  // Position sur l'accueil : 1 à 4 (null quand l'indicateur n'est pas affiché sur l'accueil)
+  dashboard_position: z
+    .number({ invalid_type_error: POSITION_MESSAGE })
+    .int(POSITION_MESSAGE)
+    .min(1, POSITION_MESSAGE)
+    .max(4, POSITION_MESSAGE)
+    .nullable(),
 });
 
 export type FieldErrors = Record<string, string>;

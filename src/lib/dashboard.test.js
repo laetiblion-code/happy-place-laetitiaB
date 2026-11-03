@@ -1,8 +1,16 @@
 import { describe, expect, mock, test } from "bun:test";
 
 mock.module("@/integrations/supabase/client", () => ({ supabase: {} }));
-const { deltaText, evaluerTendance, formatMetricValue, formatObjectif, libelleTendance, progressionObjectif } =
-  await import("./dashboard");
+const {
+  deltaText,
+  evaluerTendance,
+  formatMetricValue,
+  formatObjectif,
+  libelleTendance,
+  decomposerDuree,
+  ordreAccueil,
+  progressionObjectif,
+} = await import("./dashboard");
 
 describe("metric numeric formatting", () => {
   test("numeric text percentage delta is expressed in points", () => {
@@ -33,6 +41,24 @@ describe("metric numeric formatting", () => {
     expect(formatObjectif(28, "j")).toBe("28\u00a0jours");
     expect(formatObjectif(75, null)).toBe("75");
   });
+  test("objective keeps a space before any other unit, the number is never glued to the word", () => {
+    expect(formatObjectif(28, "j")).toBe("28\u00a0jours");
+    expect(formatObjectif(120, "h")).toBe("120\u00a0h");
+    expect(formatObjectif(3, "kg")).toBe("3\u00a0kg");
+    expect(formatObjectif("28", "j")).toMatch(/^28\u00a0jours$/);
+    expect(formatMetricValue(2340, "h").endsWith("\u00a0h")).toBe(true);
+  });
+  test("dashboard order: position ascending, missing position last, then label", () => {
+    const metrics = [
+      { label: "Missions actives", dashboard_position: 4 },
+      { label: "Zèbre", dashboard_position: null },
+      { label: "Délai", dashboard_position: 2 },
+      { label: "Taux", dashboard_position: 1 },
+      { label: "Autre délai", dashboard_position: 2 },
+    ];
+    const ordre = [...metrics].sort(ordreAccueil).map((m) => m.label);
+    expect(ordre).toEqual(["Taux", "Autre délai", "Délai", "Missions actives", "Zèbre"]);
+  });
   test("trend is favourable or not depending on the direction of the metric", () => {
     expect(evaluerTendance({ trend: "hausse", higher_is_better: true })).toBe("favorable");
     expect(evaluerTendance({ trend: "hausse", higher_is_better: false })).toBe("defavorable");
@@ -60,5 +86,16 @@ describe("metric numeric formatting", () => {
   });
   test("no target, no progress", () => {
     expect(progressionObjectif({ value: 34, target: null, higher_is_better: true })).toBeNull();
+  });
+});
+
+describe("short durations", () => {
+  const now = Date.UTC(2026, 10, 2, 12, 0);
+  const il = (ms) => new Date(now - ms).toISOString();
+  test("days and hours are unit-only, minutes stay written out", () => {
+    expect(decomposerDuree(il(5 * 86_400_000), now)).toEqual({ unite: "jour", n: 5 });
+    expect(decomposerDuree(il(18 * 3_600_000), now)).toEqual({ unite: "heure", n: 18 });
+    expect(decomposerDuree(il(42 * 60_000), now)).toEqual({ unite: "minute", n: 42 });
+    expect(decomposerDuree(il(20_000), now)).toEqual({ unite: "instant" });
   });
 });

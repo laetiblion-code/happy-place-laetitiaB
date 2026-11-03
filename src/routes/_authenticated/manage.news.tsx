@@ -130,9 +130,9 @@ function ManageNews() {
   return (
     <section className="space-y-md">
       <div className="flex items-center justify-between">
-        <h2 className="font-headline-sm text-headline-sm text-primary">
+        <h1 className="font-headline-sm text-headline-sm text-primary">
           Actualités ({list.data?.length ?? 0})
-        </h2>
+        </h1>
         <button
           onClick={() => {
             setEditing(null);
@@ -191,7 +191,7 @@ function ManageNews() {
       </div>
 
       {form && (
-        <Modal title={editing ? "Modifier l'actualité" : "Nouvelle actualité"} onClose={close}>
+        <Modal title={editing ? "Modifier l'actualité" : "Nouvelle actualité"} onClose={close} modifie={!editing && (!!form.title || !!form.body)}>
           <form onSubmit={submit} className="space-y-sm" noValidate>
             <ErrorSummary errors={errors} />
             <Field label="Titre" error={errors.title}>

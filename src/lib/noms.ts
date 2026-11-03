@@ -36,3 +36,35 @@ export function useNomsAffiches(valeurs: string[]) {
     staleTime: 5 * 60_000,
   });
 }
+
+/** Initiales décoratives d'un nom : prénom et nom, ou première lettre d'une adresse. */
+export function initialesDe(libelle: string): string {
+  if (libelle.includes("@")) return libelle.charAt(0).toUpperCase();
+  const mots = libelle.trim().split(/\s+/).filter(Boolean);
+  const premiere = mots[0]?.charAt(0) ?? "";
+  const derniere = mots.length > 1 ? (mots[mots.length - 1]?.charAt(0) ?? "") : "";
+  return `${premiere}${derniere}`.toUpperCase();
+}
+
+/** Durée entre deux dates en jours entiers, lisible : « moins d'un jour », « 2 jours ». */
+export function dureeEnJours(debut: string, fin: string): string {
+  const jours = Math.round((new Date(fin).getTime() - new Date(debut).getTime()) / 86_400_000);
+  if (jours < 1) return "moins d'un jour";
+  return `${jours} jour${jours > 1 ? "s" : ""}`;
+}
+
+/** « il y a 4 j », « il y a 3 h », « il y a 5 min » : version courte pour les tableaux. */
+export function ilYaCourt(iso: string): string {
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `il y a ${h} h`;
+  return `il y a ${Math.round(h / 24)} j`;
+}
+
+/** « Kesha Martin » -> « Kesha » ; une adresse sans nom connu -> rien (jamais d'e-mail affiché). */
+export function prenomOuRien(nom: string | null | undefined): string | null {
+  if (!nom || nom.includes("@")) return null;
+  return nom.split(/\s+/)[0] ?? null;
+}

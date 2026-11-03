@@ -75,7 +75,7 @@ function ChoisirMotDePasse() {
   const card = (children: ReactNode) => (
     <div className="min-h-dvh w-full bg-background flex flex-col">
       <SessionHeader />
-      <main id="contenu" className="flex flex-1 items-center justify-center px-md py-lg">
+      <main id="contenu" tabIndex={-1} className="focus:outline-none flex flex-1 items-center justify-center px-md py-lg">
         <section className="w-[min(100%,28rem)] border border-outline-variant bg-surface-container-lowest p-lg shadow-sm">
           {children}
         </section>

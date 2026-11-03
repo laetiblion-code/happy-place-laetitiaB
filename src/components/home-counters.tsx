@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 import { formatNumberFr, formatObjectif } from "@/lib/dashboard";
+import { Unite } from "@/components/duree-courte";
+import { ChipStatut, LienBasBloc, COULEUR_STATUT } from "@/components/chips";
+import { texteAttenteAncienne } from "@/lib/duree-libelles";
 import {
   noun,
   plural,
@@ -20,25 +23,31 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
-/** Pilule d'information : icône et texte, jamais la couleur seule. 14 px, hauteur minimale 28 px. */
-function Chip({ icon, label, className }: { icon: string; label: string; className: string }) {
+/** Chip de statut d'une carte. `label` : texte complet (lecteurs d'écran) ; `visible` : version affichée. */
+function Chip({
+  icon,
+  label,
+  visible,
+  className,
+}: {
+  icon: string;
+  label: string;
+  visible?: ReactNode;
+  className: string;
+}) {
   return (
-    <span
-      role="group"
-      aria-label={label}
-      className={`inline-flex min-h-7 items-center gap-xs rounded-full px-sm py-xs font-label-sm text-sm ${className}`}
-    >
-      <Icon name={icon} className="text-base" />
-      {label}
-    </span>
+    <ChipStatut icon={icon} label={label} couleur={className}>
+      {visible ?? label}
+    </ChipStatut>
   );
 }
 
-const SAND = "bg-[#F0D0BC] text-[#28282D]";
-const ROSE = "bg-[#F5D5D4] text-[#28282D]";
-const GREEN = "bg-[#DDF2E3] text-[#1F6B38]";
-const RED = "bg-[#FFDAD6] text-[#A81E25]";
+const SAND = COULEUR_STATUT.sable;
+const ROSE = COULEUR_STATUT.rose;
+const GREEN = COULEUR_STATUT.vert;
+const RED = COULEUR_STATUT.rouge;
 
+/** Titre de carte : Bodoni Moda 20 px (les autres titres de page restent en 24 px et plus). */
 function StatCard({
   title,
   icon,
@@ -58,7 +67,9 @@ function StatCard({
       className="flex flex-col gap-sm rounded-lg border border-[#CDCDD1] bg-white p-md"
     >
       <div className="flex items-start justify-between gap-sm">
-        <h2 className="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant">
+        <h2
+          className="font-['Bodoni_Moda',Georgia,serif] text-[20px] font-medium leading-snug text-primary"
+        >
           {title}
         </h2>
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#F5D5D4] text-primary">
@@ -81,9 +92,9 @@ function BigNumber({ value, label }: { value: string; label: string }) {
 }
 
 /** Ligne d'objectif : icône et texte, sous un trait séparateur. */
-function LigneObjectif({ icon, texte }: { icon: string; texte: string }) {
+function LigneObjectif({ icon, texte }: { icon: string; texte: ReactNode }) {
   return (
-    <p className="flex items-start gap-xs font-label-sm text-sm text-on-surface">
+    <p className="flex items-start gap-xs font-label-sm text-sm text-[#68686D]">
       <Icon name={icon} className="text-base shrink-0" />
       <span>{texte}</span>
     </p>
@@ -91,18 +102,20 @@ function LigneObjectif({ icon, texte }: { icon: string; texte: string }) {
 }
 
 const ETAT_STYLE: Record<EtatObjectif, { icon: string; classe: string; accord: string }> = {
-  atteint: { icon: "check", classe: "text-[#1F6B38]", accord: "atteint" },
+  atteint: { icon: "check_circle", classe: "text-[#1F6B38]", accord: "atteint" },
   presque: { icon: "info", classe: "text-[#68686D]", accord: "presque atteint" },
   non: { icon: "trending_down", classe: "text-[#A81E25]", accord: "non atteint" },
 };
 
 /** État d'un objectif : icône et texte (jamais la couleur seule). */
-function LigneEtat({ etat, objectif }: { etat: EtatObjectif; objectif: string }) {
+function LigneEtat({ etat, objectif }: { etat: EtatObjectif; objectif: ReactNode }) {
   const style = ETAT_STYLE[etat];
   return (
     <p className={`flex items-start gap-xs font-label-sm text-sm font-semibold ${style.classe}`}>
       <Icon name={style.icon} className="text-base shrink-0" />
-      <span>{`Objectif ${objectif} ${style.accord}`}</span>
+      <span>
+        Objectif {objectif} {style.accord}
+      </span>
     </p>
   );
 }
@@ -132,15 +145,26 @@ function PiedDelai({
   }
   const { delaiValidationJours } = OBJECTIFS_TRIMESTRE;
   const jours = formatNumberFr(delai.jours, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const unite = noun(delai.jours, "jour", "jours");
-  const libelle = isAdmin
-    ? "Délai de validation du cabinet sur 30 jours"
-    : "Délai de validation de tes équipes sur 30 jours";
+  // Accord : moins de 2 jours au singulier (« 1,4 j » pour la lecture : « 1,4 jour »), à partir de 2 au pluriel
+  const pluriel = delai.jours >= 2;
+  const libelle = isAdmin ? "Délai de validation du cabinet sur " : "Ton délai de validation sur ";
   const etat = etatObjectif(delai.jours, delaiValidationJours, "plusBas");
-  const objectif = `de moins de ${plural(delaiValidationJours, "jour", "jours")}`;
+  const objectif = (
+    <>
+      de moins de{" "}
+      <Unite valeur={String(delaiValidationJours)} unite="j" pluriel={delaiValidationJours >= 2} />
+    </>
+  );
   return (
     <PiedObjectif>
-      <LigneObjectif icon="flag" texte={`${libelle} : ${jours} ${unite}`} />
+      <p className="font-label-sm text-sm text-[#68686D]">
+        {libelle}
+        <Unite valeur="30" unite="j" pluriel />
+        {" : "}
+        <span className="inline-block rounded-[4px] bg-[#EDEBE6] px-xs font-semibold text-[#28282D]">
+          <Unite valeur={jours} unite="j" pluriel={pluriel} />
+        </span>
+      </p>
       <LigneEtat etat={etat} objectif={objectif} />
     </PiedObjectif>
   );
@@ -195,6 +219,7 @@ export function ManagerCards({
   const draftCount = drafts?.drafts ?? 0;
   const draftsMine = drafts?.draftsMine ?? 0;
   const alertTotal = alerts?.open ?? 0;
+  const texteOld = texteAttenteAncienne(old, formatNumberFr, 3);
   const parts = [
     alerts?.ouverte ? plural(alerts.ouverte, "ouverte", "ouvertes") : null,
     alerts?.enCours ? `${formatNumberFr(alerts.enCours)} en cours` : null,
@@ -217,7 +242,8 @@ export function ManagerCards({
           <div className="flex flex-wrap gap-xs">
             <Chip
               icon="hourglass_empty"
-              label={`${formatNumberFr(old)} en attente depuis plus de 3 jours`}
+              label={texteOld.long}
+              visible={texteOld.court}
               className={SAND}
             />
           </div>
@@ -255,12 +281,9 @@ export function ManagerCards({
         icon="notification_important"
         ariaLabel={plural(alertTotal, "alerte", "alertes")}
         footer={
-          <a
-            href="#alertes"
-            className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary underline focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
+          <LienBasBloc href="#alertes" align="droite">
             {isAdmin ? "Gérer les alertes" : "Voir les alertes"}
-          </a>
+          </LienBasBloc>
         }
       >
         <BigNumber

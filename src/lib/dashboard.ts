@@ -14,8 +14,11 @@ export type News = {
   body: string | null;
   author: string;
   author_email?: string | null;
+  /** Renseigné par la base quand un admin a publié au nom d'un manager (jamais saisi par le navigateur). */
+  delegated_by_email?: string | null;
   status: string;
   created_at: string;
+  updated_at?: string;
   image_path?: string | null;
   links?: unknown;
 };
@@ -51,6 +54,7 @@ export type Blocker = {
   department: string;
   severity: string;
   status: string;
+  created_at: string;
   updated_at: string;
 };
 
@@ -68,6 +72,8 @@ export type Metric = {
   /** Vrai : plus haut est mieux (défaut). Faux : plus bas est mieux (délai). */
   higher_is_better?: boolean;
   on_dashboard?: boolean;
+  /** Position sur l'accueil, de 1 à 4 (croissant). Vide : classé en dernier, puis par libellé. */
+  dashboard_position?: number | null;
 };
 
 export const TREND_LABELS: Record<Metric["trend"], string> = {
@@ -81,12 +87,13 @@ export function formatNumberFr(value: number, options?: Intl.NumberFormatOptions
   return new Intl.NumberFormat("fr-FR", options).format(value);
 }
 
-/** Unité écrite en toutes lettres : « j » devient « jours » (espace insécable avant le mot). */
+/** Unité écrite en toutes lettres : « j » devient « jours ». Espace insécable avant toute unité. */
 function suffixeUnite(unit: string | null | undefined): string {
   if (!unit) return "";
   const u = unit.trim();
+  if (!u) return "";
   if (u === "j") return "\u00a0jours";
-  return u;
+  return `\u00a0${u}`;
 }
 
 export function deltaText(m: Pick<Metric, "delta" | "unit"> | undefined): string {
@@ -110,7 +117,7 @@ export function formatMetricValue(value: number | string, unit: string | null): 
   return `${formatted}${suffix}`;
 }
 
-/** Objectif : « 55 % », « 28 jours », « 75 ». Sans zéros inutiles, contrairement à la valeur. */
+/** Objectif : « 55 % », « 28 jours », « 75 », « 120 h ». Sans zéros inutiles, contrairement à la valeur. */
 export function formatObjectif(target: number | string, unit: string | null): string {
   const formatted = formatNumberFr(Number(target), { maximumFractionDigits: 1 });
   const suffix = unit === "%" ? "\u00a0%" : suffixeUnite(unit);
@@ -192,6 +199,7 @@ export async function saveDraftNews(input: {
     : await db.from("news").insert(payload).select("id").single();
   if (error) throw error;
   await applyNewsImage(data.id, input.media);
+  return data.id as string;
 }
 
 export async function publishDraftNews(id: string) {
@@ -234,7 +242,7 @@ export async function fetchMySubmissions(email: string): Promise<Submission[]> {
 }
 
 // Même règle que la badge de statut : une demande refusée « à clarifier » est une clarification demandée.
-const CATEGORIE_CLARIFICATION = "à clarifier";
+export const CATEGORIE_CLARIFICATION = "à clarifier";
 
 const LIBELLES_STATUT: Record<string, string> = {
   "en attente": "En attente",
@@ -328,6 +336,19 @@ export async function reviewSubmission(
   if (error) throw error;
 }
 
+/**
+ * « Compléter ma demande » : seul l'auteur d'une demande refusée « à clarifier » peut l'appeler. La réponse est
+ * ajoutée au texte et la demande repasse « en attente ». Les messages d'erreur viennent du serveur, en français.
+ */
+export async function completerMaDemande(input: { id: string; reponse: string; contenu: string }) {
+  const { error } = await db.rpc("completer_ma_demande", {
+    _id: input.id,
+    _reponse: input.reponse.trim(),
+    _contenu: input.contenu.trim(),
+  });
+  if (error) throw error;
+}
+
 export async function fetchBlockers(): Promise<Blocker[]> {
   const { data, error } = await db
     .from("blockers")
@@ -336,6 +357,15 @@ export async function fetchBlockers(): Promise<Blocker[]> {
     .order("updated_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Blocker[];
+}
+
+/** Managers de l'équipe de la personne connectée (prénom et nom seulement, sans e-mail). */
+export type ManagerEquipe = { team: string; prenom: string; nom: string };
+
+export async function fetchManagersMonEquipe(): Promise<ManagerEquipe[]> {
+  const { data, error } = await db.rpc("managers_de_mon_equipe");
+  if (error) throw error;
+  return (data ?? []) as ManagerEquipe[];
 }
 
 export async function fetchResolvedBlockers(): Promise<Blocker[]> {
@@ -348,31 +378,18 @@ export async function fetchResolvedBlockers(): Promise<Blocker[]> {
   return (data ?? []) as Blocker[];
 }
 
-export type ValidatedSubmission = Submission & { validated_at: string | null };
-
-/** Demandes validées, toutes équipes (filtrées par les règles d'accès de la base). */
-export async function fetchValidatedSubmissions(): Promise<ValidatedSubmission[]> {
+/**
+ * Demandes du cabinet pour « 10 dernières demandes du cabinet » : tous statuts, de la plus récente à la plus
+ * ancienne. Les règles d'accès (RLS) décident de ce qui est renvoyé ; rien n'est filtré côté client.
+ */
+export async function fetchCabinetSubmissions(): Promise<Submission[]> {
   const { data, error } = await db
     .from("submissions")
     .select("*")
-    .eq("status", "validée")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(200);
   if (error) throw error;
-  const rows = (data ?? []) as Submission[];
-  const dates = new Map<string, string>();
-  if (rows.length) {
-    // L'historique peut ne pas être lisible pour tous : dans ce cas, date de soumission.
-    const { data: hist } = await db
-      .from("submission_status_history")
-      .select("submission_id, changed_at")
-      .eq("new_status", "validée")
-      .in("submission_id", rows.map((r) => r.id))
-      .order("changed_at", { ascending: false });
-    for (const h of hist ?? []) if (!dates.has(h.submission_id)) dates.set(h.submission_id, h.changed_at);
-  }
-  return rows
-    .map((r) => ({ ...r, validated_at: dates.get(r.id) ?? null }))
-    .sort((a, b) => (b.validated_at ?? b.created_at).localeCompare(a.validated_at ?? a.created_at));
+  return (data ?? []) as Submission[];
 }
 
 export async function updateBlockerStatus(input: { id: string; status: string }) {
@@ -389,7 +406,21 @@ export async function fetchMetrics(): Promise<Metric[]> {
   return (data ?? []) as Metric[];
 }
 
-/** Indicateurs affichés sur l'accueil (au plus 4), triés par libellé. Même liste pour tous les rôles. */
+/**
+ * Ordre d'affichage sur l'accueil : position croissante, les indicateurs sans position en dernier,
+ * puis libellé. Deux indicateurs à la même position sont donc triés par libellé.
+ */
+export function ordreAccueil(
+  a: Pick<Metric, "label" | "dashboard_position">,
+  b: Pick<Metric, "label" | "dashboard_position">,
+): number {
+  const pa = a.dashboard_position ?? Number.POSITIVE_INFINITY;
+  const pb = b.dashboard_position ?? Number.POSITIVE_INFINITY;
+  if (pa !== pb) return pa - pb;
+  return a.label.localeCompare(b.label, "fr");
+}
+
+/** Indicateurs affichés sur l'accueil (au plus 4), dans l'ordre de `ordreAccueil`. Même liste pour tous les rôles. */
 export async function fetchDashboardMetrics(): Promise<Metric[]> {
   const [flags, rows] = await Promise.all([
     db.from("metrics").select("key").eq("on_dashboard", true),
@@ -400,7 +431,7 @@ export async function fetchDashboardMetrics(): Promise<Metric[]> {
   const cles = new Set((flags.data ?? []).map((f) => f.key));
   return ((rows.data ?? []) as Metric[])
     .filter((m) => cles.has(m.key))
-    .sort((a, b) => a.label.localeCompare(b.label, "fr"));
+    .sort(ordreAccueil);
 }
 
 /** Indicateur affiché sur l'accueil (true/false) par clé, pour la gestion. */
@@ -422,6 +453,25 @@ export async function updateMetric(input: { key: string; value: number }) {
     .update({ value: input.value, updated_at: new Date().toISOString() })
     .eq("key", input.key);
   if (error) throw error;
+}
+
+/**
+ * Durée écoulée, décomposée pour l'affichage court : « 5 j », « 18 h ». Les minutes et l'instant restent
+ * écrits en toutes lettres. Même arrondi que `delaiTexte`.
+ */
+export type DureeEcoulee =
+  | { unite: "instant" }
+  | { unite: "minute"; n: number }
+  | { unite: "heure"; n: number }
+  | { unite: "jour"; n: number };
+
+export function decomposerDuree(iso: string, maintenant: number = Date.now()): DureeEcoulee {
+  const min = Math.round((maintenant - new Date(iso).getTime()) / 60000);
+  if (min < 1) return { unite: "instant" };
+  if (min < 60) return { unite: "minute", n: min };
+  const h = Math.round(min / 60);
+  if (h < 24) return { unite: "heure", n: h };
+  return { unite: "jour", n: Math.round(h / 24) };
 }
 
 /** Durée écoulée depuis une date, sans préfixe : « 5 jours », « 2 heures », « moins d'une minute ». */
@@ -469,7 +519,15 @@ export function timeAgo(iso: string): string {
  * CRUD complet — news / submissions / blockers / metrics
  * ========================================================== */
 
-export type NewsInput = { title: string; body: string; author: string; status: string; links?: NewsLink[] };
+export type NewsInput = {
+  title: string;
+  body: string;
+  author: string;
+  /** Autrice choisie (admin : publication au nom d'un manager). La base calcule la délégation. */
+  author_email?: string;
+  status: string;
+  links?: NewsLink[];
+};
 export type SubmissionInput = {
   author_name: string;
   team: string;
@@ -494,6 +552,7 @@ export type MetricInput = {
   unit: string | null;
   target: number | null;
   higher_is_better: boolean;
+  dashboard_position?: number | null;
 };
 
 export async function fetchAllNews(): Promise<News[]> {

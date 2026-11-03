@@ -62,9 +62,30 @@ type FormState = {
   target: string;
   /** Coché : plus bas est mieux (ex. délai moyen). */
   plusBas: boolean;
+  /** Affiché sur l'accueil à la date d'ouverture du formulaire : seul cas où la position se saisit. */
+  accueil: boolean;
+  /** Position sur l'accueil, saisie comme texte (1 à 4). */
+  position: string;
 };
 
-const empty: FormState = { cle: "", label: "", value: "", unit: "", target: "", plusBas: false };
+const empty: FormState = {
+  cle: "",
+  label: "",
+  value: "",
+  unit: "",
+  target: "",
+  plusBas: false,
+  accueil: false,
+  position: "",
+};
+
+/** Message de la base (en anglais) remplacé par le texte attendu en français. */
+function messageEnregistrement(e: unknown) {
+  const message = (e as Error).message ?? "";
+  return /dashboard_position/i.test(message)
+    ? "La position sur l'accueil doit être comprise entre 1 et 4."
+    : message;
+}
 
 /** Clé déduite du libellé : minuscules, sans accent, séparateurs remplacés par « _ ». */
 function cleDepuisLibelle(libelle: string) {
@@ -92,6 +113,7 @@ function ManageMetrics() {
   });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["metrics"] });
   const onError = (e: unknown) => toast.error((e as Error).message);
+  const onSaveError = (e: unknown) => toast.error(messageEnregistrement(e));
   const nbAccueil = [...(flags.data?.values() ?? [])].filter(Boolean).length;
 
   const save = useMutation({
@@ -102,7 +124,7 @@ function ManageMetrics() {
       close();
       await invalidate();
     },
-    onError,
+    onError: onSaveError,
   });
 
   const toggleAccueil = useMutation({
@@ -149,6 +171,12 @@ function ManageMetrics() {
             ? Number.NaN
             : Number(rawObjectif),
       higher_is_better: !form.plusBas,
+      // La position ne concerne que les indicateurs affichés sur l'accueil ; sinon elle est vidée
+      dashboard_position: form.accueil
+        ? form.position.trim() === ""
+          ? Number.NaN
+          : Number(form.position.trim())
+        : null,
     };
     const res = validate(metricSchema, candidate);
     if (!res.ok) {
@@ -170,9 +198,9 @@ function ManageMetrics() {
   return (
     <section className="space-y-md">
       <div className="flex items-center justify-between">
-        <h2 className="font-headline-sm text-headline-sm text-primary">
+        <h1 className="font-headline-sm text-headline-sm text-primary">
           Indicateurs clés ({list.data?.length ?? 0})
-        </h2>
+        </h1>
         <button
           onClick={() => {
             setEditing(null);
@@ -213,6 +241,13 @@ function ManageMetrics() {
                   <p className="text-sm font-label-sm text-on-surface-variant mt-xs">
                     {`Objectif ${formatObjectif(m.target, m.unit)} en fin de semestre`}
                     {m.higher_is_better === false ? ", plus bas est mieux" : ""}
+                  </p>
+                )}
+                {surAccueil && (
+                  <p className="text-sm font-label-sm text-on-surface-variant mt-xs">
+                    {m.dashboard_position != null
+                      ? `Position ${m.dashboard_position} sur l'accueil`
+                      : "Sans position sur l'accueil"}
                   </p>
                 )}
                 <p className="text-[11px] font-label-sm text-on-surface-variant mt-xs">
@@ -256,6 +291,8 @@ function ManageMetrics() {
                     unit: m.unit ?? "",
                     target: m.target != null ? String(m.target) : "",
                     plusBas: m.higher_is_better === false,
+                    accueil: surAccueil,
+                    position: m.dashboard_position != null ? String(m.dashboard_position) : "",
                   });
                 }}
                 onDelete={() => setToDelete(m)}
@@ -325,8 +362,24 @@ function ManageMetrics() {
                 onChange={(e) => setForm({ ...form, target: e.target.value })}
               />
             </Field>
+            {editing && form.accueil && (
+              <div className="space-y-xs">
+                <Field label="Position sur l'accueil (1 à 4)" error={errors.dashboard_position} required>
+                  <TextInput
+                    value={form.position}
+                    inputMode="numeric"
+                    maxLength={1}
+                    placeholder="1"
+                    onChange={(e) => setForm({ ...form, position: e.target.value })}
+                  />
+                </Field>
+                <p className="font-label-sm text-sm text-on-surface-variant">
+                  Deux indicateurs peuvent avoir la même position : ils sont alors classés par libellé.
+                </p>
+              </div>
+            )}
             <label className="flex min-h-11 items-center gap-sm font-label-sm text-sm text-on-surface">
-              <input
+              <input name="objectif-bas-est-mieux"
                 type="checkbox"
                 checked={form.plusBas}
                 onChange={(e) => setForm({ ...form, plusBas: e.target.checked })}

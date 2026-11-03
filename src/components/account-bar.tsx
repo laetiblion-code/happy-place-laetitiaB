@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EXPORT_INFO_MES_DEMANDES } from "@/hooks/use-export-mes-demandes";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -17,20 +18,19 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
-const EXPORT_INFO = "30 derniers jours, tous statuts";
-
 const FOCUS =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 /**
- * Identité et actions du compte, dans la barre du haut.
- * Grand écran (1280 px et plus) : avatar, prénom, rôle et boutons. Plus petit : un menu accessible au clavier (Radix).
+ * Identité et actions du compte, à droite de l'en-tête : prénom en gras, rôle dessous, avatar, déconnexion.
+ * L'avatar ouvre le menu du compte (mot de passe, et pour un manager ou un admin l'export des demandes,
+ * qui n'a pas de bloc « Mes demandes » sur l'accueil).
  */
 export function AccountBar({
   firstName,
   email,
   roleLabel,
-  isAdmin,
+  showExport,
   exporting,
   onExport,
   onSignOut,
@@ -38,105 +38,55 @@ export function AccountBar({
   firstName: string;
   email: string;
   roleLabel: string;
-  isAdmin: boolean;
+  /** Vrai pour un manager ou un admin : l'export passe alors dans le menu du compte. */
+  showExport: boolean;
   exporting: boolean;
   onExport: () => void;
   onSignOut: () => void;
 }) {
   const name = firstName || email;
-  const avatar = (
-    <span
-      aria-hidden="true"
-      className="flex size-11 shrink-0 items-center justify-center rounded-[8px] bg-primary text-on-primary"
-    >
-      <Icon name="person" />
-    </span>
-  );
 
   return (
-    <div className="flex min-w-0 items-center gap-md">
-      {/* Bureau */}
-      <div className="hidden min-w-0 items-center gap-md xl:flex">
-        <div className="flex min-w-0 items-center gap-sm">
-          {avatar}
-          <div className="min-w-0 text-right">
-            <p className="font-body-md text-body-md font-semibold text-primary wrap-anywhere">
-              {name}
-            </p>
-            <p className="font-label-sm text-label-sm text-on-surface-variant">{roleLabel}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-xs">
-          <Link to="/mot-de-passe" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-            <Icon name="key" /> Mot de passe
-          </Link>
-          {isAdmin && (
-            <Link
-              to="/manage/news"
-              className={buttonVariants({ variant: "secondary", size: "sm" })}
-            >
-              <Icon name="database" /> Gérer les données
-            </Link>
-          )}
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={exporting}
-            onClick={onExport}
-            title={EXPORT_INFO}
-          >
-            <Icon name="file_download" /> {exporting ? "Export en cours…" : "Exporter mes demandes"}
-          </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={onSignOut}>
-            <Icon name="logout" /> Déconnexion
-          </Button>
-        </div>
+    <div className="flex min-w-0 items-center gap-sm">
+      <div className="min-w-0 text-right">
+        <p className="font-body-md text-body-md font-bold text-primary wrap-anywhere">{name}</p>
+        <p className="font-label-sm text-sm text-on-surface-variant">{roleLabel}</p>
       </div>
 
-      {/* Mobile : menu */}
-      <div className="xl:hidden">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            aria-label={`Menu du compte, ${name}`}
-            className={`${buttonVariants({ variant: "secondary" })} gap-sm px-sm ${FOCUS}`}
-          >
-            {avatar}
-            <Icon name="menu" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-56 p-xs">
-            <DropdownMenuLabel className="font-normal">
-              <span className="block font-semibold text-primary wrap-anywhere">{name}</span>
-              <span className="block text-on-surface-variant">{roleLabel}</span>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild className="min-h-11 cursor-pointer">
-              <Link to="/mot-de-passe">
-                <Icon name="key" /> Mot de passe
-              </Link>
-            </DropdownMenuItem>
-            {isAdmin && (
-              <DropdownMenuItem asChild className="min-h-11 cursor-pointer">
-                <Link to="/manage/news">
-                  <Icon name="database" /> Gérer les données
-                </Link>
-              </DropdownMenuItem>
-            )}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Menu du compte, ${name}`}
+          className={`flex size-11 shrink-0 items-center justify-center rounded-[8px] bg-primary text-on-primary ${FOCUS}`}
+        >
+          <Icon name="person" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-56 p-xs">
+          <DropdownMenuLabel className="font-normal">
+            <span className="block font-semibold text-primary wrap-anywhere">{name}</span>
+            <span className="block text-on-surface-variant">{roleLabel}</span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild className="min-h-11 cursor-pointer">
+            <Link to="/mot-de-passe">
+              <Icon name="key" /> Mot de passe
+            </Link>
+          </DropdownMenuItem>
+          {showExport && (
             <DropdownMenuItem
               disabled={exporting}
               onSelect={onExport}
-              title={EXPORT_INFO}
+              title={EXPORT_INFO_MES_DEMANDES}
               className="min-h-11 cursor-pointer"
             >
-              <Icon name="file_download" /> {exporting ? "Export en cours…" : "Exporter mes demandes"}
+              <Icon name="file_download" /> Exporter mes demandes (CSV)
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onSignOut} className="min-h-11 cursor-pointer">
-              <Icon name="logout" /> Déconnexion
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Button type="button" variant="secondary" size="sm" onClick={onSignOut} className="shrink-0">
+        <Icon name="logout" /> Déconnexion
+      </Button>
     </div>
   );
 }

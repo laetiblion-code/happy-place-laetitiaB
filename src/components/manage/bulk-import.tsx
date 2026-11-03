@@ -204,9 +204,18 @@ export function BulkImport({ onImported }: { onImported: () => void }) {
         />
         <label
           htmlFor="import-file"
-          className={`${btn} cursor-pointer peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary ${busy ? "pointer-events-none opacity-50" : ""}`}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const f = e.dataTransfer.files?.[0];
+            if (busy || !f) return;
+            setFileName(f.name);
+            void onFile(f);
+          }}
+          className={`flex w-full cursor-pointer flex-col items-center gap-xs border border-dashed border-[#8A8A90] bg-surface px-md py-md text-center hover:border-primary peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary ${busy ? "pointer-events-none opacity-50" : ""}`}
         >
-          Choisir un fichier (.csv)
+          <span aria-hidden="true" className="material-symbols-outlined text-[24px] text-on-surface-variant">upload_file</span>
+          <span className="font-label-md text-label-md text-primary">Glisse ton fichier CSV ici, ou clique pour le choisir</span>
         </label>
         <span id="import-file-status" className="text-body-sm text-on-surface-variant wrap-anywhere">
           {busy ? "Analyse du fichier…" : fileName ?? "Aucun fichier"}

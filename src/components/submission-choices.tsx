@@ -1,6 +1,7 @@
 import { Building2, Check, CircleHelp, Lightbulb, Lock, Sparkles, TriangleAlert, Users, type LucideIcon } from "lucide-react";
+import { EtiquetteType, PiluleVisibilite } from "@/components/chips";
 
-type Choice = { value: string; label: string; help: string; icon: LucideIcon; labelClass?: string };
+type Choice = { value: string; label: string; help: string; icon: LucideIcon; labelClass?: string; libelleCourt?: string };
 
 export const SUBMISSION_CATEGORY_OPTIONS: Choice[] = [
   { value: "question", label: "Question", help: "Tu cherches une information ou une réponse.", icon: CircleHelp },
@@ -9,6 +10,7 @@ export const SUBMISSION_CATEGORY_OPTIONS: Choice[] = [
   {
     value: "amélioration de Happy Place",
     label: "Amélioration de Happy Place",
+    libelleCourt: "Améliorer Happy Place",
     help: "Tu proposes un changement de l'outil Happy Place.",
     icon: Sparkles,
   },
@@ -124,25 +126,26 @@ export function ChoiceGroup({
   );
 }
 
-/** Étiquette de catégorie et pilule de visibilité, pour les cartes et la fenêtre de lecture. */
-export function SubmissionTags({ category, visibility }: { category?: string | null; visibility?: string | null }) {
+/** Étiquette de type (question, idée, problème, amélioration). Rien si la catégorie est absente (anciennes demandes). */
+export function CategoryChip({ category }: { category?: string | null }) {
   const cat = SUBMISSION_CATEGORY_OPTIONS.find((o) => o.value === category);
+  if (!cat) return null;
+  return <EtiquetteType icon={cat.icon}>{cat.libelleCourt ?? cat.label}</EtiquetteType>;
+}
+
+/** Pilule de visibilité (privée, équipe, entreprise). Rien si la visibilité est absente. */
+export function VisibilityChip({ visibility }: { visibility?: string | null }) {
   const vis = SUBMISSION_VISIBILITY_OPTIONS.find((o) => o.value === visibility);
-  if (!cat && !vis) return null;
+  if (!vis) return null;
+  return <PiluleVisibilite icon={vis.icon}>{vis.label}</PiluleVisibilite>;
+}
+
+export function SubmissionTags({ category, visibility }: { category?: string | null; visibility?: string | null }) {
+  if (!SUBMISSION_CATEGORY_OPTIONS.some((o) => o.value === category) && !SUBMISSION_VISIBILITY_OPTIONS.some((o) => o.value === visibility)) return null;
   return (
     <div className="flex flex-wrap gap-xs">
-      {cat && (
-        <span className="inline-flex min-h-7 items-center gap-xs bg-[#EDEBE6] px-sm py-xs font-label-sm text-sm uppercase text-[#28282D]">
-          <cat.icon aria-hidden="true" className="h-3.5 w-3.5" />
-          {cat.label}
-        </span>
-      )}
-      {vis && (
-        <span className={`inline-flex min-h-7 items-center gap-xs rounded-full bg-[#EDEBE6] px-sm py-xs font-label-sm text-sm text-[#28282D] ${vis.labelClass ?? ""}`}>
-          <vis.icon aria-hidden="true" className="h-3.5 w-3.5" />
-          {vis.label}
-        </span>
-      )}
+      <CategoryChip category={category} />
+      <VisibilityChip visibility={visibility} />
     </div>
   );
 }

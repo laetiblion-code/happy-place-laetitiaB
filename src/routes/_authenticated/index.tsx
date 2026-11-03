@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -7,52 +6,32 @@ import { ErrorSummary, Field, FormActions, Modal, TextArea, TextInput } from "@/
 import { rejectionSchema, submissionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import { SessionHeader } from "@/components/session-header";
 import { DashboardMetricCard } from "@/components/dashboard-metric-card";
-import { AttachmentLink } from "@/components/attachment-link";
-import { CharCounter, SubmissionPreview, rejectionErrorMessage } from "@/components/expandable-card";
+import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card";
 import { SubmissionReader } from "@/components/submission-reader";
-import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS, SubmissionTags } from "@/components/submission-choices";
-import { NewsReader } from "@/components/news-reader";
-import { nomAffiche, useNomsAffiches } from "@/lib/noms";
-import { useConfirm } from "@/components/confirm-dialog";
-import { DelaiStatut } from "@/components/delai-statut";
-import { SubmissionHistory } from "@/components/manage/submission-history";
-import { DepartureNotices } from "@/components/departure-notices";
-import { ManagerCards, MyChips } from "@/components/home-counters";
-import {
-  fetchAlertCounts,
-  fetchDelaiValidation,
-  fetchDraftCounts,
-  fetchMyCounts,
-  fetchPublicationActus,
-  fetchReviewCounts,
-  fetchReviewList,
-} from "@/lib/home-counts";
-import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
-import { NewsAiHelper } from "@/components/news-ai-helper";
-import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
-import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
+import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS } from "@/components/submission-choices";
+import { ManagerCards } from "@/components/home-counters";
+import { fetchAlertCounts, fetchDelaiValidation, fetchDraftCounts, fetchMyCounts, fetchPublicationActus, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
+import { AlertsKanban } from "@/components/alerts-kanban";
 import { buttonVariants } from "@/components/ui/button";
-import { AdminGapsBanner } from "@/components/admin-gaps-banner";
-import { ALERT_STATES, alertStatusOptions } from "@/lib/alert-states";
-import { RejectionNote, StatusBadge } from "@/components/status-badge";
+import { LienBasBloc } from "@/components/chips";
+import { DepartureNotices } from "@/components/departure-notices";
+import { ActualitesCabinet } from "@/components/actualites-cabinet";
+import { DemandesATraiter } from "@/components/demandes-a-traiter";
+import { MesDemandes } from "@/components/mes-demandes";
+import { DemandesCabinet } from "@/components/cabinet-demandes";
+import { useExportMesDemandes } from "@/hooks/use-export-mes-demandes";
+import { CLARIFY_CATEGORY } from "@/components/status-badge";
 import {
-  fetchBlockers,
   fetchDashboardMetrics,
   fetchLastStatusChanges,
-  fetchNews,
   fetchMySubmissions,
   REJECTION_CATEGORIES,
-  type News,
   type Submission,
-  saveDraftNews,
-  publishDraftNews,
-  deleteDraftNews,
   reviewSubmission,
   submitIdea,
-  timeAgo,
-  updateBlockerStatus,
   type SubmissionInput,
 } from "@/lib/dashboard";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -87,12 +66,12 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 const SANS_CHANGEMENT = new Map<string, { new_status: string; changed_at: string }>();
 
 function ManagerSpace() {
-  const [demander, dialogueConfirm] = useConfirm();
   const qc = useQueryClient();
   const { role, email } = Route.useRouteContext();
   const isAdmin = role === "admin";
   const canReview = role === "admin" || role === "manager";
-  const canWriteNews = canReview;
+  // Rôle transmis aux blocs : un rôle inconnu est traité comme collaborateur
+  const roleAffiche = role === "admin" || role === "manager" ? role : "collaborateur";
   const myEmail = (email ?? "").toLowerCase();
   // Prénom et nom viennent de la ligne de la personne connectée (lisible par RLS) ; sans nom, l'e-mail
   const profile = useQuery({
@@ -109,23 +88,14 @@ function ManagerSpace() {
     },
     retry: false,
   });
-  const firstName = profile.data?.first_name?.trim() ?? "";
   // Nom affiché et enregistré : prénom et nom de la ligne allowed_users ; sans nom, l'e-mail
   const profileName = [profile.data?.first_name, profile.data?.last_name]
     .map((p) => p?.trim() ?? "")
     .filter(Boolean)
     .join(" ");
   const myName = profileName || myEmail;
-  const newsSection = useRef<HTMLElement>(null);
-  const newsTitleInput = useRef<HTMLInputElement>(null);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  // Vrai tant que le titre et le texte viennent d'une proposition de l'IA non enregistrée
-  const [propositionIA, setPropositionIA] = useState(false);
-  const [editingNewsId, setEditingNewsId] = useState<string | null>(null);
-  const [media, setMedia] = useState<MediaDraft>(emptyMedia);
-  const [showLinkErrs, setShowLinkErrs] = useState(false);
-  const newsLinkErrs = showLinkErrs ? linkErrors(media.links) : {};
+  // Ouverture de la rédaction d'actualité depuis l'en-tête (compteur : chaque clic ouvre la fenêtre)
+  const [ouvertureActu, setOuvertureActu] = useState(0);
   const [submissionForm, setSubmissionForm] = useState<SubmissionInput | null>(null);
   const [submissionErrors, setSubmissionErrors] = useState<FieldErrors>({});
   const myTeams = useQuery({
@@ -143,13 +113,13 @@ function ManagerSpace() {
   const [attachment, setAttachment] = useState<File | null>(null);
   const attachmentInput = useRef<HTMLInputElement>(null);
   const [rejecting, setRejecting] = useState<Submission | null>(null);
+  // Refus ou demande de clarification : la clarification préremplit le motif « à clarifier »
+  const [modeRefus, setModeRefus] = useState<"refus" | "clarification">("refus");
   const [reading, setReading] = useState<Submission | null>(null);
-  const [readingNews, setReadingNews] = useState<News | null>(null);
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [rejectForm, setRejectForm] = useState({ rejection_category: "", rejection_note: "" });
   const [rejectErrors, setRejectErrors] = useState<FieldErrors>({});
+  const exporter = useExportMesDemandes(email ?? "");
 
-  const news = useQuery({ queryKey: ["news"], queryFn: fetchNews, retry: false });
   // Demandes à traiter : mêmes filtres que la carte « Demandes en attente » (hors ses propres demandes, équipes gérées)
   const toReview = useQuery({
     queryKey: ["submissions", "to-review", role, myEmail, myTeams.data],
@@ -180,7 +150,6 @@ function ManagerSpace() {
       queryFn: () => fetchLastStatusChanges(mineIds),
       retry: false,
     }).data ?? SANS_CHANGEMENT;
-  const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
   const dashMetrics = useQuery({ queryKey: ["metrics", "dashboard"], queryFn: fetchDashboardMetrics, retry: false });
   // Compteurs de l'accueil : invalidés par toutes les mutations qui changent un statut, un brouillon ou une alerte
   const homeReview = useQuery({
@@ -220,52 +189,16 @@ function ManagerSpace() {
     queryFn: fetchPublicationActus,
     retry: false,
   });
-  const onError = (e: unknown) => toast.error((e as Error).message);
-
-  const saveDraft = useMutation({
-    mutationFn: saveDraftNews,
-    onSuccess: () => {
-      setTitle("");
-      setBody("");
-      setPropositionIA(false);
-      setEditingNewsId(null);
-      setMedia(emptyMedia());
-      setShowLinkErrs(false);
-      toast.success("Brouillon enregistré");
-      qc.invalidateQueries({ queryKey: ["news"] });
-      qc.invalidateQueries({ queryKey: ["home-counts"] });
-    },
-    onError,
-  });
-
-  const publishDraft = useMutation({
-    mutationFn: publishDraftNews,
-    onSuccess: () => {
-      toast.success("Actualité publiée");
-      qc.invalidateQueries({ queryKey: ["news"] });
-      qc.invalidateQueries({ queryKey: ["home-counts"] });
-    },
-    onError,
-  });
-
-  const removeDraft = useMutation({
-    mutationFn: (n: { id: string; image_path?: string | null }) => deleteDraftNews(n.id, n.image_path),
-    onSuccess: () => {
-      toast.success("Brouillon supprimé");
-      qc.invalidateQueries({ queryKey: ["news"] });
-      qc.invalidateQueries({ queryKey: ["home-counts"] });
-    },
-    onError,
-  });
 
   const review = useMutation({
     mutationFn: reviewSubmission,
     onSuccess: (_d, vars) => {
       if (vars.status === "refusée") {
         setRejecting(null);
-        toast.success("Demande refusée");
+        toast.success(vars.rejection_category === CLARIFY_CATEGORY ? "Clarification demandée" : "Demande refusée");
       } else {
         setReading((r) => (r?.id === vars.id ? null : r));
+        toast.success("Demande validée");
       }
       qc.invalidateQueries({ queryKey: ["submissions"] });
       qc.invalidateQueries({ queryKey: ["home-counts"] });
@@ -273,11 +206,15 @@ function ManagerSpace() {
     onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
   });
 
-  function startReject(s: Submission) {
+  function startReject(s: Submission, mode: "refus" | "clarification" = "refus") {
     setReading(null);
     setRejecting(s);
+    setModeRefus(mode);
     setRejectErrors({});
-    setRejectForm({ rejection_category: "", rejection_note: "" });
+    setRejectForm({
+      rejection_category: mode === "clarification" ? CLARIFY_CATEGORY : "",
+      rejection_note: "",
+    });
   }
 
   const submit = useMutation({
@@ -299,26 +236,13 @@ function ManagerSpace() {
     onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
   });
 
-  const setBlocker = useMutation({
-    mutationFn: updateBlockerStatus,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["blockers"] });
-      qc.invalidateQueries({ queryKey: ["home-counts"] });
-    },
-    onError,
-  });
-
-  const visibleDrafts = news.data?.filter((n) => n.status === "brouillon") ?? [];
-  const drafts = visibleDrafts.length;
-  const published = news.data?.filter((n) => n.status === "publiée") ?? [];
-  const nomsAuteurs = useNomsAffiches((news.data ?? []).map((n) => n.author ?? "")).data;
   const roleIntro =
     role === "manager"
       ? "Gère les validations prioritaires de ton équipe et consulte les actualités du cabinet."
       : role === "admin"
         ? "Suis ce qui attend une action dans tout le cabinet."
         : "Suis tes demandes et retrouve les actualités du cabinet.";
-  const greeting = firstName ? `Bonjour ${firstName}` : "Bonjour";
+  const greeting = profile.data?.first_name?.trim() ? `Bonjour ${profile.data.first_name.trim()}` : "Bonjour";
 
   function openSubmissionForm() {
     setSubmissionErrors({});
@@ -327,12 +251,6 @@ function ManagerSpace() {
       author_name: profileName, team: only, content: "", status: "en attente",
       category: null, visibility: "privée",
     });
-  }
-
-  // Fait défiler jusqu'au formulaire d'actualité et place le focus sur le titre
-  function goToNewsForm() {
-    newsSection.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    newsTitleInput.current?.focus({ preventScroll: true });
   }
 
   function sendSubmission(e: React.FormEvent) {
@@ -360,9 +278,8 @@ function ManagerSpace() {
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
       <SessionHeader />
-      <main id="contenu" className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
-        <AdminGapsBanner enabled={isAdmin} />
-        <header className="flex flex-wrap items-end justify-between gap-md mb-lg">
+      <main id="contenu" tabIndex={-1} className="focus:outline-none flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-lg">
+        <header className="flex flex-wrap items-end justify-between gap-md">
           <div className="min-w-0 space-y-xs">
             <h1 className="font-headline-lg text-headline-lg text-primary wrap-anywhere">{greeting}</h1>
             <p className="font-body-md text-body-md text-on-surface-variant max-w-prose">{roleIntro}</p>
@@ -371,14 +288,19 @@ function ManagerSpace() {
             <button type="button" onClick={openSubmissionForm} className={buttonVariants({ variant: "default" })}>
               <Icon name="add" /> Nouvelle demande
             </button>
-            {canWriteNews && (
-              <button type="button" onClick={goToNewsForm} className={buttonVariants({ variant: "secondary" })}>
+            {canReview && (
+              <button
+                type="button"
+                onClick={() => setOuvertureActu((n) => n + 1)}
+                className={buttonVariants({ variant: "secondary" })}
+              >
                 <Icon name="edit_note" /> Nouvelle actualité
               </button>
             )}
           </div>
         </header>
 
+        {/* 1. Compteurs (manager et admin) */}
         {canReview && (
           <ManagerCards
             isAdmin={isAdmin}
@@ -389,464 +311,66 @@ function ManagerSpace() {
             actus={homeActus.data}
           />
         )}
-        {email && <DepartureNotices email={email} />}
 
-        <div className="bento-grid">
-          {/* News Management & Input */}
-          <section
-            ref={newsSection}
-            className="col-span-12 lg:col-span-8 scroll-mt-4 rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col gap-md"
-          >
-            <div className="flex items-center justify-between border-b border-outline-variant pb-sm">
-              <h2 className="font-headline-sm text-headline-sm text-primary">
-                Actualités du cabinet
-              </h2>
-              {canWriteNews && (
-                <span className="font-label-sm text-label-sm text-on-surface-variant">
-                  {drafts} brouillon{drafts > 1 ? "s" : ""} en attente
-                </span>
-              )}
-            </div>
-            {canWriteNews && (
-              <NewsAiHelper
-                titre={title}
-                texte={body}
-                onProposition={(p) => {
-                  setTitle(p.titre);
-                  setBody(p.texte);
-                  setPropositionIA(true);
-                }}
-              />
-            )}
-            {canWriteNews && <form
-              className="space-y-md"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!title.trim()) return;
-                setShowLinkErrs(true);
-                if (Object.keys(linkErrors(media.links)).length) {
-                  toast.error("Corrige les liens invalides avant d'enregistrer.");
-                  return;
-                }
-                saveDraft.mutate({
-                  links: toNewsLinks(media.links),
-                  media,
-                  id: editingNewsId ?? undefined,
-                  title: title.trim(),
-                  body,
-                  author: myName,
-                  author_email: myEmail,
-                });
-              }}
-            >
-              {propositionIA && (
-                <p className="inline-flex items-center gap-xs px-sm py-xs bg-[#F0D0BC] text-on-surface font-label-sm text-label-sm">
-                  <span aria-hidden="true" className="material-symbols-outlined text-sm">auto_awesome</span>
-                  Proposition de l'IA, à relire
-                </p>
-              )}
-              <div className="space-y-xs">
-                <label className="font-label-md text-label-md text-on-surface-variant block">
-                  TITRE
-                </label>
-                <input
-                  ref={newsTitleInput}
-                  className="w-full bg-transparent border-b border-[#8A8A90] focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-colors font-headline-sm text-headline-sm px-0 py-xs"
-                   placeholder="Saisis un titre…"
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
-              <div className="space-y-xs">
-                <label className="font-label-md text-label-md text-on-surface-variant block">
-                  CONTENU
-                </label>
-                <textarea
-                  className="w-full rounded-md bg-card border border-[#8A8A90] focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary p-sm font-body-md"
-                   placeholder="Rédige l'actualité…"
-                  rows={4}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-sm">
-                <NewsMediaEditor
-                  value={media}
-                  onChange={setMedia}
-                  linkErrs={newsLinkErrs}
-                  disabled={saveDraft.isPending}
-                  title={title}
-                />
-                <div className="flex items-center gap-sm">
-                  {editingNewsId && (
-                    <button
-                      type="button"
-                      className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary"
-                      onClick={() => {
-                        setEditingNewsId(null);
-                        setTitle("");
-                        setBody("");
-                        setPropositionIA(false);
-                        setMedia(emptyMedia());
-                        setShowLinkErrs(false);
-                      }}
-                    >
-                      Annuler
-                    </button>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={saveDraft.isPending || profile.isPending}
-                    className={buttonVariants({ variant: "default" })}
-                  >
-                    {saveDraft.isPending ? "Enregistrement…" : "Enregistrer le brouillon"}
-                  </button>
-                </div>
-              </div>
-            </form>}
-            <div className={canWriteNews ? "mt-md pt-md border-t border-outline-variant" : ""}>
-              {canWriteNews && visibleDrafts.length > 0 && (
-                <>
-                  <h3 className="font-label-md text-label-md text-on-surface-variant mb-sm">
-                    BROUILLONS
-                  </h3>
-                  <div className="space-y-xs mb-md">
-                    {visibleDrafts.map((n) => {
-                      const own = (n.author_email ?? "").toLowerCase() === myEmail;
-                      const allowed = isAdmin || own;
-                      return (
-                        <div
-                          key={n.id}
-                          className="flex items-center justify-between gap-sm rounded-md p-sm bg-surface-container"
-                        >
-                          <div className="flex items-center gap-md min-w-0">
-                            <Icon name="draft" className="text-on-surface-variant" />
-                            <div className="min-w-0">
-                              <p className="font-body-md text-primary flex items-center gap-xs">
-                                <span className="truncate">{n.title}</span>
-                                <span className="shrink-0 border border-outline-variant px-xs font-label-sm text-label-sm text-on-surface-variant">
-                                  Brouillon
-                                </span>
-                              </p>
-                              <p className="text-xs text-on-surface-variant uppercase font-label-sm">
-                                Créé {timeAgo(n.created_at)} • Par {nomAffiche(n.author ?? "", nomsAuteurs)}
-                              </p>
-                            </div>
-                          </div>
-                          {allowed && (
-                            <div className="flex items-center gap-sm shrink-0">
-                              <button
-                                type="button"
-                                className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary"
-                                onClick={() => {
-                                  setEditingNewsId(n.id);
-                                  setTitle(n.title);
-                                  setBody(n.body ?? "");
-                                  setMedia(mediaFromNews(n));
-                                  setShowLinkErrs(false);
-                                }}
-                              >
-                                Modifier
-                              </button>
-                              <button
-                                type="button"
-                                className="font-label-sm text-label-sm text-error"
-                                disabled={removeDraft.isPending}
-                                onClick={async () => {
-                                  if (
-                                    await demander({
-                                      titre: "Supprimer le brouillon",
-                                      message: `Supprimer le brouillon « ${n.title} » ?`,
-                                      libelleConfirmer: "Supprimer",
-                                      destructive: true,
-                                    })
-                                  )
-                                    removeDraft.mutate(n);
-                                }}
-                              >
-                                Supprimer
-                              </button>
-                              <button
-                                type="button"
-                                className={`${buttonVariants({ variant: "default", size: "sm" })} disabled:opacity-50`}
-                                disabled={publishDraft.isPending || profile.isPending}
-                                onClick={async () => {
-                                  if (
-                                    await demander({
-                                      titre: "Publier l'actualité",
-                                      message: `Publier l'actualité « ${n.title} » ? Elle sera visible par tous.`,
-                                      libelleConfirmer: "Publier",
-                                    })
-                                  )
-                                    publishDraft.mutate(n.id);
-                                }}
-                              >
-                                Publier
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-              <h3 className="font-label-md text-label-md text-on-surface-variant mb-sm">
-                PUBLIÉES RÉCEMMENT
-              </h3>
-              <div className="space-y-xs">
-                {news.isLoading && (
-                  <p className="text-body-sm text-on-surface-variant">Chargement…</p>
-                )}
-                {news.isError && (
-                  <p className="text-body-sm text-error">
-                    Les actualités sont indisponibles.
-                  </p>
-                )}
-                {published.slice(0, 4).map((n) => (
-                  <div key={n.id} className="space-y-xs">
-                  <button
-                    type="button"
-                    onClick={() => setReadingNews(n)}
-                    aria-haspopup="dialog"
-                    className="w-full rounded-md text-left p-sm bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer group min-w-0 overflow-hidden space-y-xs focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  >
-                    {n.image_path && <NewsImage path={n.image_path} alt={n.title} />}
-                    <div className="flex items-center justify-between gap-sm min-w-0">
-                    <div className="flex items-center gap-md min-w-0">
-                      <Icon name="article" className="text-on-surface-variant" />
-                      <div className="min-w-0">
-                        <p className="font-body-md text-primary group-hover:underline wrap-anywhere">{n.title}</p>
-                        <p className="text-xs text-on-surface-variant uppercase font-label-sm">
-                          Publiée {timeAgo(n.created_at)} • Par {nomAffiche(n.author ?? "", nomsAuteurs)}
-                        </p>
-                      </div>
-                    </div>
-                    {isAdmin && <Icon name="edit" className="text-on-surface-variant" />}
-                    </div>
-                  </button>
-                  <NewsLinks links={n.links} />
-                  </div>
-                ))}
-              </div>
-              {published.length > 0 && (
-                <Link
-                  to="/actualites"
-                  className="font-label-md text-label-md text-primary underline underline-offset-4 min-h-11 inline-flex items-center"
-                >
-                  Voir toutes les actualités
-                </Link>
-              )}
-            </div>
-          </section>
-
-          {/* Demandes à traiter (manager et admin) */}
-          {canReview && (
-          <section className="col-span-12 lg:col-span-4 min-w-0 rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
-            <div className="flex items-center justify-between border-b border-outline-variant pb-sm mb-md">
-              <h2 className="font-headline-sm text-headline-sm text-primary">
-                Demandes à traiter
-              </h2>
-              {(homeReview.data?.pending ?? 0) > 0 && (
-                <div className="bg-tertiary-fixed text-on-tertiary-fixed px-xs py-1 rounded-full font-label-sm text-label-sm tabular-nums">
-                  {`${homeReview.data?.pending} à valider`}
-                </div>
-              )}
-            </div>
-            <div className="space-y-sm flex-grow min-w-0">
-              {toReview.isError && (
-                <p className="text-body-sm text-error">
-                  Les demandes sont indisponibles.
-                </p>
-              )}
-              {toReview.isSuccess && toReview.data.length === 0 && (
-                <p className="text-body-sm text-on-surface-variant italic">
-                  Aucune demande à traiter.
-                </p>
-              )}
-              {toReview.data?.map((s) => (
-                <div
-                  key={s.id}
-                  className="p-sm rounded-md border border-outline-variant bg-card space-y-sm min-w-0 overflow-hidden"
-                >
-                  <div className="flex items-center gap-sm">
-                    <div className="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center">
-                      <Icon name="person" className="text-sm" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-body-sm text-primary font-bold wrap-anywhere">{s.author_name}</p>
-                      <p className="text-sm text-on-surface-variant font-label-sm wrap-anywhere">{s.team}</p>
-                    </div>
-                    <span className="text-sm text-on-surface-variant font-label-sm whitespace-nowrap">
-                      <DelaiStatut status="en attente" depuis={reviewChanges.get(s.id)?.changed_at ?? s.created_at} />
-                    </span>
-                  </div>
-                  <SubmissionTags category={s.category} visibility={s.visibility} />
-                  <SubmissionPreview content={s.content} onOpen={() => setReading(s)} />
-                  <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-                  {canReview && <div className="flex gap-xs pt-xs">
-                    <button
-                      onClick={() => startReject(s)}
-                      className={`${buttonVariants({ variant: "destructive" })} flex-1`}
-                    >
-                      Refuser
-                    </button>
-                    <button
-                      onClick={() => review.mutate({ id: s.id, status: "validée" })}
-                      className={`${buttonVariants({ variant: "default" })} flex-1`}
-                    >
-                      Valider
-                    </button>
-                  </div>}
-                </div>
-              ))}
-            </div>
-          </section>
-          )}
-
-          {/* Mes demandes : toujours affiché pour un collaborateur (même vide) */}
-          {(!canReview || (mine.data && mine.data.length > 0)) && (
-            <section className="col-span-12 min-w-0 rounded-lg bg-surface-container-lowest border border-outline-variant p-md">
-              <h2 className="font-headline-sm text-headline-sm text-primary border-b border-outline-variant pb-sm mb-md">
-                Mes demandes
-              </h2>
-              {!canReview && (
-                <div className="mb-md">
-                  <MyChips counts={homeMine.data} />
-                </div>
-              )}
-              {!canReview && mine.isSuccess && mine.data.length === 0 && (
-                <p className="text-body-sm text-on-surface-variant italic">
-                  Tu n'as pas encore envoyé de demande.
-                </p>
-              )}
-              <div className="space-y-xs">
-                {mine.data?.map((s) => (
-                  <div key={s.id} className="p-sm rounded-md border border-outline-variant bg-card min-w-0 overflow-hidden">
-                    <SubmissionTags category={s.category} visibility={s.visibility} />
-                    <SubmissionPreview content={s.content} onOpen={() => setReading(s)} />
-                    <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-                    <div className="mt-xs flex flex-wrap items-center gap-xs text-sm text-[#68686D]">
-                      <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
-                      <span>{s.team} · </span>
-                      <DelaiStatut
-                        status={s.status === "refusée" && s.rejection_category === "à clarifier" ? "clarification" : s.status}
-                        depuis={mineChanges.get(s.id)?.changed_at ?? s.created_at}
-                      />
-                    </div>
-                    <SubmissionHistory submissionId={s.id} />
-                    {s.status === "refusée" && s.rejection_category && (
-                      <div className="mt-xs">
-                        <RejectionNote category={s.rejection_category} note={s.rejection_note} />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <ValidatedSubmissions
-            role={role}
-            email={myEmail}
-            managerTeams={myTeams.data ?? []}
-            onRead={setReading}
+        {/* 2. Départs à venir (et équipes à suivre pour l'admin) */}
+        {email && (
+          <DepartureNotices
+            email={email}
+            role={roleAffiche}
+            equipesGerees={myTeams.data ?? []}
+            demandesEnAttente={toReview.data}
           />
+        )}
 
-          {/* Alertes opérationnelles */}
-          <section id="alertes" className="col-span-12 md:col-span-7 scroll-mt-4 rounded-lg bg-surface-container-lowest border border-outline-variant p-md">
-            <div className="flex items-center justify-between mb-md">
-              <div className="flex items-center gap-sm">
-                <h2 className="font-headline-sm text-headline-sm text-primary">Alertes opérationnelles</h2>
-                <span className="inline-flex items-center gap-xs rounded-full bg-error-container px-sm py-[2px] font-label-sm text-label-sm text-on-error-container">
-                  <Icon name="priority_high" className="text-base" />
-                  Priorité haute
-                </span>
-              </div>
-              <button
-                type="button"
-                aria-haspopup="dialog"
-                onClick={() => setArchiveOpen(true)}
-                className="text-primary font-label-sm text-label-sm underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                 Voir l'archive
-              </button>
-            </div>
-            <div className="space-y-sm">
-              {blockers.isError && (
-                <p className="text-body-sm text-error">
-                  Les alertes sont indisponibles.
-                </p>
-              )}
-              {blockers.data?.length === 0 && (
-                <p className="text-body-sm text-on-surface-variant italic">
-                  Aucun point bloquant en cours.
-                </p>
-              )}
-              {blockers.data?.map((b) => {
-                const critical = b.severity === "critical";
-                return (
-                  <div
-                    key={b.id}
-                    className={`${critical ? "accent-bar " : ""}rounded-md bg-card border border-outline-variant p-sm flex items-start justify-between`}
-                  >
-                    <div className="flex gap-md">
-                      <Icon
-                        name={critical ? "error" : "warning"}
-                        className={
-                          critical
-                            ? "text-error mt-1 [font-variation-settings:'FILL'_1]"
-                            : "text-secondary mt-1"
-                        }
-                      />
-                      <div>
-                        <p className="font-body-md text-primary font-bold">{b.title}</p>
-                        <p className="text-body-sm text-on-surface-variant">{b.description}</p>
-                        <div className="flex items-center gap-sm mt-xs">
-                          <span className="text-[11px] font-label-sm bg-surface-container-highest px-xs py-0.5">
-                            {b.department}
-                          </span>
-                          <span className="text-[11px] font-label-sm text-on-surface-variant">
-                            Mis à jour {timeAgo(b.updated_at)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    {(() => {
-                      const state = ALERT_STATES[b.status as keyof typeof ALERT_STATES];
-                      return (
-                        <span className={`inline-flex shrink-0 items-center gap-xs rounded-full px-sm py-[2px] font-label-sm text-label-sm font-semibold ${state?.className ?? "bg-surface-container-highest text-on-surface"}`}>
-                          <Icon name={state?.icon ?? "help"} className="text-base" />
-                          {isAdmin ? (
-                            <select
-                              aria-label={`Statut de ${b.title}`}
-                              value={b.status}
-                              onChange={(e) => setBlocker.mutate({ id: b.id, status: e.target.value })}
-                              className="cursor-pointer bg-transparent font-label-sm text-label-sm font-semibold text-[inherit] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                            >
-                              {alertStatusOptions(b.status).map((value) => (
-                                <option key={value} value={value}>
-                                  {ALERT_STATES[value].label}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span>{state?.label ?? b.status}</span>
-                          )}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+        {canReview ? (
+          /* 3. Demandes à traiter à gauche, actualités à droite */
+          <div className="grid grid-cols-1 items-start gap-md lg:grid-cols-2">
+            <DemandesATraiter
+              email={myEmail}
+              items={toReview.data}
+              error={toReview.isError}
+              pending={homeReview.data?.pending ?? 0}
+              changes={reviewChanges}
+              validant={review.isPending}
+              onRead={setReading}
+              onRefuser={(s) => startReject(s)}
+              onClarifier={(s) => startReject(s, "clarification")}
+              onValider={(s) => review.mutate({ id: s.id, status: "validée" })}
+            />
+            <ActualitesCabinet role={roleAffiche} email={myEmail} auteur={myName} equipe={profile.data?.team ?? ""} ouvertureDemandee={ouvertureActu} />
+          </div>
+        ) : (
+          /* Collaborateur : ses demandes, puis les actualités du cabinet */
+          <>
+            <MesDemandes
+              items={mine.data}
+              isError={mine.isError}
+              changes={mineChanges}
+              counts={homeMine.data}
+              email={myEmail}
+              exporting={exporter.isPending}
+              onExport={() => exporter.mutate()}
+              onRead={setReading}
+            />
+            <ActualitesCabinet role={roleAffiche} email={myEmail} auteur={myName} equipe={profile.data?.team ?? ""} ouvertureDemandee={ouvertureActu} />
+          </>
+        )}
+
+        {/* 4. 10 dernières demandes du cabinet (tous les rôles) */}
+        <DemandesCabinet
+          email={myEmail}
+          role={roleAffiche}
+          managerTeams={myTeams.data ?? []}
+          onRead={setReading}
+        />
+
+          {/* Alertes opérationnelles en quatre colonnes (tous les rôles) */}
+          <AlertsKanban isAdmin={isAdmin} />
 
           {/* Performance Hub */}
-          <section className="col-span-12 md:col-span-5 rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
+          <section aria-labelledby="titre-indicateurs" className="rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
             <div className="flex items-center justify-between mb-md">
-              <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs clés</h2>
+              <h2 id="titre-indicateurs" className="font-headline-sm text-headline-sm text-primary">Indicateurs clés</h2>
             </div>
             {dashMetrics.isError && (
               <p className="text-body-sm text-error mb-md">Les indicateurs sont indisponibles.</p>
@@ -857,22 +381,20 @@ function ManagerSpace() {
                 {isAdmin ? " Choisis-en jusqu'à quatre dans la gestion des indicateurs." : ""}
               </p>
             )}
-            <div className="grid grid-cols-1 gap-sm mb-md sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-sm mb-md md:grid-cols-2 lg:grid-cols-4">
               {dashMetrics.data?.map((m) => (
                 <DashboardMetricCard key={m.key} metric={m} />
               ))}
             </div>
             {isAdmin && (
-              <Link to="/manage/metrics" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+              <LienBasBloc to="/manage/metrics" align="droite">
                 Gérer les indicateurs
-              </Link>
+              </LienBasBloc>
             )}
           </section>
-        </div>
       </main>
-      <BlockerArchive open={archiveOpen} onClose={() => setArchiveOpen(false)} />
-      <NewsReader news={readingNews} onClose={() => setReadingNews(null)} />
       <SubmissionReader
+        moi={myEmail}
         submission={reading}
         onClose={() => setReading(null)}
         onReject={reading && canReview && reading.status === "en attente" ? () => startReject(reading) : undefined}
@@ -884,7 +406,7 @@ function ManagerSpace() {
         approving={review.isPending}
       />
       {rejecting && (
-        <Modal title="Refuser la demande" onClose={() => setRejecting(null)}>
+        <Modal title={modeRefus === "clarification" ? "Demander une clarification" : "Refuser la demande"} onClose={() => setRejecting(null)} modifie={rejectForm.rejection_note !== ""}>
           <form
             noValidate
             className="space-y-sm"
@@ -899,7 +421,7 @@ function ManagerSpace() {
             <p className="max-h-48 overflow-y-auto border border-outline-variant bg-surface-container-low p-xs text-body-sm italic text-on-surface-variant whitespace-pre-line wrap-anywhere">“{rejecting.content}”</p>
             <ErrorSummary errors={rejectErrors} />
             <Field label="Motif du refus" error={rejectErrors.rejection_category}>
-              <select
+              <select name="motif-refus"
                 className="w-full border border-outline-variant bg-card p-xs text-body-sm"
                 value={rejectForm.rejection_category}
                 onChange={(e) => setRejectForm({ ...rejectForm, rejection_category: e.target.value })}
@@ -910,11 +432,11 @@ function ManagerSpace() {
                 ))}
               </select>
             </Field>
-            <Field label="Raison du refus (obligatoire)" error={rejectErrors.rejection_note}>
+            <Field label={modeRefus === "clarification" ? "Question pour le collaborateur (obligatoire)" : "Raison du refus (obligatoire)"} error={rejectErrors.rejection_note}>
               <TextArea
                 rows={4}
                 value={rejectForm.rejection_note}
-                placeholder="Explique au collaborateur pourquoi sa demande est refusée…"
+                placeholder={modeRefus === "clarification" ? "Pose ta question au collaborateur…" : "Explique au collaborateur pourquoi sa demande est refusée…"}
                 onChange={(e) => setRejectForm({ ...rejectForm, rejection_note: e.target.value })}
               />
               <CharCounter value={rejectForm.rejection_note} max={500} />
@@ -923,9 +445,8 @@ function ManagerSpace() {
           </form>
         </Modal>
       )}
-      {dialogueConfirm}
       {submissionForm && (
-        <Modal title="Nouvelle demande" onClose={() => setSubmissionForm(null)}>
+        <Modal title="Nouvelle demande" onClose={() => setSubmissionForm(null)} modifie={!!submissionForm.content || !!submissionForm.author_name}>
           <form onSubmit={sendSubmission} className="space-y-sm" noValidate>
             <ErrorSummary errors={submissionErrors} />
             <ChoiceGroup
@@ -953,7 +474,7 @@ function ManagerSpace() {
             )}
             {role === "manager" && (
               <Field label="Équipe" error={submissionErrors.team}>
-                <select
+                <select name="equipe-demande"
                   required
                   value={submissionForm.team}
                   onChange={(e) => setSubmissionForm({ ...submissionForm, team: e.target.value })}

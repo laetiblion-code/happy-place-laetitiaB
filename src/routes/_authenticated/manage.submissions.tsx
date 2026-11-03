@@ -48,6 +48,7 @@ export const Route = createFileRoute("/_authenticated/manage/submissions")({
 
 
 function ManageSubmissions() {
+  const { email } = Route.useRouteContext();
   const qc = useQueryClient();
   const [form, setForm] = useState<SubmissionInput | null>(null);
   const [editing, setEditing] = useState<Submission | null>(null);
@@ -105,9 +106,9 @@ function ManageSubmissions() {
   return (
     <section className="space-y-md">
       <div className="flex items-center justify-between">
-        <h2 className="font-headline-sm text-headline-sm text-primary">
+        <h1 className="font-headline-sm text-headline-sm text-primary">
           Demandes ({list.data?.length ?? 0})
-        </h2>
+        </h1>
 
       </div>
 
@@ -172,6 +173,7 @@ function ManageSubmissions() {
       </div>
 
       <SubmissionReader
+        moi={(email ?? "").toLowerCase()}
         submission={reading}
         onClose={() => setReading(null)}
       />

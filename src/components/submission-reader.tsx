@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Linkify } from "@/components/linkify";
+import { TexteDemande } from "@/components/echange-demande";
 import { AttachmentLink } from "@/components/attachment-link";
 import { formatExactDate } from "@/components/expandable-card";
 import { SubmissionTags } from "@/components/submission-choices";
@@ -9,12 +9,15 @@ import { buttonVariants } from "@/components/ui/button";
 
 /** Grande fenêtre de lecture d'une soumission (focus piégé, Échap, clic fond). */
 export function SubmissionReader({
+  moi,
   submission: s,
   onClose,
   onReject,
   onApprove,
   approving,
 }: {
+  /** Adresse de la personne connectée (« Toi » dans l'échange de clarification). */
+  moi: string;
   submission: Submission | null;
   onClose: () => void;
   onReject?: () => void;
@@ -50,10 +53,9 @@ export function SubmissionReader({
               </DialogPrimitive.Close>
             </div>
             <div className="flex-1 overflow-y-auto p-md space-y-md">
+              {/* Chips (type, visibilité) sur leur rangée, puis le texte de la demande et l'échange de clarification */}
               <SubmissionTags category={s.category} visibility={s.visibility} />
-              <p className="font-body-md text-body-md text-on-surface whitespace-pre-line wrap-anywhere">
-                <Linkify text={s.content} />
-              </p>
+              <TexteDemande s={s} moi={moi} />
               <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
               {s.status === "refusée" && s.rejection_category && (
                 <RejectionNote category={s.rejection_category} note={s.rejection_note} />

@@ -1,4 +1,5 @@
 import { Linkify } from "@/components/linkify";
+import { ChipStatut, COULEUR_STATUT } from "@/components/chips";
 
 /** Une demande « à clarifier » est une demande refusée avec cette catégorie (pas de statut dédié). */
 export const CLARIFY_CATEGORY = "à clarifier";
@@ -9,15 +10,15 @@ const STATUS_STYLES: Record<"en attente" | "clarification" | "validée" | "refus
   "en attente": {
     label: "En attente",
     icon: "hourglass_empty",
-    className: "bg-[#F0D0BC] text-[#28282D]",
+    className: COULEUR_STATUT.sable,
   },
   clarification: {
     label: "Clarification demandée",
     icon: "help",
-    className: "bg-[#F5D5D4] text-[#28282D]",
+    className: COULEUR_STATUT.rose,
   },
-  validée: { label: "Validée", icon: "check", className: "bg-[#DDF2E3] text-[#1F6B38]" },
-  refusée: { label: "Refusée", icon: "close", className: "bg-[#FFDAD6] text-[#A81E25]" },
+  validée: { label: "Validée", icon: "check", className: COULEUR_STATUT.vert },
+  refusée: { label: "Refusée", icon: "close", className: COULEUR_STATUT.rouge },
 };
 
 /**
@@ -38,17 +39,12 @@ export function StatusBadge({
         ? (status as keyof typeof STATUS_STYLES)
         : null;
   if (!key)
-    return <span className="font-label-sm text-label-sm text-on-surface-variant">{status}</span>;
+    return <span className="font-label-sm text-sm text-on-surface-variant">{status}</span>;
   const style = STATUS_STYLES[key];
   return (
-    <span
-      className={`inline-flex items-center gap-xs rounded-md px-xs py-[2px] font-label-sm text-label-sm font-semibold ${style.className}`}
-    >
-      <span aria-hidden="true" className="material-symbols-outlined text-sm">
-        {style.icon}
-      </span>
+    <ChipStatut icon={style.icon} couleur={style.className}>
       {style.label}
-    </span>
+    </ChipStatut>
   );
 }
 

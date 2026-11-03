@@ -242,6 +242,7 @@ export type Database = {
       }
       metrics: {
         Row: {
+          dashboard_position: number | null
           higher_is_better: boolean
           key: string
           label: string
@@ -252,6 +253,7 @@ export type Database = {
           value: number
         }
         Insert: {
+          dashboard_position?: number | null
           higher_is_better?: boolean
           key: string
           label: string
@@ -262,6 +264,7 @@ export type Database = {
           value: number
         }
         Update: {
+          dashboard_position?: number | null
           higher_is_better?: boolean
           key?: string
           label?: string
@@ -300,36 +303,42 @@ export type Database = {
           author_email: string | null
           body: string | null
           created_at: string
+          delegated_by_email: string | null
           id: string
           image_path: string | null
           links: Json
           revalidate_at: string | null
           status: Database["public"]["Enums"]["news_status"]
           title: string
+          updated_at: string
         }
         Insert: {
           author?: string
           author_email?: string | null
           body?: string | null
           created_at?: string
+          delegated_by_email?: string | null
           id?: string
           image_path?: string | null
           links?: Json
           revalidate_at?: string | null
           status?: Database["public"]["Enums"]["news_status"]
           title: string
+          updated_at?: string
         }
         Update: {
           author?: string
           author_email?: string | null
           body?: string | null
           created_at?: string
+          delegated_by_email?: string | null
           id?: string
           image_path?: string | null
           links?: Json
           revalidate_at?: string | null
           status?: Database["public"]["Enums"]["news_status"]
           title?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -473,6 +482,7 @@ export type Database = {
     Views: {
       metrics_with_trend: {
         Row: {
+          dashboard_position: number | null
           delta: number | null
           higher_is_better: boolean | null
           key: string | null
@@ -523,6 +533,14 @@ export type Database = {
       noms_affiches: {
         Args: { _emails: string[] }
         Returns: { email: string; nom: string }[]
+      }
+      managers_de_mon_equipe: {
+        Args: never
+        Returns: { team: string; prenom: string; nom: string }[]
+      }
+      completer_ma_demande: {
+        Args: { _id: string; _reponse: string; _contenu?: string | null }
+        Returns: undefined
       }
     }
     Enums: {

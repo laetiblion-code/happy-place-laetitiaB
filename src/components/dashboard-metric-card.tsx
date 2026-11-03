@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   evaluerTendance,
   formatDateCourte,
@@ -28,6 +29,14 @@ const MOT_TENDANCE: Record<Tendance, string> = {
   stable: "",
 };
 
+/**
+ * Dégradé fixe sur toute la longueur de la piste : rosé, orangé, sable, puis vert (plus foncé à 100 %).
+ * La partie non atteinte est recouverte par un masque couleur piste : une barre à 40 % montre le début
+ * du dégradé, une barre à 90 % le montre presque en entier. Les couleurs ne portent pas l'information seules.
+ */
+const DEGRADE_PISTE =
+  "linear-gradient(90deg, #D9777A 0%, #E89A6B 25%, #E2C08D 50%, #4E9A62 75%, #1F6B38 100%)";
+
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
     <span aria-hidden="true" className={`material-symbols-outlined ${className}`}>
@@ -37,8 +46,63 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 }
 
 /**
- * Carte d'un indicateur de l'accueil : libellé, valeur, tendance, barre vers l'objectif (si objectif),
- * ligne d'objectif, date de mise à jour. Les informations tiennent en texte : la barre n'est pas indispensable.
+ * Barre de progression vers l'objectif : pilule de 10 px, piste bordée, pourcentage écrit à droite dessous.
+ * Le masque glisse du bout de la barre vers le pourcentage atteint (motion-safe : sans mouvement sinon).
+ */
+function BarreObjectif({
+  ratio,
+  libelle,
+  valeurTexte,
+  objectif,
+  plusBasEstMieux,
+}: {
+  ratio: number;
+  atteint: boolean;
+  libelle: string;
+  valeurTexte: string;
+  objectif: string;
+  plusBasEstMieux: boolean;
+}) {
+  const pourcent = Math.round(ratio * 100);
+  // Le masque couvre tout au départ, puis se place à la valeur atteinte après le premier affichage
+  const [masque, setMasque] = useState(100);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMasque(pourcent));
+    return () => cancelAnimationFrame(id);
+  }, [pourcent]);
+
+  const valeurAccessible = plusBasEstMieux
+    ? `${valeurTexte} pour un objectif de ${objectif}, plus bas est mieux`
+    : `${valeurTexte} sur un objectif de ${objectif}`;
+
+  return (
+    <div className="flex flex-col gap-xs">
+      <div
+        role="meter"
+        aria-label={`Avancement vers l'objectif, ${libelle}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pourcent}
+        aria-valuetext={valeurAccessible}
+        className="relative h-2.5 w-full overflow-hidden rounded-full border border-[#8A8A90] bg-[#EDEBE6]"
+        style={{ backgroundImage: DEGRADE_PISTE }}
+      >
+        <div
+          aria-hidden="true"
+          className="absolute inset-y-0 right-0 bg-[#EDEBE6] motion-safe:transition-[left] motion-safe:duration-700 motion-safe:ease-out"
+          style={{ left: `${masque}%` }}
+        />
+      </div>
+      <p aria-hidden="true" className="self-end font-label-sm text-sm tabular-nums text-[#68686D]">
+        {formatObjectif(pourcent, "%")}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Carte d'un indicateur de l'accueil, dans cet ordre : libellé, valeur, tendance, trait séparateur,
+ * ligne d'objectif, barre de progression (si objectif), date de mise à jour.
  */
 export function DashboardMetricCard({ metric: m }: { metric: Metric }) {
   const tendance = evaluerTendance(m);
@@ -72,38 +136,29 @@ export function DashboardMetricCard({ metric: m }: { metric: Metric }) {
         </span>
       </p>
 
-      {progression && objectif && (
-        <div
-          role="meter"
-          aria-label={`Avancement vers l'objectif, ${m.label}`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(progression.ratio * 100)}
-          aria-valuetext={
-            plusBasEstMieux
-              ? `${valeurTexte} pour un objectif de ${objectif}, plus bas est mieux`
-              : `${valeurTexte} sur un objectif de ${objectif}`
-          }
-          className="h-1.5 w-full overflow-hidden rounded-full border border-[#8A8A90] bg-[#EDEBE6]"
-        >
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${Math.round(progression.ratio * 100)}%`,
-              backgroundColor: progression.atteint ? "#1F6B38" : "#28282D",
-            }}
-          />
-        </div>
-      )}
-
       <hr className="border-t border-[#CDCDD1]" />
 
-      {objectif && (
-        <p className="flex items-start gap-xs font-label-sm text-sm text-on-surface">
-          <Icon name="flag" className="text-base shrink-0" />
-          <span>{`Objectif ${objectif} en fin de semestre`}</span>
-        </p>
+      {progression && objectif && (
+        <>
+          <p className="flex items-start gap-xs font-label-sm text-sm text-on-surface">
+            <Icon name="track_changes" className="text-base shrink-0" />
+            {/* « en fin de semestre » est toujours sur sa propre ligne, sous « Objectif … » */}
+            <span className="flex flex-col">
+              <span className="block">{`Objectif ${objectif}`}</span>
+              <span className="block">en fin de semestre</span>
+            </span>
+          </p>
+          <BarreObjectif
+            ratio={progression.ratio}
+            atteint={progression.atteint}
+            libelle={m.label}
+            valeurTexte={valeurTexte}
+            objectif={objectif}
+            plusBasEstMieux={plusBasEstMieux}
+          />
+        </>
       )}
+
       {m.updated_at && (
         <p className="font-label-sm text-sm text-on-surface-variant">
           {`Mis à jour le ${formatDateCourte(m.updated_at)}`}
