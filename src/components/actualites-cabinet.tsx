@@ -86,6 +86,7 @@ export function ActualitesCabinet({
   ).data;
 
   const [lue, setLue] = useState<News | null>(null);
+  const [apercu, setApercu] = useState<News | null>(null);
   // Fenêtre de rédaction ouverte : news null = nouvelle actualité
   const [editeur, setEditeur] = useState<{ news: News | null } | null>(null);
 
@@ -214,6 +215,16 @@ export function ActualitesCabinet({
                       >
                         <Icon name="edit" className="text-base" />
                         <span className={TEXTE_SOULIGNE}>Modifier</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setApercu(n)}
+                        aria-haspopup="dialog"
+                        aria-label={`Aperçu du brouillon « ${n.title} »`}
+                        className={CLASSE_LIEN_ACTION}
+                      >
+                        <Icon name="visibility" className="text-base" />
+                        <span className={TEXTE_SOULIGNE}>Aperçu</span>
                       </button>
                     </div>
                     <button
@@ -351,6 +362,44 @@ export function ActualitesCabinet({
       )}
 
       <NewsReader news={lue} onClose={() => setLue(null)} />
+      <NewsReader
+        news={apercu}
+        apercu
+        onClose={() => setApercu(null)}
+        pied={
+          apercu && (
+            <>
+              <button
+                type="button"
+                onClick={() => setApercu(null)}
+                className={buttonVariants({ variant: "secondary" })}
+              >
+                Fermer
+              </button>
+              <button
+                type="button"
+                disabled={publier.isPending}
+                onClick={async () => {
+                  const n = apercu;
+                  // La fenêtre d'aperçu se ferme avant la confirmation : deux fenêtres ne se superposent pas
+                  setApercu(null);
+                  if (
+                    await demander({
+                      titre: "Publier l'actualité",
+                      message: `Publier l'actualité « ${n.title} » ? Elle sera visible par tous.`,
+                      libelleConfirmer: "Publier",
+                    })
+                  )
+                    publier.mutate(n.id);
+                }}
+                className={buttonVariants({ variant: "default" })}
+              >
+                Publier
+              </button>
+            </>
+          )
+        }
+      />
       {dialogueConfirm}
     </section>
   );

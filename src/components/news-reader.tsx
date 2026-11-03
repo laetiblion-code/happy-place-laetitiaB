@@ -4,10 +4,24 @@ import { formatExactDate } from "@/components/expandable-card";
 import { AuteurActualite } from "@/components/news-author";
 import { NewsImage, NewsLinks } from "@/components/news-media";
 import type { News } from "@/lib/dashboard";
+import type { ReactNode } from "react";
 import { useNomsAffiches } from "@/lib/noms";
 
-/** Fenêtre de lecture d'une actualité publiée (lecture seule, Échap, clic fond). */
-export function NewsReader({ news: n, onClose }: { news: News | null; onClose: () => void }) {
+/**
+ * Fenêtre de lecture d'une actualité publiée (lecture seule, Échap, clic fond).
+ * `apercu` : brouillon affiché comme il serait publié, avec un bandeau ; `pied` : actions du bas de fenêtre.
+ */
+export function NewsReader({
+  news: n,
+  onClose,
+  apercu = false,
+  pied,
+}: {
+  news: News | null;
+  onClose: () => void;
+  apercu?: boolean;
+  pied?: ReactNode;
+}) {
   const noms = useNomsAffiches([n?.author ?? "", n?.delegated_by_email ?? ""]).data;
   return (
     <DialogPrimitive.Root open={!!n} onOpenChange={(o) => !o && onClose()}>
@@ -23,7 +37,13 @@ export function NewsReader({ news: n, onClose }: { news: News | null; onClose: (
                   {n.title}
                 </DialogPrimitive.Title>
                 <DialogPrimitive.Description className="font-label-sm text-label-sm text-on-surface-variant">
-                  Publiée le {formatExactDate(n.created_at)} • <AuteurActualite news={n} noms={noms} />
+                  {apercu ? (
+                    <AuteurActualite news={n} noms={noms} />
+                  ) : (
+                    <>
+                      Publiée le {formatExactDate(n.created_at)} • <AuteurActualite news={n} noms={noms} />
+                    </>
+                  )}
                 </DialogPrimitive.Description>
               </div>
               <DialogPrimitive.Close
@@ -34,6 +54,11 @@ export function NewsReader({ news: n, onClose }: { news: News | null; onClose: (
               </DialogPrimitive.Close>
             </div>
             <div className="flex-1 overflow-y-auto p-md space-y-md">
+              {apercu && (
+                <p role="note" className="border border-[#CDCDD1] bg-[#F5F4F1] p-sm text-body-sm font-semibold text-on-surface">
+                  Aperçu : cette actualité n'est pas encore publiée.
+                </p>
+              )}
               {n.image_path && <NewsImage path={n.image_path} alt={n.title} />}
               {n.body && (
                 <p className="font-body-md text-body-md text-on-surface whitespace-pre-line wrap-anywhere">
@@ -42,6 +67,7 @@ export function NewsReader({ news: n, onClose }: { news: News | null; onClose: (
               )}
               <NewsLinks links={n.links} />
             </div>
+            {pied && <div className="flex flex-wrap justify-end gap-xs border-t border-outline-variant p-md">{pied}</div>}
           </DialogPrimitive.Content>
         )}
       </DialogPrimitive.Portal>

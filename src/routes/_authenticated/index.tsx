@@ -371,7 +371,7 @@ function ManagerSpace() {
           {/* Performance Hub */}
           <section aria-labelledby="titre-indicateurs" className="rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
             <div className="flex items-center justify-between mb-md">
-              <h2 id="titre-indicateurs" className="font-headline-sm text-headline-sm text-primary">Indicateurs clés</h2>
+              <h2 id="titre-indicateurs" className="font-headline-sm text-headline-sm text-primary">Performance et objectifs de Bigger Boat en 4 chiffres clés</h2>
             </div>
             {dashMetrics.isError && (
               <p className="text-body-sm text-error mb-md">Les indicateurs sont indisponibles.</p>
