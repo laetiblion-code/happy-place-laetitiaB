@@ -9,6 +9,7 @@ import { AttachmentLink } from "@/components/attachment-link";
 import { cn } from "@/lib/utils";
 import { fetchCabinetSubmissions, type Submission } from "@/lib/dashboard";
 import { CLARIFY_CATEGORY } from "@/components/status-badge";
+import { decouperContenu } from "@/lib/historique-demande";
 
 /** Accueil : 10 dernières demandes, avec un lien vers la page complète. Page /demandes : 20, puis 20 de plus. */
 const PAGE_ACCUEIL = 10;
@@ -24,17 +25,22 @@ const FILTRES: { valeur: Filtre; libelle: string; reserveAuxManagers?: boolean }
 ];
 
 /**
- * Mise en page selon la largeur du bloc (requêtes de conteneur, pas de la fenêtre) :
- * - moins de 700 px : une carte par demande (type et date ; auteur et texte ; statut ; visibilité) ;
- * - de 700 à 1000 px : trois colonnes, la troisième « Suivi » empile statut, visibilité et date ;
- * - 1000 px et plus : cinq colonnes (Catégorie, Auteur et demande, Statut, Visibilité, Date).
+ * Mise en page selon la largeur du bloc (requêtes de conteneur, pas de la fenêtre). Une seule grille pour tout le
+ * tableau : le conteneur porte les colonnes (variable --colonnes), chaque ligne les reprend en sous-grille (subgrid).
+ * Sans subgrid, chaque ligne reprend les mêmes largeurs fixes : l'alignement reste le même.
+ * - moins de 700 px : une carte par demande (Catégorie et date ; auteur et texte ; statut ; visibilité) ;
+ * - de 700 à 1000 px : trois colonnes, « Suivi » empile statut, visibilité et date ;
+ * - 1000 px et plus : cinq colonnes (Catégorie 210 px, Auteur et demande, Statut 190 px, Visibilité 140 px, Date 56 px).
  * La sémantique reste celle d'un tableau (role table, row, columnheader, cell).
  */
-const GRILLE =
-  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-sm gap-y-xs @min-[700px]:grid-cols-[max-content_minmax(0,1fr)_max-content] @min-[1000px]:grid-cols-[max-content_minmax(240px,1fr)_max-content_max-content_max-content]";
-const LIGNE =
-  "border-b border-outline-variant py-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
-const CELLULE = "min-w-0 self-center";
+const TABLEAU =
+  "grid grid-cols-[var(--colonnes)] [--colonnes:minmax(0,1fr)_96px] @min-[700px]:[--colonnes:210px_minmax(0,1fr)_196px] @min-[1000px]:[--colonnes:210px_minmax(0,1fr)_190px_140px_56px]";
+/** Ligne du tableau (en-tête compris) : pleine largeur, colonnes reprises du tableau. */
+const LIGNE_GRILLE =
+  "col-span-full grid grid-cols-[var(--colonnes)] supports-[grid-template-columns:subgrid]:grid-cols-subgrid gap-y-xs";
+const LIGNE = `${LIGNE_GRILLE} border-b border-outline-variant py-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`;
+/** Marge horizontale : sépare les colonnes ; la colonne Catégorie est collée au bord (pl-0). */
+const CELLULE = "min-w-0 self-center px-xs";
 /** Demande en attente (ou à clarifier) depuis plus de 3 jours : date en rouge, filtre « En retard ». */
 const SEUIL_ATTENTE_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -213,17 +219,17 @@ export function DemandesCabinet({
       )}
 
       {visibles.length > 0 && (
-        <div role="table" aria-label={titreTableau} className="mt-md min-w-0">
+        <div role="table" aria-label={titreTableau} className={cn(TABLEAU, "mt-md min-w-0")}>
           <div
             role="row"
             className={cn(
-              GRILLE,
+              LIGNE_GRILLE,
               "sr-only border-b border-outline-variant bg-[#F5F4F1] font-label-sm text-sm text-on-surface-variant @min-[700px]:not-sr-only",
             )}
           >
             <div
               role="columnheader"
-              className="col-start-1 row-start-1 min-w-0 px-xs py-xs font-semibold uppercase"
+              className="col-start-1 row-start-1 min-w-0 py-xs pl-0 pr-xs font-semibold uppercase"
             >
               Catégorie
             </div>
@@ -253,7 +259,7 @@ export function DemandesCabinet({
             </div>
             <div
               role="columnheader"
-              className="col-start-5 row-start-1 hidden min-w-0 px-xs py-xs font-semibold uppercase @min-[1000px]:block"
+              className="col-start-5 row-start-1 hidden min-w-0 px-xs py-xs text-right font-semibold uppercase @min-[1000px]:block"
             >
               Date
             </div>
@@ -267,9 +273,9 @@ export function DemandesCabinet({
                 role="row"
                 ref={i === limite - PAGE ? premiereAjoutee : undefined}
                 tabIndex={-1}
-                className={cn(GRILLE, LIGNE)}
+                className={LIGNE}
               >
-                <div role="cell" className={cn(CELLULE, "col-start-1 row-start-1")}>
+                <div role="cell" className={cn(CELLULE, "col-start-1 row-start-1 pl-0")}>
                   {s.category ? (
                     <CategoryChip category={s.category} />
                   ) : (
@@ -288,20 +294,20 @@ export function DemandesCabinet({
                     <span>{`${s.author_name} · ${s.team}`}</span>
                     {estMoi(s) && <EtiquetteSoi>Moi</EtiquetteSoi>}
                   </p>
-                  {/* Texte sur trois lignes au plus (il ne peut pas élargir la grille), « Voir » toujours visible. */}
-                  <div className="flex min-w-0 items-end gap-sm">
-                    <span
-                      className="line-clamp-3 min-w-0 flex-1 break-words whitespace-normal"
-                      title={s.content}
+                  {/* Texte sur deux lignes au plus ; « Voir » est posé à la fin de la dernière ligne, dans la marge réservée */}
+                  <div className="relative min-w-0">
+                    <p
+                      className="line-clamp-2 min-w-0 break-words pr-14 whitespace-normal"
+                      title={decouperContenu(s.content).texte}
                     >
-                      {s.content}
-                    </span>
+                      {decouperContenu(s.content).texte}
+                    </p>
                     <button
                       type="button"
                       onClick={() => onRead(s)}
                       aria-haspopup="dialog"
                       aria-label={`Voir la demande de ${s.author_name}`}
-                      className="inline-flex min-h-11 shrink-0 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      className="absolute bottom-0 right-0 inline-flex h-6 items-center bg-surface-container-lowest pl-xs font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     >
                       <span className="underline underline-offset-2">Voir</span>
                     </button>
@@ -340,7 +346,7 @@ export function DemandesCabinet({
                   role="cell"
                   className={cn(
                     CELLULE,
-                    "col-start-2 row-start-1 justify-self-end font-label-sm text-sm @min-[700px]:col-start-3 @min-[700px]:row-start-3 @min-[700px]:justify-self-start @min-[1000px]:col-start-5 @min-[1000px]:row-start-1",
+                    "col-start-2 row-start-1 justify-self-end font-label-sm text-sm @min-[700px]:col-start-3 @min-[700px]:row-start-3 @min-[700px]:justify-self-start @min-[1000px]:col-start-5 @min-[1000px]:row-start-1 @min-[1000px]:justify-self-end",
                   )}
                 >
                   <time

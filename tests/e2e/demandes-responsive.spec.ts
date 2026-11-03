@@ -106,6 +106,26 @@ test.describe("tableau « 10 dernières demandes » : mise en page responsive", 
     await page.setViewportSize({ width: 375, height: 900 });
     await expect(tableau.getByRole("columnheader", { name: "Statut" })).toBeHidden();
   });
+
+  for (const largeur of [1440, 1100]) {
+    test(`à ${largeur} px, la colonne « Auteur et demande » est alignée sur toutes les lignes`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: largeur, height: 900 });
+      await ouvrirEnTantQue(page, "admin", "/", { demandes: DEMANDES });
+      const tableau = page.getByRole("table", { name: /Dix dernières demandes/ });
+      await expect(tableau).toBeVisible();
+      // Dans chaque ligne (en-tête compris), la deuxième cellule est « Auteur et demande »
+      const gauches = await tableau.getByRole("row").evaluateAll((lignes) =>
+        lignes.map((ligne) => {
+          const cellules = ligne.querySelectorAll<HTMLElement>('[role="columnheader"], [role="cell"]');
+          return Math.round(cellules[1].getBoundingClientRect().left);
+        }),
+      );
+      expect(gauches.length).toBeGreaterThan(2);
+      expect(new Set(gauches).size).toBe(1);
+    });
+  }
 });
 
 test.describe("filtre « En retard (+3 j) »", () => {
