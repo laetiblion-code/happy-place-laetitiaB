@@ -326,6 +326,7 @@ function ManagerSpace() {
           /* 3. Demandes à traiter à gauche, actualités à droite */
           <div className="grid grid-cols-1 items-start gap-md lg:grid-cols-2">
             <DemandesATraiter
+              email={myEmail}
               items={toReview.data}
               error={toReview.isError}
               pending={homeReview.data?.pending ?? 0}
@@ -393,6 +394,7 @@ function ManagerSpace() {
           </section>
       </main>
       <SubmissionReader
+        moi={myEmail}
         submission={reading}
         onClose={() => setReading(null)}
         onReject={reading && canReview && reading.status === "en attente" ? () => startReject(reading) : undefined}

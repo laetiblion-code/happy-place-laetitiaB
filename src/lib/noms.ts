@@ -62,3 +62,9 @@ export function ilYaCourt(iso: string): string {
   if (h < 24) return `il y a ${h} h`;
   return `il y a ${Math.round(h / 24)} j`;
 }
+
+/** « Kesha Martin » -> « Kesha » ; une adresse sans nom connu -> rien (jamais d'e-mail affiché). */
+export function prenomOuRien(nom: string | null | undefined): string | null {
+  if (!nom || nom.includes("@")) return null;
+  return nom.split(/\s+/)[0] ?? null;
+}

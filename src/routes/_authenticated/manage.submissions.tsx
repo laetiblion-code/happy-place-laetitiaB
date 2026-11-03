@@ -48,6 +48,7 @@ export const Route = createFileRoute("/_authenticated/manage/submissions")({
 
 
 function ManageSubmissions() {
+  const { email } = Route.useRouteContext();
   const qc = useQueryClient();
   const [form, setForm] = useState<SubmissionInput | null>(null);
   const [editing, setEditing] = useState<Submission | null>(null);
@@ -172,6 +173,7 @@ function ManageSubmissions() {
       </div>
 
       <SubmissionReader
+        moi={(email ?? "").toLowerCase()}
         submission={reading}
         onClose={() => setReading(null)}
       />

@@ -15,7 +15,8 @@ const fmt = new Intl.DateTimeFormat("fr-FR", {
 });
 
 /** Marqueur ajouté au texte de la demande par « Compléter ma demande ». */
-const MARQUEUR_REPONSE = "Réponse à la clarification : ";
+/** Marqueur ajouté au texte de la demande par « Compléter ma demande ». */
+export const MARQUEUR_REPONSE = "Réponse à la clarification : ";
 
 /** Réponses données aux clarifications, dans l'ordre (la plus ancienne d'abord), lues dans le texte. */
 export function reponsesClarification(contenu: string): string[] {
@@ -116,6 +117,56 @@ export function lignesHistorique(
 }
 
 /** Un complément : la demande repasse de « refusée » à « en attente » par son auteur (pas une revalidation). */
-function isComplement(h: SubmissionStatusHistory) {
+export function isComplement(h: SubmissionStatusHistory) {
   return h.old_status === "refusée" && h.new_status === "en attente" && !h.is_automatic;
+}
+
+/**
+ * Découpe le texte enregistré : ce qui précède la première « Réponse à la clarification : » est le texte de la
+ * demande ; ce qui suit la dernière est la réponse la plus récente. Les réponses intermédiaires restent dans le
+ * texte enregistré (base, export, gestion), mais ne sont pas affichées comme texte de la demande.
+ */
+export function decouperContenu(contenu: string): { texte: string; reponse: string | null } {
+  const premier = contenu.indexOf(MARQUEUR_REPONSE);
+  if (premier < 0) return { texte: contenu.trim(), reponse: null };
+  const dernier = contenu.lastIndexOf(MARQUEUR_REPONSE);
+  return {
+    texte: contenu.slice(0, premier).trim(),
+    reponse: contenu.slice(dernier + MARQUEUR_REPONSE.length).trim(),
+  };
+}
+
+export type Echange = {
+  /** Texte de la demande, sans les réponses. */
+  texte: string;
+  /** Dernière question du manager (historique « refusée à clarifier »). */
+  question: { email: string | null; texte: string; quand: string } | null;
+  /** Dernière réponse de l'auteur, seulement si elle est postérieure à la question. */
+  reponse: { texte: string; quand: string } | null;
+};
+
+/**
+ * Question et réponse les plus récentes d'une demande. `rows` : historique du plus récent au plus ancien.
+ * Sans historique, la question peut être lue sur la demande elle-même (`fallbackQuestion`).
+ */
+export function echangeClarification(
+  contenu: string,
+  rows: SubmissionStatusHistory[],
+  fallbackQuestion?: { texte: string; quand: string },
+): Echange {
+  const { texte, reponse } = decouperContenu(contenu);
+  const ligneQuestion = rows.find(
+    (h) => h.new_status === "refusée" && h.rejection_category === CATEGORIE_CLARIFICATION,
+  );
+  const question = ligneQuestion
+    ? { email: ligneQuestion.changed_by_email, texte: ligneQuestion.rejection_note ?? "", quand: ligneQuestion.changed_at }
+    : fallbackQuestion
+      ? { email: null, ...fallbackQuestion }
+      : null;
+  const derniereReponse = rows.find(isComplement);
+  const reponseAffichee =
+    reponse && question && derniereReponse && new Date(derniereReponse.changed_at) > new Date(question.quand)
+      ? { texte: reponse, quand: derniereReponse.changed_at }
+      : null;
+  return { texte, question, reponse: reponseAffichee };
 }

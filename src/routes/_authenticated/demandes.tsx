@@ -64,7 +64,8 @@ function DemandesPage() {
           />
         )}
       </main>
-      <SubmissionReader submission={lue} onClose={() => setLue(null)} />
+      <SubmissionReader
+          moi={myEmail} submission={lue} onClose={() => setLue(null)} />
     </div>
   );
 }

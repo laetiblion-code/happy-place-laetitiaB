@@ -3,10 +3,7 @@ import { useState } from "react";
 import { AttachmentLink } from "@/components/attachment-link";
 import { Linkify } from "@/components/linkify";
 import { CLARIFY_CATEGORY, StatusBadge } from "@/components/status-badge";
-import {
-  SubmissionHistory,
-  useHistoriqueDemande,
-} from "@/components/manage/submission-history";
+import { SubmissionHistory } from "@/components/manage/submission-history";
 import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
 import { DureeCourte } from "@/components/duree-courte";
 import { ChipStatut, COULEUR_STATUT, LienBasBloc } from "@/components/chips";
@@ -22,7 +19,8 @@ import {
 } from "@/lib/dashboard";
 import type { MyCounts } from "@/lib/home-counts";
 import { MyChips } from "@/components/home-counters";
-import { dureeEnJours, nomAffiche, useNomsAffiches } from "@/lib/noms";
+import { dureeEnJours, ilYaCourt } from "@/lib/noms";
+import { EchangeDemande, useEchangeDemande } from "@/components/echange-demande";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -174,12 +172,6 @@ function dateCourteLongue(iso: string) {
   return dateCourte.format(new Date(iso));
 }
 
-/** Prénom d'une personne, ou rien si seule son adresse est connue (jamais d'e-mail affiché). */
-function prenomOuRien(nom: string | null) {
-  if (!nom || nom.includes("@")) return null;
-  return nom.split(/\s+/)[0] ?? null;
-}
-
 function CarteDemande({
   s,
   changes,
@@ -206,16 +198,10 @@ function CarteDemande({
     ? `Envoyée à ${prenoms} (${pluriel ? "managers" : "manager"} ${s.team})`
     : `Envoyée au manager de l'équipe ${s.team}`;
 
-  // Qui a demandé la clarification : la personne de la ligne d'historique « refusée à clarifier » (pas tous les managers)
-  const historique = useHistoriqueDemande(s.id, clarification);
-  const ligneClarification = historique.data?.find(
-    (h) => h.new_status === "refusée" && h.rejection_category === CLARIFY_CATEGORY,
-  );
-  const noms = useNomsAffiches([ligneClarification?.changed_by_email ?? ""]).data;
-  const demandeur = ligneClarification?.changed_by_email
-    ? prenomOuRien(nomAffiche(ligneClarification.changed_by_email, noms))
-    : null;
-  const Demandeur = demandeur ?? "Ton manager";
+  // Texte de la demande sans les réponses, question et réponse les plus récentes (voir echange-demande)
+  const echange = useEchangeDemande(s, moi);
+  // Qui a demandé la clarification : seulement cette personne (pas tous les managers)
+  const Demandeur = echange.question?.nom ?? "Ton manager";
 
   return (
     <li
@@ -237,26 +223,18 @@ function CarteDemande({
       </div>
 
       <div className="flex flex-col gap-sm rounded-md bg-[#F5F4F1] p-sm">
-        {/* Étiquette à gauche (taille fixe) ; le texte occupe la colonne de droite et passe à la ligne sous lui-même */}
-        <div className="flex items-start gap-sm">
-          {s.category && (
-            <span className="shrink-0">
-              <CategoryChip category={s.category} />
-            </span>
-          )}
-          <p className="min-w-0 flex-1 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
-            {`« ${s.content} »`}
-          </p>
-        </div>
-        <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-
-        {clarification && (
-          <div className="border border-[#CDCDD1] bg-white p-sm text-body-sm text-on-surface wrap-anywhere">
-            <p className="whitespace-pre-line">
-              <strong>{`${Demandeur} :`}</strong> « <Linkify text={s.rejection_note ?? ""} /> »
-            </p>
+        {/* Étiquette de type sur sa propre ligne, puis le texte de la demande sur toute la largeur */}
+        {s.category && (
+          <div>
+            <CategoryChip category={s.category} />
           </div>
         )}
+        <p className="whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
+          {`« ${echange.texte} »`}
+        </p>
+        <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+
+        <EchangeDemande echange={echange} />
 
         {s.status === "refusée" && !clarification && s.rejection_category && (
           <div className="border border-[#CDCDD1] bg-white p-sm text-body-sm text-on-surface wrap-anywhere">
@@ -302,6 +280,13 @@ function CarteDemande({
         <p className="flex items-start gap-xs font-label-sm text-sm text-on-surface-variant">
           <Icon name="hourglass_empty" className="text-base shrink-0" />
           <span>{`${Demandeur} attend ta réponse depuis ${delaiTexte(changement)}`}</span>
+        </p>
+      )}
+
+      {enAttente && echange.reponse && (
+        <p className="flex items-start gap-xs font-label-sm text-sm text-on-surface-variant">
+          <Icon name="hourglass_empty" className="text-base shrink-0" />
+          <span>{`Réponse envoyée ${ilYaCourt(echange.reponse.quand)} · en attente chez ${prenoms || "ton manager"}`}</span>
         </p>
       )}
 

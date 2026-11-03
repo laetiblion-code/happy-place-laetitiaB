@@ -7,9 +7,11 @@ import { cn } from "@/lib/utils";
 import { type Submission } from "@/lib/dashboard";
 import { DureeCourte } from "@/components/duree-courte";
 import { initialesDe } from "@/lib/noms";
+import { TexteDemande } from "@/components/echange-demande";
 
 /** Demandes à traiter (manager et admin) : une carte par demande, les plus anciennes d'abord. */
 export function DemandesATraiter({
+  email,
   items,
   error,
   pending,
@@ -20,6 +22,8 @@ export function DemandesATraiter({
   onClarifier,
   onValider,
 }: {
+  /** Adresse de la personne connectée (« Toi » dans l'échange). */
+  email: string;
   items: Submission[] | undefined;
   error: boolean;
   /** Nombre de demandes à valider (même compte que la carte « Demandes en attente »). */
@@ -95,15 +99,11 @@ export function DemandesATraiter({
               </div>
 
               <div className="flex flex-col gap-sm rounded-md border border-[#E4E2DD] bg-[#FAF9F7] p-sm">
-                {/* Étiquette à gauche (taille fixe) ; le texte occupe la colonne de droite */}
-                <div className="flex items-start gap-sm">
-                  <span className="shrink-0">
-                    <CategoryChip category={s.category} />
-                  </span>
-                  <p className="line-clamp-4 min-w-0 flex-1 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
-                    {`« ${s.content} »`}
-                  </p>
+                {/* Étiquette de type sur sa propre ligne, puis le texte et l'échange de clarification */}
+                <div>
+                  <CategoryChip category={s.category} />
                 </div>
+                <TexteDemande s={s} moi={email} />
                 {/* Voir tout : à droite, juste sous le texte. La zone de 44 px dépasse en bas de l'encadré
                     (-mb-3) pour que la marge sous « Voir tout » soit la même que la marge au-dessus de la chip. */}
                 <div className="-mt-4 -mb-3 flex flex-wrap items-center gap-sm">
