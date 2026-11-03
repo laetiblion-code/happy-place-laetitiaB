@@ -14,28 +14,30 @@ import { CLARIFY_CATEGORY } from "@/components/status-badge";
 const PAGE_ACCUEIL = 10;
 const PAGE_COMPLETE = 20;
 
-type Filtre = "toutes" | "mes" | "pj";
-const FILTRES: { valeur: Filtre; libelle: string }[] = [
+type Filtre = "toutes" | "mes" | "pj" | "retard";
+/** « En retard » n'est proposé qu'aux managers et à l'admin (ils traitent les demandes). */
+const FILTRES: { valeur: Filtre; libelle: string; reserveAuxManagers?: boolean }[] = [
   { valeur: "toutes", libelle: "Toutes" },
   { valeur: "mes", libelle: "Mes demandes" },
   { valeur: "pj", libelle: "Avec pièce jointe" },
+  { valeur: "retard", libelle: "En retard (+3 j)", reserveAuxManagers: true },
 ];
 
 /**
- * Mise en page : sous 640 px, chaque demande est une carte (grille : type et date, auteur et texte, statut et
- * visibilité). De 640 à 900 px, un tableau à quatre colonnes, la visibilité sous le statut. Dès 900 px, cinq colonnes.
+ * Mise en page selon la largeur du bloc (requêtes de conteneur, pas de la fenêtre) :
+ * - moins de 700 px : une carte par demande (type et date ; auteur et texte ; statut ; visibilité) ;
+ * - de 700 à 1000 px : trois colonnes, la troisième « Suivi » empile statut, visibilité et date ;
+ * - 1000 px et plus : cinq colonnes (Catégorie, Auteur et demande, Statut, Visibilité, Date).
+ * La sémantique reste celle d'un tableau (role table, row, columnheader, cell).
  */
+const GRILLE =
+  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-sm gap-y-xs @min-[700px]:grid-cols-[max-content_minmax(0,1fr)_max-content] @min-[1000px]:grid-cols-[max-content_minmax(240px,1fr)_max-content_max-content_max-content]";
 const LIGNE =
-  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-sm gap-y-xs border-b border-outline-variant py-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-[640px]:table-row min-[640px]:py-0";
-const CELLULE = "min-w-0 align-middle min-[640px]:px-xs min-[640px]:py-sm";
-/** Demande en attente (ou à clarifier) depuis plus de 4 jours : date en rouge. */
-const SEUIL_ATTENTE_MS = 4 * 24 * 60 * 60 * 1000;
+  "border-b border-outline-variant py-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+const CELLULE = "min-w-0 self-center";
+/** Demande en attente (ou à clarifier) depuis plus de 3 jours : date en rouge, filtre « En retard ». */
+const SEUIL_ATTENTE_MS = 3 * 24 * 60 * 60 * 1000;
 
-/**
- * « 10 dernières demandes du cabinet » (accueil) ou tableau complet (page /demandes) : tous statuts, les plus
- * récentes d'abord. Les règles d'accès (RLS) décident de ce qui est visible : les demandes privées des autres
- * équipes n'apparaissent pas.
- */
 /** Date courte d'une demande : « 11 h », « 4 j ». L'heure exacte est dans le titre de la balise. */
 function dateCourteDemande(iso: string, maintenant = Date.now()): string {
   const min = Math.round((maintenant - new Date(iso).getTime()) / 60000);
@@ -54,6 +56,11 @@ function demandeEnAttente(s: Submission): boolean {
   );
 }
 
+/**
+ * « 10 dernières demandes du cabinet » (accueil) ou tableau complet (page /demandes) : tous statuts, les plus
+ * récentes d'abord. Les règles d'accès (RLS) décident de ce qui est visible : les demandes privées des autres
+ * équipes n'apparaissent pas.
+ */
 export function DemandesCabinet({
   email,
   role,
@@ -90,18 +97,27 @@ export function DemandesCabinet({
   const [filtre, setFiltre] = useState<Filtre>("toutes");
   const [equipe, setEquipe] = useState("");
   const [limite, setLimite] = useState(PAGE);
-  const premiereAjoutee = useRef<HTMLTableRowElement>(null);
+  const premiereAjoutee = useRef<HTMLDivElement>(null);
+
+  const maintenant = Date.now();
+  /** En attente (ou à clarifier) depuis plus de 3 jours : même seuil que la date en rouge. */
+  function attendLongtemps(s: Submission) {
+    return demandeEnAttente(s) && maintenant - new Date(s.created_at).getTime() > SEUIL_ATTENTE_MS;
+  }
 
   const toutes = useMemo(() => q.data ?? [], [q.data]);
   const equipes = useMemo(
     () => [...new Set(toutes.map((s) => s.team))].sort((a, b) => a.localeCompare(b, "fr")),
     [toutes],
   );
-  const filtrees = toutes.filter(
-    (s) =>
-      (filtre === "toutes" || (filtre === "mes" ? estMoi(s) : !!s.attachment_path)) &&
-      (!equipe || s.team === equipe),
-  );
+  const filtres = FILTRES.filter((f) => !f.reserveAuxManagers || role !== "collaborateur");
+  function correspond(s: Submission) {
+    if (filtre === "mes") return estMoi(s);
+    if (filtre === "pj") return !!s.attachment_path;
+    if (filtre === "retard") return attendLongtemps(s);
+    return true;
+  }
+  const filtrees = toutes.filter((s) => correspond(s) && (!equipe || s.team === equipe));
   const visibles = filtrees.slice(0, limite);
 
   // Après « Afficher 20 de plus », le focus va sur la première ligne ajoutée
@@ -114,10 +130,15 @@ export function DemandesCabinet({
     setLimite(PAGE);
   }
 
+  const titreTableau =
+    variante === "accueil"
+      ? "Dix dernières demandes du cabinet, de la plus récente à la plus ancienne"
+      : "Demandes du cabinet, de la plus récente à la plus ancienne";
+
   return (
     <section
       aria-labelledby="titre-cabinet"
-      className="min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest p-sm min-[900px]:p-md"
+      className="@container min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest p-sm min-[900px]:p-md"
     >
       {variante === "accueil" ? (
         <div className="space-y-xs border-b border-outline-variant pb-sm">
@@ -137,7 +158,7 @@ export function DemandesCabinet({
 
       <div className="mt-md flex flex-wrap items-center justify-between gap-sm">
         <div role="group" aria-label="Filtrer les demandes" className="flex flex-wrap gap-xs">
-          {FILTRES.map((f) => (
+          {filtres.map((f) => (
             <button
               key={f.valeur}
               type="button"
@@ -157,9 +178,9 @@ export function DemandesCabinet({
         </div>
         <label
           htmlFor="filtre-equipe-cabinet"
-          className="flex min-h-11 items-center gap-xs font-label-sm text-sm text-on-surface"
+          className="flex min-h-11 min-w-0 max-w-full items-center gap-xs font-label-sm text-sm text-on-surface"
         >
-          <span>Équipe :</span>
+          <span className="shrink-0">Équipe :</span>
           <select
             id="filtre-equipe-cabinet"
             name="equipe"
@@ -168,7 +189,7 @@ export function DemandesCabinet({
               setEquipe(e.target.value);
               setLimite(PAGE);
             }}
-            className="min-h-11 max-w-full border border-[#8A8A90] bg-card px-sm py-xs font-label-sm text-sm focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="min-h-11 min-w-0 max-w-full border border-[#8A8A90] bg-card px-sm py-xs font-label-sm text-sm focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <option value="">Toutes</option>
             {equipes.map((t) => (
@@ -185,138 +206,165 @@ export function DemandesCabinet({
       )}
       {q.isSuccess && filtrees.length === 0 && (
         <p className="mt-md text-body-sm italic text-on-surface-variant">
-          Aucune demande ne correspond à ces filtres.
+          {filtre === "retard"
+            ? "Aucune demande en retard."
+            : "Aucune demande ne correspond à ces filtres."}
         </p>
       )}
 
       {visibles.length > 0 && (
-        <div className="mt-md">
-          <table className="w-full border-collapse text-left">
-            <caption className="sr-only">
-              Dix dernières demandes du cabinet, de la plus récente à la plus ancienne
-            </caption>
-            <thead className="sr-only min-[640px]:not-sr-only">
-              <tr className="border-b border-outline-variant bg-[#F5F4F1] font-label-sm text-sm text-on-surface-variant">
-                <th scope="col" className="whitespace-nowrap px-xs py-xs font-semibold uppercase">
-                  Catégorie
-                </th>
-                <th scope="col" className="px-xs py-xs font-semibold uppercase">
-                  Auteur et demande
-                </th>
-                <th scope="col" className="whitespace-nowrap px-xs py-xs font-semibold uppercase">
-                  Statut
-                </th>
-                <th
-                  scope="col"
-                  className="hidden whitespace-nowrap px-xs py-xs font-semibold uppercase min-[900px]:table-cell"
+        <div role="table" aria-label={titreTableau} className="mt-md min-w-0">
+          <div
+            role="row"
+            className={cn(
+              GRILLE,
+              "sr-only border-b border-outline-variant bg-[#F5F4F1] font-label-sm text-sm text-on-surface-variant @min-[700px]:not-sr-only",
+            )}
+          >
+            <div
+              role="columnheader"
+              className="col-start-1 row-start-1 min-w-0 px-xs py-xs font-semibold uppercase"
+            >
+              Catégorie
+            </div>
+            <div
+              role="columnheader"
+              className="col-start-2 row-start-1 min-w-0 px-xs py-xs font-semibold uppercase"
+            >
+              Auteur et demande
+            </div>
+            <div
+              role="columnheader"
+              className="col-start-3 row-start-1 hidden min-w-0 px-xs py-xs font-semibold uppercase @min-[700px]:block @min-[1000px]:hidden"
+            >
+              Suivi
+            </div>
+            <div
+              role="columnheader"
+              className="col-start-3 row-start-1 hidden min-w-0 px-xs py-xs font-semibold uppercase @min-[1000px]:block"
+            >
+              Statut
+            </div>
+            <div
+              role="columnheader"
+              className="col-start-4 row-start-1 hidden min-w-0 px-xs py-xs font-semibold uppercase @min-[1000px]:block"
+            >
+              Visibilité
+            </div>
+            <div
+              role="columnheader"
+              className="col-start-5 row-start-1 hidden min-w-0 px-xs py-xs font-semibold uppercase @min-[1000px]:block"
+            >
+              Date
+            </div>
+          </div>
+
+          {visibles.map((s, i) => {
+            const attenteLongue = attendLongtemps(s);
+            return (
+              <div
+                key={s.id}
+                role="row"
+                ref={i === limite - PAGE ? premiereAjoutee : undefined}
+                tabIndex={-1}
+                className={cn(GRILLE, LIGNE)}
+              >
+                <div role="cell" className={cn(CELLULE, "col-start-1 row-start-1")}>
+                  {s.category ? (
+                    <CategoryChip category={s.category} />
+                  ) : (
+                    <span className="text-on-surface-variant">Non renseignée</span>
+                  )}
+                </div>
+
+                <div
+                  role="cell"
+                  className={cn(
+                    CELLULE,
+                    "col-span-2 col-start-1 row-start-2 @min-[700px]:col-span-1 @min-[700px]:col-start-2 @min-[700px]:row-span-3 @min-[700px]:row-start-1 @min-[1000px]:row-span-1",
+                  )}
                 >
-                  Visibilité
-                </th>
-                <th scope="col" className="whitespace-nowrap px-xs py-xs font-semibold uppercase">
-                  Date
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibles.map((s, i) => {
-                const attenteLongue =
-                  demandeEnAttente(s) &&
-                  Date.now() - new Date(s.created_at).getTime() > SEUIL_ATTENTE_MS;
-                return (
-                  <tr
-                    key={s.id}
-                    ref={i === limite - PAGE ? premiereAjoutee : undefined}
-                    tabIndex={-1}
-                    className={LIGNE}
+                  <p className="flex min-w-0 flex-wrap items-center gap-x-xs font-body-sm font-bold text-primary break-normal">
+                    <span>{`${s.author_name} · ${s.team}`}</span>
+                    {estMoi(s) && <EtiquetteSoi>Moi</EtiquetteSoi>}
+                  </p>
+                  {/* Texte sur trois lignes au plus (il ne peut pas élargir la grille), « Voir » toujours visible. */}
+                  <div className="flex min-w-0 items-end gap-sm">
+                    <span
+                      className="line-clamp-3 min-w-0 flex-1 break-words whitespace-normal"
+                      title={s.content}
+                    >
+                      {s.content}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onRead(s)}
+                      aria-haspopup="dialog"
+                      aria-label={`Voir la demande de ${s.author_name}`}
+                      className="inline-flex min-h-11 shrink-0 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    >
+                      <span className="underline underline-offset-2">Voir</span>
+                    </button>
+                  </div>
+                  {s.attachment_path &&
+                    (peutLirePiece(s) ? (
+                      <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+                    ) : (
+                      <p className="font-label-sm text-sm text-on-surface-variant wrap-anywhere">
+                        {`${s.attachment_name ?? "Pièce jointe"} · réservée à l'équipe`}
+                      </p>
+                    ))}
+                </div>
+
+                <div
+                  role="cell"
+                  className={cn(
+                    CELLULE,
+                    "col-start-1 row-start-3 @min-[700px]:col-start-3 @min-[700px]:row-start-1",
+                  )}
+                >
+                  <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
+                </div>
+
+                <div
+                  role="cell"
+                  className={cn(
+                    CELLULE,
+                    "col-start-2 row-start-3 justify-self-end @min-[700px]:col-start-3 @min-[700px]:row-start-2 @min-[700px]:justify-self-start @min-[1000px]:col-start-4 @min-[1000px]:row-start-1",
+                  )}
+                >
+                  <VisibilityChip visibility={s.visibility} />
+                </div>
+
+                <div
+                  role="cell"
+                  className={cn(
+                    CELLULE,
+                    "col-start-2 row-start-1 justify-self-end font-label-sm text-sm @min-[700px]:col-start-3 @min-[700px]:row-start-3 @min-[700px]:justify-self-start @min-[1000px]:col-start-5 @min-[1000px]:row-start-1",
+                  )}
+                >
+                  <time
+                    dateTime={s.created_at}
+                    title={formatExactDate(s.created_at)}
+                    className={cn(
+                      "inline-flex items-center gap-xs whitespace-nowrap",
+                      attenteLongue ? "font-semibold text-[#A81E25]" : "text-on-surface-variant",
+                    )}
                   >
-                    <td className={`${CELLULE} col-start-1 row-start-1`}>
-                      {s.category ? (
-                        <CategoryChip category={s.category} />
-                      ) : (
-                        <span className="text-on-surface-variant">Non renseignée</span>
-                      )}
-                    </td>
-                    <td
-                      className={`${CELLULE} col-span-2 row-start-2 w-full min-[640px]:col-auto min-[640px]:row-auto`}
-                    >
-                      <div className="min-w-0 min-[900px]:min-w-[15rem]">
-                        <p className="flex min-w-0 flex-wrap items-center gap-x-xs font-body-sm font-bold text-primary break-normal">
-                          <span>{`${s.author_name} · ${s.team}`}</span>
-                          {estMoi(s) && <EtiquetteSoi>Moi</EtiquetteSoi>}
-                        </p>
-                        {/* Texte sur trois lignes au plus (il ne peut pas élargir le tableau), « Voir » toujours visible. */}
-                        <div className="flex min-w-0 flex-wrap items-start gap-x-sm min-[640px]:flex-nowrap min-[640px]:items-center">
-                          <span
-                            className="line-clamp-3 min-w-0 break-words whitespace-normal min-[640px]:flex-1"
-                            title={s.content}
-                          >
-                            {s.content}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onRead(s)}
-                            aria-haspopup="dialog"
-                            aria-label={`Voir la demande de ${s.author_name}`}
-                            className="inline-flex min-h-11 shrink-0 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                          >
-                            <span className="underline underline-offset-2">Voir</span>
-                          </button>
-                        </div>
-                        {s.attachment_path &&
-                          (peutLirePiece(s) ? (
-                            <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-                          ) : (
-                            <p className="font-label-sm text-sm text-on-surface-variant wrap-anywhere">
-                              {`${s.attachment_name ?? "Pièce jointe"} · réservée à l'équipe`}
-                            </p>
-                          ))}
-                      </div>
-                    </td>
-                    <td
-                      className={`${CELLULE} whitespace-nowrap row-start-3 col-start-1 min-[640px]:row-auto min-[640px]:col-auto`}
-                    >
-                      <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
-                      {/* Entre 640 et 900 px, la visibilité passe sous le statut, dans la même cellule */}
-                      <div className="mt-xs hidden min-[640px]:block min-[900px]:hidden">
-                        <VisibilityChip visibility={s.visibility} />
-                      </div>
-                    </td>
-                    <td
-                      className={`${CELLULE} row-start-3 col-start-2 justify-self-end whitespace-nowrap min-[640px]:hidden min-[900px]:table-cell`}
-                    >
-                      <VisibilityChip visibility={s.visibility} />
-                    </td>
-                    <td
-                      className={`${CELLULE} row-start-1 col-start-2 justify-self-end whitespace-nowrap font-label-sm text-sm min-[640px]:justify-self-auto`}
-                    >
-                      <time
-                        dateTime={s.created_at}
-                        title={formatExactDate(s.created_at)}
-                        className={
-                          attenteLongue
-                            ? "inline-flex items-center gap-xs font-semibold text-[#A81E25]"
-                            : "text-on-surface-variant"
-                        }
-                      >
-                        {attenteLongue && (
-                          <span
-                            aria-hidden="true"
-                            className="material-symbols-outlined text-[16px]"
-                          >
-                            schedule
-                          </span>
-                        )}
-                        {dateCourteDemande(s.created_at)}
-                        {attenteLongue && (
-                          <span className="sr-only">, en attente depuis plus de 4 jours</span>
-                        )}
-                      </time>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    {attenteLongue && (
+                      <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
+                        schedule
+                      </span>
+                    )}
+                    {dateCourteDemande(s.created_at, maintenant)}
+                    {attenteLongue && (
+                      <span className="sr-only">, en attente depuis plus de 3 jours</span>
+                    )}
+                  </time>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
