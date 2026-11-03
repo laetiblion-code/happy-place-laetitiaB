@@ -10,7 +10,7 @@ import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card
 import { SubmissionReader } from "@/components/submission-reader";
 import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS } from "@/components/submission-choices";
 import { ManagerCards } from "@/components/home-counters";
-import { fetchAlertCounts, fetchDelaiValidation, fetchDraftCounts, fetchMyCounts, fetchPublicationActus, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
+import { fetchAdminDirectory, fetchAlertCounts, fetchDelaiValidation, fetchDraftCounts, fetchMyCounts, fetchPublicationActus, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
 import { AlertsKanban } from "@/components/alerts-kanban";
 import { buttonVariants } from "@/components/ui/button";
 import { LienBasBloc } from "@/components/chips";
@@ -191,6 +191,14 @@ function ManagerSpace() {
     retry: false,
   });
 
+  // Annuaire (admin) : nomme les managers de chaque équipe dans « Attend chez … » (même clé que les départs)
+  const annuaire = useQuery({
+    queryKey: ["admin-directory"],
+    queryFn: fetchAdminDirectory,
+    enabled: isAdmin,
+    retry: false,
+  });
+
   const review = useMutation({
     mutationFn: reviewSubmission,
     onSuccess: (_d, vars) => {
@@ -328,6 +336,8 @@ function ManagerSpace() {
           <div className="grid grid-cols-1 items-start gap-md lg:grid-cols-2">
             <DemandesATraiter
               email={myEmail}
+              admin={isAdmin}
+              annuaire={annuaire.data}
               items={toReview.data}
               error={toReview.isError}
               pending={homeReview.data?.pending ?? 0}
@@ -399,6 +409,11 @@ function ManagerSpace() {
         submission={reading}
         onClose={() => setReading(null)}
         onReject={reading && canReview && reading.status === "en attente" ? () => startReject(reading) : undefined}
+        onClarify={
+          reading && canReview && reading.status === "en attente"
+            ? () => startReject(reading, "clarification")
+            : undefined
+        }
         onApprove={
           reading && canReview && reading.status === "en attente"
             ? () => review.mutate({ id: reading.id, status: "validée" })

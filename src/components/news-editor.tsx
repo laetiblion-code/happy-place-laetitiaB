@@ -422,37 +422,44 @@ export function NewsEditor({
                 </div>
               )}
 
-              <footer className="space-y-sm border-t border-outline-variant bg-[#F5F4F1] px-md py-sm">
-                <p className="flex min-w-0 items-center gap-xs text-[13px] text-on-surface-variant">
-                  <Icone
-                    name={delegation ? "shield" : "visibility"}
-                    className="shrink-0 text-[18px]"
-                  />
-                  <span>
-                    {delegation
-                      ? "Publication administrative déléguée."
-                      : estPubliee
-                        ? "Visible par tout Bigger Boat."
-                        : "Visible par tout Bigger Boat une fois publiée."}
-                  </span>
-                </p>
-                {/* Une ligne : « Annuler » à gauche ; sous 480 px, les boutons s'empilent, « Publier » en premier */}
-                <div className="flex flex-col-reverse gap-xs min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
-                  <button
-                    type="button"
-                    disabled={sauver.isPending}
-                    onClick={demanderFermeture}
-                    className={buttonVariants({ variant: "secondary" }) + " w-full min-[480px]:w-auto"}
-                  >
-                    Annuler
-                  </button>
+              {/* Ligne des boutons : « Annuler » à gauche ; à droite, la mention de visibilité au-dessus de
+                  « Enregistrer en brouillon » et « Publier ». Sous 480 px : empilé, « Publier » en premier. */}
+              <footer className="flex flex-col-reverse gap-sm border-t border-outline-variant bg-[#F5F4F1] px-md py-sm min-[480px]:flex-row min-[480px]:items-end min-[480px]:justify-between">
+                <button
+                  type="button"
+                  disabled={sauver.isPending}
+                  onClick={demanderFermeture}
+                  className={cn(
+                    buttonVariants({ variant: "secondary" }),
+                    "w-full min-[480px]:w-auto",
+                  )}
+                >
+                  Annuler
+                </button>
+                <div className="flex flex-col gap-xs min-[480px]:items-end">
+                  <p className="flex min-w-0 items-center gap-xs text-[13px] text-on-surface-variant min-[480px]:justify-end">
+                    <Icone
+                      name={delegation ? "shield" : "visibility"}
+                      className="shrink-0 text-[18px]"
+                    />
+                    <span>
+                      {delegation
+                        ? "Publication administrative déléguée."
+                        : estPubliee
+                          ? "Visible par tout Bigger Boat."
+                          : "Visible par tout Bigger Boat une fois publiée."}
+                    </span>
+                  </p>
                   <div className="flex flex-col-reverse gap-xs min-[480px]:flex-row min-[480px]:items-center">
                     {!estPubliee && (
                       <button
                         type="button"
                         disabled={sauver.isPending}
                         onClick={() => soumettre("brouillon")}
-                        className={buttonVariants({ variant: "secondary" }) + " w-full min-[480px]:w-auto"}
+                        className={cn(
+                          buttonVariants({ variant: "secondary" }),
+                          "w-full min-[480px]:w-auto",
+                        )}
                       >
                         {libelleEnregistrer}
                       </button>
@@ -461,7 +468,10 @@ export function NewsEditor({
                       type="button"
                       disabled={sauver.isPending}
                       onClick={() => soumettre("publiée")}
-                      className={buttonVariants({ variant: "default" }) + " w-full min-[480px]:w-auto"}
+                      className={cn(
+                        buttonVariants({ variant: "default" }),
+                        "w-full min-[480px]:w-auto",
+                      )}
                     >
                       {estPubliee ? "Enregistrer les modifications" : "Publier"}
                     </button>

@@ -30,7 +30,7 @@ export async function ouvrirEnTantQue(
   page: Page,
   role: "admin" | "manager" | "collaborateur",
   chemin = "/",
-  options: { demandes?: unknown[] } = {},
+  options: { demandes?: unknown[]; historique?: unknown[]; actualites?: unknown[] } = {},
 ) {
   await page.route(`${SUPABASE}/**`, (route) => {
     const url = new URL(route.request().url());
@@ -43,6 +43,9 @@ export async function ouvrirEnTantQue(
     if (url.pathname.startsWith("/rest/v1/allowed_user_roles"))
       return reponse([{ role, allowed_user_id: 1 }]);
     if (url.pathname.startsWith("/rest/v1/submissions")) return reponse(options.demandes ?? []);
+    if (url.pathname.startsWith("/rest/v1/submission_status_history"))
+      return reponse(options.historique ?? []);
+    if (url.pathname.startsWith("/rest/v1/news")) return reponse(options.actualites ?? []);
     return reponse([]);
   });
   await page.addInitScript(

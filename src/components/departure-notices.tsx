@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Link } from "@tanstack/react-router";
+import { LienBasBloc } from "@/components/chips";
 import { buttonVariants } from "@/components/ui/button";
 import {
   downloadAttachment,
@@ -259,12 +259,9 @@ function BlocAdmin({
         </p>
       )}
 
-      <Link
-        to="/manage/users"
-        className="inline-flex min-h-11 items-center font-label-md text-label-md text-primary underline underline-offset-4 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-      >
+      <LienBasBloc to="/manage/users" align="centre">
         Gérer les utilisateurs et équipes
-      </Link>
+      </LienBasBloc>
     </section>
   );
 }
@@ -322,7 +319,7 @@ function EquipesSansManager({
       )}
       {sansMembre.length > 0 && (
         <p className="rounded-md bg-surface-container px-sm py-xs font-label-sm text-sm text-on-surface-variant wrap-anywhere">
-          {`Sans membre : ${sansMembre.map((t) => t.name).join(", ")}`}
+          {`Équipes sans membre : ${sansMembre.map((t) => t.name).join(", ")}`}
         </p>
       )}
     </div>

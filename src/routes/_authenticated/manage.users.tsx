@@ -476,15 +476,28 @@ function UsersPage() {
               {initialesDe(nom || u.email)}
             </span>
             <div className="min-w-0">
-              <h3
-                id={`${idCarte}-titre`}
-                className="font-body-md font-bold text-primary wrap-anywhere"
-              >
-                {nom || u.email}
-                {u.email === me && (
-                  <span className="ml-xs font-normal text-on-surface-variant">(toi)</span>
-                )}
-              </h3>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-sm gap-y-xs">
+                <h3
+                  id={`${idCarte}-titre`}
+                  className="font-body-md font-bold text-primary wrap-anywhere"
+                >
+                  {nom || u.email}
+                  {u.email === me && (
+                    <span className="ml-xs font-normal text-on-surface-variant">(toi)</span>
+                  )}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditingName({ id: u.id, first: u.first_name ?? "", last: u.last_name ?? "" })
+                  }
+                  aria-label={`Modifier le nom de ${u.email}`}
+                  className={CLASSE_LIEN_ACTION}
+                >
+                  <Pencil aria-hidden="true" size={16} />
+                  <span className={TEXTE_SOULIGNE}>Modifier</span>
+                </button>
+              </div>
               {nom && (
                 <p className="text-body-sm text-on-surface-variant wrap-anywhere">{u.email}</p>
               )}
@@ -602,18 +615,6 @@ function UsersPage() {
         )}
 
         <div className="flex flex-wrap items-center gap-sm border-t border-outline-variant pt-sm">
-          <button
-            type="button"
-            onClick={() =>
-              setEditingName({ id: u.id, first: u.first_name ?? "", last: u.last_name ?? "" })
-            }
-            aria-label={`Modifier le nom de ${u.email}`}
-            className={CLASSE_LIEN_ACTION}
-          >
-            <Pencil aria-hidden="true" size={16} />
-            <span className={TEXTE_SOULIGNE}>Modifier</span>
-          </button>
-
           <select
             name="role-utilisateur"
             value={u.role}

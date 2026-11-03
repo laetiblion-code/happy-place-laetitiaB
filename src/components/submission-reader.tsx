@@ -13,6 +13,7 @@ export function SubmissionReader({
   submission: s,
   onClose,
   onReject,
+  onClarify,
   onApprove,
   approving,
 }: {
@@ -21,6 +22,8 @@ export function SubmissionReader({
   submission: Submission | null;
   onClose: () => void;
   onReject?: () => void;
+  /** Demande de clarification (manager et admin, demande en attente). */
+  onClarify?: () => void;
   onApprove?: () => void;
   approving?: boolean;
 }) {
@@ -61,8 +64,8 @@ export function SubmissionReader({
                 <RejectionNote category={s.rejection_category} note={s.rejection_note} />
               )}
             </div>
-            {(onReject || onApprove) && (
-              <div className="flex gap-xs border-t border-outline-variant p-md">
+            {(onReject || onClarify || onApprove) && (
+              <div className="flex flex-wrap gap-xs border-t border-outline-variant p-md">
                 {onReject && (
                   <button
                     type="button"
@@ -70,6 +73,15 @@ export function SubmissionReader({
                     className={`${buttonVariants({ variant: "destructive" })} flex-1`}
                   >
                     Refuser
+                  </button>
+                )}
+                {onClarify && (
+                  <button
+                    type="button"
+                    onClick={onClarify}
+                    className={`${buttonVariants({ variant: "secondary" })} flex-1`}
+                  >
+                    Clarifier
                   </button>
                 )}
                 {onApprove && (

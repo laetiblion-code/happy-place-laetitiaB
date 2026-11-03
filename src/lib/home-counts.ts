@@ -260,8 +260,8 @@ export type DelaiValidation = {
  * dans les 30 derniers jours. Les demandes de manager et d'admin sont validées dès l'envoi : elles n'ont pas
  * d'historique « en attente », donc elles sont exclues.
  *
- * Décision du 2026-10-30 : une demande « à clarifier » sort du délai de validation. Toute demande dont
- * l'historique contient un refus « à clarifier » est donc exclue, même si elle a été décidée ensuite.
+ * Décision du 2026-11-03 (remplace celle du 2026-10-30) : la première décision, validée, refusée ou
+ * clarification demandée, termine le délai. Les demandes passées par une clarification ne sont plus exclues.
  *
  * Périmètre : `teams` = équipes gérées par le manager, null pour l'admin. L'admin lit tout ce que la RLS
  * lui laisse voir : la RLS ne lui montre pas les demandes privées des équipes qui ont un manager. Le délai
@@ -297,36 +297,38 @@ export async function fetchDelaiValidation(
       if (!premiere.has(h.submission_id)) premiere.set(h.submission_id, h.changed_at);
   }
 
-  // Demandes passées par « à clarifier » (décision du 2026-10-30) : hors du délai, à tout moment de leur historique
-  const aClarifier = new Set<string>();
+  // Dates de création des demandes décidées (les équipes gérées seulement, pour le manager)
+  const creation = new Map<string, string>();
   for (let i = 0; i < ids.length; i += LOT_IDS) {
-    const { data, error } = await supabase
-      .from("submission_status_history")
-      .select("submission_id")
-      .eq("rejection_category", "à clarifier")
-      .in("submission_id", ids.slice(i, i + LOT_IDS));
-    if (error) throw error;
-    for (const h of data ?? []) aClarifier.add(h.submission_id);
-  }
-
-  const retenues = [...premiere]
-    .filter(([id, date]) => new Date(date).getTime() >= Date.parse(debut) && !aClarifier.has(id))
-    .map(([id]) => id);
-  if (retenues.length === 0) return null;
-  const jours: number[] = [];
-  for (let i = 0; i < retenues.length; i += LOT_IDS) {
     let q = supabase
       .from("submissions")
       .select("id, created_at, team")
-      .in("id", retenues.slice(i, i + LOT_IDS));
+      .in("id", ids.slice(i, i + LOT_IDS));
     if (teams) q = q.in("team", teams);
     const { data, error } = await q;
     if (error) throw error;
-    for (const s of data ?? []) {
-      const decision = premiere.get(s.id);
-      if (decision)
-        jours.push((new Date(decision).getTime() - new Date(s.created_at).getTime()) / DAY_MS);
-    }
+    for (const s of data ?? []) creation.set(s.id, s.created_at);
+  }
+  return calculerDelaiValidation(premiere, creation, Date.parse(debut));
+}
+
+/**
+ * Moyenne des délais calendaires entre la création de chaque demande et sa première décision, pour les
+ * décisions datées à partir de `debutMs`. `premiere` : première décision (ISO) par demande ; `creation` :
+ * date de création par demande (une demande absente, par exemple hors périmètre, est ignorée).
+ */
+export function calculerDelaiValidation(
+  premiere: Map<string, string>,
+  creation: Map<string, string>,
+  debutMs: number,
+): DelaiValidation | null {
+  const jours: number[] = [];
+  for (const [id, decision] of premiere) {
+    const cree = creation.get(id);
+    if (!cree) continue;
+    const decideMs = new Date(decision).getTime();
+    if (decideMs < debutMs) continue;
+    jours.push((decideMs - new Date(cree).getTime()) / DAY_MS);
   }
   if (jours.length === 0) return null;
   const moyenne = jours.reduce((a, b) => a + b, 0) / jours.length;

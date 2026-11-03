@@ -14,6 +14,17 @@ import {
   type ReviewCounts,
 } from "@/lib/home-counts";
 import { etatObjectif, OBJECTIFS_TRIMESTRE, type EtatObjectif } from "@/lib/objectifs";
+import { AideCompteur } from "@/components/aide-compteur";
+
+/** Textes des info-bulles « Comment est calculé ce chiffre ? » (décision du 2026-11-03 sur le délai). */
+const INFO_DELAI_CABINET =
+  "Calcul effectué sur le délai de traitement des demandes en attente du cabinet sur les 30 derniers jours. Une demande de clarification et un refus sont considérés comme un traitement.";
+const INFO_DELAI_MANAGER =
+  "Calcul effectué sur le délai de traitement des demandes en attente chez toi sur les 30 derniers jours. Une demande de clarification et un refus sont considérés comme un traitement.";
+const INFO_ACTUS_CABINET =
+  "Nombre d'actualités publiées par rapport au nombre d'actualités commencées sur les 30 derniers jours.";
+const INFO_ACTUS_MANAGER =
+  "Nombre d'actualités que tu as publiées par rapport au nombre d'actualités que tu as commencées sur les 30 derniers jours.";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -147,7 +158,7 @@ function PiedDelai({
   const jours = formatNumberFr(delai.jours, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   // Accord : moins de 2 jours au singulier (« 1,4 j » pour la lecture : « 1,4 jour »), à partir de 2 au pluriel
   const pluriel = delai.jours >= 2;
-  const libelle = isAdmin ? "Délai de validation du cabinet sur " : "Ton délai de validation sur ";
+  const libelle = isAdmin ? "Délai de validation : " : "Ton délai de validation : ";
   const etat = etatObjectif(delai.jours, delaiValidationJours, "plusBas");
   const objectif = (
     <>
@@ -157,13 +168,12 @@ function PiedDelai({
   );
   return (
     <PiedObjectif>
-      <p className="font-label-sm text-sm text-[#68686D]">
-        {libelle}
-        <Unite valeur="30" unite="j" pluriel />
-        {" : "}
+      <p className="flex flex-wrap items-center gap-xs font-label-sm text-sm text-[#68686D]">
+        <span>{libelle}</span>
         <span className="inline-block rounded-[4px] bg-[#EDEBE6] px-xs font-semibold text-[#28282D]">
           <Unite valeur={jours} unite="j" pluriel={pluriel} />
         </span>
+        <AideCompteur texte={isAdmin ? INFO_DELAI_CABINET : INFO_DELAI_MANAGER} />
       </p>
       <LigneEtat etat={etat} objectif={objectif} />
     </PiedObjectif>
@@ -174,7 +184,7 @@ function PiedDelai({
  * Taux de publication des actualités créées dans les 30 derniers jours : tout le cabinet pour l'admin,
  * ses propres actualités pour le manager.
  */
-function PiedActus({ actus }: { actus: PublicationActus | undefined }) {
+function PiedActus({ actus, isAdmin }: { actus: PublicationActus | undefined; isAdmin: boolean }) {
   if (!actus) return null;
   if (actus.commencees === 0) {
     return (
@@ -189,11 +199,11 @@ function PiedActus({ actus }: { actus: PublicationActus | undefined }) {
   const etat = etatObjectif(pourcentage, OBJECTIFS_TRIMESTRE.tauxPublicationActus, "plusHaut");
   return (
     <PiedObjectif>
-      <p className="font-label-sm text-sm text-[#68686D]">
-        {`${plural(actus.publiees, "actu publiée", "actus publiées")} sur ${formatNumberFr(actus.commencees)} commencée${actus.commencees > 1 ? "s" : ""} en 30 j : `}
+      <p className="flex flex-wrap items-center gap-xs font-label-sm text-sm text-[#68686D]">
         <span className="inline-block rounded-[4px] bg-[#EDEBE6] px-xs font-semibold text-[#28282D]">
-          {formatObjectif(pourcentage, "%")}
+          {`${formatNumberFr(actus.publiees)} publiées / ${formatNumberFr(actus.commencees)}`}
         </span>
+        <AideCompteur texte={isAdmin ? INFO_ACTUS_CABINET : INFO_ACTUS_MANAGER} />
       </p>
       <LigneEtat
         etat={etat}
@@ -269,7 +279,7 @@ export function ManagerCards({
         title="Actualités en attente"
         icon="edit_note"
         ariaLabel={plural(draftCount, "brouillon à finaliser", "brouillons à finaliser")}
-        footer={<PiedActus actus={actus} />}
+        footer={<PiedActus actus={actus} isAdmin={isAdmin} />}
       >
         <BigNumber
           value={formatNumberFr(draftCount)}

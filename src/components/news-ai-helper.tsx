@@ -425,7 +425,7 @@ export function NewsAiHelper({
           <p className="flex flex-wrap items-center gap-xs font-body-sm text-on-surface">
             <span aria-hidden="true">🧑‍🏫</span>
             {epuise ? (
-              <span>{`Tu as utilisé tes ${LIMITE_PERSONNE} propositions du jour. Reviens demain.`}</span>
+              <span className="rounded-[4px] bg-[#F5D5D4] px-xs text-[#28282D]">{`Tu as utilisé tes ${LIMITE_PERSONNE} propositions du jour. Reviens demain.`}</span>
             ) : restant <= 2 ? (
               <span>
                 Plus que{" "}
@@ -435,7 +435,7 @@ export function NewsAiHelper({
             ) : (
               <span>
                 Il te reste{" "}
-                <span className="rounded-[4px] bg-[#F5D5D4] px-xs font-semibold text-[#28282D]">{restant}</span>{" "}
+                <span className="rounded-[4px] bg-[#DDF2E3] px-xs font-semibold text-[#1F6B38]">{restant}</span>{" "}
                 propositions aujourd'hui.
               </span>
             )}
