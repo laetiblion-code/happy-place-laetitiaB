@@ -142,17 +142,20 @@ export function MesDemandes({
         ))}
       </ul>
 
-      <CompleterDemande
-        submission={cible?.s ?? null}
-        demandeur={cible?.demandeur ?? "Ton manager"}
-        attente={cible?.attente ?? "ton manager"}
-        idRetour={ID_TITRE}
-        onClose={() => setCible(null)}
-        onEnvoyee={() => {
-          setAnnonce(`Réponse envoyée à ${cible?.attente ?? "ton manager"}.`);
-          setCible(null);
-        }}
-      />
+      {cible && (
+        <CompleterDemande
+          submission={cible.s}
+          demandeur={cible.demandeur}
+          attente={cible.attente}
+          onClose={() => setCible(null)}
+          onEnvoyee={() => {
+            setAnnonce(`Réponse envoyée à ${cible.attente}.`);
+            setCible(null);
+            // La fenêtre rend le focus au bouton, qui disparaît : le focus va au titre de la section
+            setTimeout(() => document.getElementById(ID_TITRE)?.focus(), 0);
+          }}
+        />
+      )}
 
       {toutes.length > APERCU && (
         <div className="mt-md">
@@ -163,6 +166,12 @@ export function MesDemandes({
       )}
     </section>
   );
+}
+
+/** « 2 nov. » : date courte pour les libellés accessibles. */
+const dateCourte = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
+function dateCourteLongue(iso: string) {
+  return dateCourte.format(new Date(iso));
 }
 
 /** Prénom d'une personne, ou rien si seule son adresse est connue (jamais d'e-mail affiché). */
@@ -228,15 +237,17 @@ function CarteDemande({
       </div>
 
       <div className="flex flex-col gap-sm rounded-md bg-[#F5F4F1] p-sm">
-        {/* Étiquette de type en ligne : le texte continue à côté et passe à la ligne dessous */}
-        <p className="min-w-0 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
+        {/* Étiquette à gauche (taille fixe) ; le texte occupe la colonne de droite et passe à la ligne sous lui-même */}
+        <div className="flex items-start gap-sm">
           {s.category && (
-            <span className="mr-xs inline-block align-middle">
+            <span className="shrink-0">
               <CategoryChip category={s.category} />
             </span>
           )}
-          {`« ${s.content} »`}
-        </p>
+          <p className="min-w-0 flex-1 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
+            {`« ${s.content} »`}
+          </p>
+        </div>
         <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
 
         {clarification && (
@@ -266,10 +277,10 @@ function CarteDemande({
             type="button"
             onClick={() => onRead(s)}
             aria-haspopup="dialog"
-            aria-label={`Lire ma demande en entier, envoyée le ${formatDateCourte(s.created_at)}`}
+            aria-label={`Voir plus d'infos sur ma demande du ${dateCourteLongue(s.created_at)}`}
             className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            <span className="underline underline-offset-2">Lire ma demande en entier</span>
+            <span className="underline underline-offset-2">Voir plus d'infos</span>
           </button>
           {clarification && (
             <button

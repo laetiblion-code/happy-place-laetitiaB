@@ -191,7 +191,7 @@ function ManageNews() {
       </div>
 
       {form && (
-        <Modal title={editing ? "Modifier l'actualité" : "Nouvelle actualité"} onClose={close}>
+        <Modal title={editing ? "Modifier l'actualité" : "Nouvelle actualité"} onClose={close} modifie={!editing && (!!form.title || !!form.body)}>
           <form onSubmit={submit} className="space-y-sm" noValidate>
             <ErrorSummary errors={errors} />
             <Field label="Titre" error={errors.title}>

@@ -268,48 +268,28 @@ export function ActualitesCabinet({
             return (
               <li
                 key={n.id}
-                className="flex min-w-0 gap-sm border-t border-outline-variant pt-sm first:border-t-0 first:pt-0"
+                className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)_auto] items-start gap-x-sm gap-y-xs border-t border-outline-variant pt-sm first:border-t-0 first:pt-0"
               >
                 <time
                   dateTime={n.created_at}
-                  className="w-14 shrink-0 font-label-sm text-sm text-on-surface-variant"
+                  className="font-label-sm text-sm text-on-surface-variant"
                 >
                   {formatDateCourte(n.created_at)}
                 </time>
-                {n.image_path && <NewsVignette path={n.image_path} alt={n.title} />}
-                <div className="min-w-0 flex-1 space-y-xs">
-                  <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
-                  <p className="flex flex-wrap items-center gap-x-xs font-label-sm text-sm text-on-surface-variant">
-                    <span>
-                      <AuteurActualite news={n} noms={noms} />
-                    </span>
-                    {moi && <EtiquetteSoi>Toi</EtiquetteSoi>}
-                    {moi && roleEquipe && <span>{`· ${roleEquipe}`}</span>}
-                  </p>
-                  <NewsLinks links={n.links} />
-                  {peutModifier && (
-                    <div className="flex flex-wrap items-center gap-md">
-                      <button
-                        type="button"
-                        onClick={() => ouvrir(n)}
-                        aria-label={`Modifier l'actualité « ${n.title} »`}
-                        className={CLASSE_LIEN_ACTION}
-                      >
-                        <Icon name="edit" className="text-base" />
-                        <span className={TEXTE_SOULIGNE}>Modifier</span>
-                      </button>
-                      <button
-                        type="button"
-                        disabled={supprimer.isPending}
-                        onClick={() => confirmerSuppression(n)}
-                        aria-label={`Supprimer l'actualité « ${n.title} »`}
-                        className={CLASSE_LIEN_SUPPRIMER}
-                      >
-                        <Icon name="delete" className="text-base" />
-                        <span className={TEXTE_SOULIGNE}>Supprimer</span>
-                      </button>
-                    </div>
-                  )}
+                {/* Vignette (si image) et texte côte à côte ; les actions sont sous le bloc, à partir de la colonne 2 */}
+                <div className="flex min-w-0 gap-sm">
+                  {n.image_path && <NewsVignette path={n.image_path} alt={n.title} />}
+                  <div className="min-w-0 flex-1 space-y-xs">
+                    <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
+                    <p className="flex flex-wrap items-center gap-x-xs font-label-sm text-sm text-on-surface-variant">
+                      <span>
+                        <AuteurActualite news={n} noms={noms} />
+                      </span>
+                      {moi && <EtiquetteSoi>Toi</EtiquetteSoi>}
+                      {moi && roleEquipe && <span>{`· ${roleEquipe}`}</span>}
+                    </p>
+                    <NewsLinks links={n.links} />
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -321,6 +301,29 @@ export function ActualitesCabinet({
                   <span className={TEXTE_SOULIGNE}>Lire</span>
                   <Icon name="chevron_right" className="text-base" />
                 </button>
+                {peutModifier && (
+                  <div className="col-start-2 flex flex-wrap items-center gap-md">
+                    <button
+                      type="button"
+                      onClick={() => ouvrir(n)}
+                      aria-label={`Modifier l'actualité « ${n.title} »`}
+                      className={CLASSE_LIEN_ACTION}
+                    >
+                      <Icon name="edit" className="text-base" />
+                      <span className={TEXTE_SOULIGNE}>Modifier</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={supprimer.isPending}
+                      onClick={() => confirmerSuppression(n)}
+                      aria-label={`Supprimer l'actualité « ${n.title} »`}
+                      className={CLASSE_LIEN_SUPPRIMER}
+                    >
+                      <Icon name="delete" className="text-base" />
+                      <span className={TEXTE_SOULIGNE}>Supprimer</span>
+                    </button>
+                  </div>
+                )}
               </li>
             );
           })}

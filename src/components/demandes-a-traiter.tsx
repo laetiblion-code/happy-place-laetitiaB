@@ -95,10 +95,15 @@ export function DemandesATraiter({
               </div>
 
               <div className="flex flex-col gap-sm rounded-md border border-[#E4E2DD] bg-[#FAF9F7] p-sm">
-                <CategoryChip category={s.category} />
-                <p className="line-clamp-4 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
-                  {`« ${s.content} »`}
-                </p>
+                {/* Étiquette à gauche (taille fixe) ; le texte occupe la colonne de droite */}
+                <div className="flex items-start gap-sm">
+                  <span className="shrink-0">
+                    <CategoryChip category={s.category} />
+                  </span>
+                  <p className="line-clamp-4 min-w-0 flex-1 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
+                    {`« ${s.content} »`}
+                  </p>
+                </div>
                 {/* Voir tout : à droite, juste sous le texte. La zone de 44 px dépasse en bas de l'encadré
                     (-mb-3) pour que la marge sous « Voir tout » soit la même que la marge au-dessus de la chip. */}
                 <div className="-mt-4 -mb-3 flex flex-wrap items-center gap-sm">

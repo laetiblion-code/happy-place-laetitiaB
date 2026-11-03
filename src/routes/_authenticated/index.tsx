@@ -404,7 +404,7 @@ function ManagerSpace() {
         approving={review.isPending}
       />
       {rejecting && (
-        <Modal title={modeRefus === "clarification" ? "Demander une clarification" : "Refuser la demande"} onClose={() => setRejecting(null)}>
+        <Modal title={modeRefus === "clarification" ? "Demander une clarification" : "Refuser la demande"} onClose={() => setRejecting(null)} modifie={rejectForm.rejection_note !== ""}>
           <form
             noValidate
             className="space-y-sm"
@@ -444,7 +444,7 @@ function ManagerSpace() {
         </Modal>
       )}
       {submissionForm && (
-        <Modal title="Nouvelle demande" onClose={() => setSubmissionForm(null)}>
+        <Modal title="Nouvelle demande" onClose={() => setSubmissionForm(null)} modifie={!!submissionForm.content || !!submissionForm.author_name}>
           <form onSubmit={sendSubmission} className="space-y-sm" noValidate>
             <ErrorSummary errors={submissionErrors} />
             <ChoiceGroup

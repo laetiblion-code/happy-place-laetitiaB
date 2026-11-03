@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import {
   Children,
   cloneElement,
@@ -5,6 +6,7 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactElement,
   type ReactNode,
@@ -84,17 +86,26 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={`${inputBase} ${props.className ?? ""}`} />;
 }
 
+/**
+ * Fenêtre modale commune. Rendue dans un portail (document.body) : voile et fenêtre sont dans le même conteneur,
+ * la fenêtre est placée après le voile, donc au-dessus. Clic sur le voile, bouton Fermer ou Échap : la fenêtre
+ * se ferme, sauf si `modifie` est vrai : une confirmation s'affiche alors dans la fenêtre.
+ */
 export function Modal({
   title,
   onClose,
   children,
+  modifie = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /** Un champ a été rempli : fermer demande confirmation. */
+  modifie?: boolean;
 }) {
   const titreId = useId();
   const boite = useRef<HTMLDivElement>(null);
+  const [confirmer, setConfirmer] = useState(false);
   const fermer = useRef(onClose);
   fermer.current = onClose;
 
@@ -114,10 +125,16 @@ export function Modal({
     };
   }, []);
 
+  function demanderFermeture() {
+    if (modifie) setConfirmer(true);
+    else fermer.current();
+  }
+
   function surTouche(e: ReactKeyboardEvent<HTMLDivElement>) {
     if (e.key === "Escape") {
       e.stopPropagation();
-      fermer.current();
+      if (confirmer) setConfirmer(false);
+      else demanderFermeture();
       return;
     }
     if (e.key !== "Tab") return;
@@ -139,8 +156,9 @@ export function Modal({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-sm md:p-lg">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-sm md:p-lg">
+      <div aria-hidden="true" onClick={demanderFermeture} className="fixed inset-0 bg-black/50" />
       <div
         ref={boite}
         role="dialog"
@@ -148,22 +166,51 @@ export function Modal({
         aria-labelledby={titreId}
         tabIndex={-1}
         onKeyDown={surTouche}
-        className="w-full max-w-2xl rounded-lg bg-surface-container-lowest border border-outline p-md space-y-md"
+        className="relative w-full max-w-2xl rounded-lg bg-surface-container-lowest border border-outline p-md space-y-md focus:outline-none"
       >
         <div className="flex items-center justify-between border-b border-outline-variant pb-sm">
           <h2 id={titreId} className="font-headline-sm text-headline-sm text-primary">{title}</h2>
           <button
             type="button"
             aria-label="Fermer"
-            onClick={onClose}
+            onClick={demanderFermeture}
             className="text-on-surface-variant hover:text-primary"
           >
             <ManageIcon name="close" />
           </button>
         </div>
         <div data-corps-modale className="space-y-md">{children}</div>
+        {confirmer && (
+          <div
+            role="group"
+            aria-label="Confirmer la fermeture"
+            className="flex flex-wrap items-center justify-between gap-sm border-t border-outline-variant bg-card -mx-md -mb-md px-md py-sm"
+          >
+            <p className="min-w-0 text-body-sm font-semibold text-on-surface">
+              Abandonner les modifications ? Les changements non enregistrés seront perdus.
+            </p>
+            <div className="flex flex-wrap gap-xs">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setConfirmer(false)}
+                className={buttonVariants({ variant: "secondary", size: "sm" })}
+              >
+                Continuer la rédaction
+              </button>
+              <button
+                type="button"
+                onClick={() => fermer.current()}
+                className={buttonVariants({ variant: "destructive", size: "sm" })}
+              >
+                Abandonner
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

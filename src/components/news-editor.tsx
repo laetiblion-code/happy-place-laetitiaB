@@ -219,6 +219,10 @@ export function NewsEditor({
             demanderFermeture();
           }}
           onInteractOutside={(e) => e.preventDefault()}
+          // Clic sur le voile (zone hors de la fenêtre) : même chemin qu'Échap, avec confirmation si besoin
+          onClick={(e) => {
+            if (e.target === e.currentTarget) demanderFermeture();
+          }}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             formRef.current
