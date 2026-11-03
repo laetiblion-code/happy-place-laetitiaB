@@ -367,15 +367,17 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
     }
   }
 
-  const bouton = buttonVariants({ variant: "secondary", size: "sm" }) + " min-h-11";
+  // Sous 600 px, le bouton prend toute la largeur
+  const bouton = buttonVariants({ variant: "secondary", size: "sm" }) + " min-h-11 w-full min-[600px]:w-auto";
 
   // Texte lu par les lecteurs d'écran seulement : la chip J-N reste visible
   const texteUrgence =
     ligne.jours === 0 ? ", aujourd'hui" : `, dans ${plural(ligne.jours, "jour", "jours")}`;
 
-  // Trois zones sur une grille fixe : chaque ligne s'aligne sur les autres. Sur petit écran, elles s'empilent.
+  // Au-dessus de 900 px : une ligne, trois zones sur une grille fixe. De 600 à 900 px : nom et date sur la
+  // première ligne, état des documents à gauche et boutons à droite sur la seconde. Sous 600 px : tout empilé.
   return (
-    <li className="grid grid-cols-1 items-center gap-sm py-sm md:grid-cols-[minmax(0,17rem)_minmax(0,15rem)_minmax(0,1fr)] md:gap-md">
+    <li className="grid grid-cols-1 items-center gap-sm py-sm min-[600px]:grid-cols-2 min-[600px]:gap-x-md min-[900px]:grid-cols-[minmax(0,17rem)_minmax(0,15rem)_minmax(0,1fr)] min-[900px]:gap-md">
       {/* Gauche : initiales, nom, équipe et manager */}
       <div className="flex min-w-0 items-center gap-sm">
         <span
@@ -421,17 +423,17 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
       </p>
 
       {/* Droite : état des documents, puis le bouton, alignés à droite */}
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-xs md:justify-end">
+      <div className="flex min-w-0 flex-col gap-xs min-[600px]:col-span-2 min-[600px]:flex-row min-[600px]:flex-wrap min-[600px]:items-center min-[600px]:justify-between min-[900px]:col-auto min-[900px]:justify-end">
         {count > 0 ? (
-          <p className={`flex items-center gap-xs font-label-sm text-sm font-semibold ${ROUGE}`}>
+          <p className={`flex items-center gap-xs whitespace-nowrap font-label-sm text-sm font-semibold ${ROUGE}`}>
             <Icon name="attach_file" className="text-base shrink-0" />
             {plural(count, "document", "documents")}
           </p>
         ) : (
-          <p className="font-label-sm text-sm text-on-surface-variant">Aucun document requis</p>
+          <p className="whitespace-nowrap font-label-sm text-sm text-on-surface-variant">Aucun document requis</p>
         )}
         {count > 0 ? (
-          <div className="flex flex-wrap items-center justify-end gap-xs">
+          <div className="flex w-full flex-col gap-xs min-[600px]:w-auto min-[600px]:flex-row min-[600px]:flex-wrap min-[600px]:justify-end">
             <button
               type="button"
               className={bouton}
@@ -475,7 +477,7 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
       </div>
 
       {open && (
-        <ul className="space-y-xs border-t border-outline-variant pt-xs md:col-span-3">
+        <ul className="space-y-xs border-t border-outline-variant pt-xs min-[600px]:col-span-2 min-[900px]:col-span-3">
           {n.documents.map((d) => (
             <li
               key={d.path}
