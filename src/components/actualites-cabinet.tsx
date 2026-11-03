@@ -184,11 +184,15 @@ export function ActualitesCabinet({
                   key={n.id}
                   className="flex flex-col gap-sm rounded-md border border-outline-variant bg-card p-sm"
                 >
-                  <div className="min-w-0 space-y-xs">
-                    <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
-                    <p className="font-label-sm text-sm text-on-surface-variant">
-                      {libelleBrouillon(n, noms)}
-                    </p>
+                  {/* Vignette carrée (si image) à gauche, comme pour les actualités publiées */}
+                  <div className="flex min-w-0 gap-sm">
+                    {n.image_path && <NewsVignette path={n.image_path} alt={n.title} />}
+                    <div className="min-w-0 flex-1 space-y-xs">
+                      <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
+                      <p className="font-label-sm text-sm text-on-surface-variant">
+                        {libelleBrouillon(n, noms)}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-sm">
                     <div className="flex flex-wrap items-center gap-md">
