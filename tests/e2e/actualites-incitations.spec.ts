@@ -26,7 +26,8 @@ test.describe("état des objectifs et pourcentage des actualités", () => {
       ...Array.from({ length: 6 }, (_, i) => actualite(100 + i, "brouillon", 2)),
     ];
     await ouvrirEnTantQue(page, "admin", "/", { actualites });
-    await expect(page.getByText("16 publiées / 22 ·")).toBeVisible();
+    // Premier chargement de la suite : Vite compile les modules, d'où un délai plus long
+    await expect(page.getByText("16 publiées / 22 ·")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("72,7 %", { exact: true })).toBeVisible();
     await expect(page.getByText("Objectif de 70 % atteint")).toBeVisible();
   });
