@@ -1,20 +1,22 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   ChoixAuteur,
   useManagersPossibles,
   type AuteurPossible,
 } from "@/components/news-author-picker";
-import { NewsAiHelper } from "@/components/news-ai-helper";
+import { NewsAiHelper, type PropositionAvecSource } from "@/components/news-ai-helper";
 import { NewsImage } from "@/components/news-media";
+import { useDepotFichier } from "@/components/use-depot-fichier";
 import { CLASSE_LIEN_ACTION, CLASSE_LIEN_SUPPRIMER, TEXTE_SOULIGNE } from "@/components/chips";
 import { buttonVariants } from "@/components/ui/button";
 import { publishDraftNews, saveDraftNews, updateNews, type News } from "@/lib/dashboard";
 import {
   MAX_NEWS_LINKS,
   NEWS_IMAGE_TYPES,
+  nomDuSite,
   emptyMedia,
   imageError,
   linkErrors,
@@ -186,6 +188,28 @@ export function NewsEditor({
     sauver.mutate(statut);
   }
 
+  /**
+   * Proposition de l'IA appliquée au formulaire, source citée : un lien est ajouté aux liens (sans doublon,
+   * dans la limite de 3), un PDF est cité à la fin du contenu. Renvoie une ligne d'information si le lien n'a
+   * pas pu être ajouté.
+   */
+  function appliquerProposition(p: PropositionAvecSource): string | void {
+    setTitre(p.titre.slice(0, TITRE_MAX));
+    if (p.source.type === "pdf") {
+      const ligne = `Source : ${p.source.nom}`;
+      const place = CONTENU_MAX - ligne.length - 2;
+      setCorps(`${p.texte.slice(0, place).trimEnd()}\n\n${ligne}`);
+      return;
+    }
+    setCorps(p.texte.slice(0, CONTENU_MAX));
+    const url = p.source.url;
+    if (media.links.some((l) => l.url.trim() === url)) return;
+    if (media.links.length >= MAX_NEWS_LINKS) {
+      return `Les ${MAX_NEWS_LINKS} liens sont déjà ajoutés : la source n'a pas été ajoutée. Retire un lien pour l'ajouter.`;
+    }
+    setMedia({ ...media, links: [...media.links, { url, label: `Source : ${nomDuSite(url)}` }] });
+  }
+
   function demanderFermeture() {
     if (sauver.isPending) return;
     if (confirmation === "fermer") {
@@ -349,10 +373,7 @@ export function NewsEditor({
                 <NewsAiHelper
                   titre={titre}
                   texte={corps}
-                  onProposition={(p) => {
-                    setTitre(p.titre);
-                    setCorps(p.texte);
-                  }}
+                  onProposition={(p) => appliquerProposition(p)}
                 />
 
                 <ChampImage
@@ -379,9 +400,7 @@ export function NewsEditor({
                   className="flex flex-wrap items-center justify-between gap-sm border-t border-outline-variant bg-card px-md py-sm"
                 >
                   <p className="min-w-0 text-body-sm font-semibold text-on-surface wrap-anywhere">
-                    {estPubliee || news
-                      ? "Abandonner les modifications ? Les changements non enregistrés seront perdus."
-                      : "Abandonner l'actualité en cours ? Ce que tu as saisi ne sera pas enregistré."}
+                    Abandonner ta saisie ? Les champs remplis seront perdus.
                   </p>
                   <div className="flex flex-wrap gap-xs">
                     <button
@@ -390,7 +409,7 @@ export function NewsEditor({
                       onClick={() => setConfirmation(null)}
                       className={buttonVariants({ variant: "secondary", size: "sm" })}
                     >
-                      Continuer la rédaction
+                      Continuer la saisie
                     </button>
                     <button
                       type="button"
@@ -418,6 +437,14 @@ export function NewsEditor({
                   </span>
                 </p>
                 <div className="flex flex-wrap items-center gap-xs">
+                  <button
+                    type="button"
+                    disabled={sauver.isPending}
+                    onClick={demanderFermeture}
+                    className={buttonVariants({ variant: "secondary" })}
+                  >
+                    Annuler
+                  </button>
                   {!estPubliee && (
                     <button
                       type="button"
@@ -497,7 +524,6 @@ function ChampImage({
 }) {
   const entree = useRef<HTMLInputElement>(null);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [glisse, setGlisse] = useState(false);
   const apercu = useMemo(() => (value.file ? URL.createObjectURL(value.file) : null), [value.file]);
   useEffect(
     () => () => {
@@ -515,11 +541,7 @@ function ChampImage({
     if (!err) onChange({ ...value, file: f });
   }
 
-  function surDepot(e: DragEvent<HTMLButtonElement>) {
-    e.preventDefault();
-    setGlisse(false);
-    if (!disabled) prendre(e.dataTransfer.files?.[0]);
-  }
+  const depot = useDepotFichier((f) => prendre(f), disabled);
 
   const idFormat = `${idChamp}-format`;
 
@@ -531,11 +553,7 @@ function ChampImage({
       {apercu || existante ? (
         <div className="space-y-xs">
           {apercu ? (
-            <img
-              src={apercu}
-              alt="Aperçu de l'image"
-              className={VIGNETTE_IMAGE}
-            />
+            <img src={apercu} alt="Aperçu de l'image" className={VIGNETTE_IMAGE} />
           ) : (
             <NewsImage path={existante!} alt="Aperçu de l'image" className={VIGNETTE_IMAGE} />
           )}
@@ -561,31 +579,33 @@ function ChampImage({
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          disabled={disabled}
-          aria-labelledby={`${idChamp}-libelle`}
-          aria-describedby={idFormat}
-          onClick={() => entree.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setGlisse(true);
-          }}
-          onDragLeave={() => setGlisse(false)}
-          onDrop={surDepot}
+        <div
+          {...depot.zone}
+          data-testid="zone-depot-image"
           className={cn(
-            "flex w-full flex-col items-center gap-xs border border-dashed px-md py-md text-center focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50",
-            glisse ? "border-primary bg-card" : "border-[#8A8A90] bg-transparent",
+            "border border-dashed transition-colors",
+            depot.glisse ? "border-primary border-2 bg-card" : "border-[#8A8A90] bg-transparent",
           )}
         >
-          <Icone name="image" className="text-[24px] text-on-surface-variant" />
-          <span className="font-body-md text-on-surface">
-            Glisse une image ici, ou clique pour la choisir
-          </span>
-          <span id={idFormat} className="text-[13px] text-on-surface-variant">
-            JPG, PNG ou WebP, 5 Mo max.
-          </span>
-        </button>
+          <button
+            type="button"
+            disabled={disabled}
+            aria-labelledby={`${idChamp}-libelle`}
+            aria-describedby={idFormat}
+            onClick={() => entree.current?.click()}
+            className="flex w-full flex-col items-center gap-xs px-md py-md text-center focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+          >
+            <Icone name="image" className="text-[24px] text-on-surface-variant" />
+            <span className="font-body-md text-on-surface">
+              {depot.glisse
+                ? "Dépose l'image ici"
+                : "Glisse une image ici, ou clique pour la choisir"}
+            </span>
+            <span id={idFormat} className="text-[13px] text-on-surface-variant">
+              JPG, PNG ou WebP, 5 Mo max.
+            </span>
+          </button>
+        </div>
       )}
       {erreur && (
         <p role="alert" className={CLASSE_ERREUR}>

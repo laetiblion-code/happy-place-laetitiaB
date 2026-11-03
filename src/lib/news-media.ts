@@ -114,3 +114,12 @@ export async function signedNewsImageUrl(path: string): Promise<string> {
   if (error || !data?.signedUrl) throw error ?? new Error("Image indisponible");
   return data.signedUrl;
 }
+
+/** Nom du site d'un lien, sans « www. » : « https://www.actu.ai/x » donne « actu.ai ». */
+export function nomDuSite(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
