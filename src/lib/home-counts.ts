@@ -340,12 +340,19 @@ export type PublicationActus = {
   publiees: number;
 };
 
-/** Actualités créées dans les 30 derniers jours : publiées et toutes (lecture admin). */
-export async function fetchPublicationActus(): Promise<PublicationActus> {
-  const { data, error } = await supabase
+/**
+ * Actualités créées dans les 30 derniers jours : publiées et toutes. Sans e-mail : tout le cabinet (admin).
+ * Avec e-mail : ses seules actualités (manager).
+ */
+export async function fetchPublicationActus(
+  email: string | null = null,
+): Promise<PublicationActus> {
+  let requete = supabase
     .from("news")
     .select("status")
     .gte("created_at", new Date(Date.now() - FENETRE_MS).toISOString());
+  if (email) requete = requete.eq("author_email", email.toLowerCase());
+  const { data, error } = await requete;
   if (error) throw error;
   const rows = data ?? [];
   return { commencees: rows.length, publiees: rows.filter((n) => n.status === "publiée").length };

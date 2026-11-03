@@ -183,10 +183,11 @@ function ManagerSpace() {
     queryFn: () => fetchDelaiValidation(isAdmin ? null : (myTeams.data ?? [])),
     retry: false,
   });
+  // Admin : tout le cabinet ; manager : ses propres actualités
   const homeActus = useQuery({
-    queryKey: ["home-counts", "actus"],
-    enabled: isAdmin,
-    queryFn: fetchPublicationActus,
+    queryKey: ["home-counts", "actus", role, myEmail],
+    enabled: canReview && !!myEmail,
+    queryFn: () => fetchPublicationActus(isAdmin ? null : myEmail),
     retry: false,
   });
 

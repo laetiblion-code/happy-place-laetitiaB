@@ -170,14 +170,17 @@ function PiedDelai({
   );
 }
 
-/** Taux de publication des actualités créées dans les 30 derniers jours (admin seulement). */
+/**
+ * Taux de publication des actualités créées dans les 30 derniers jours : tout le cabinet pour l'admin,
+ * ses propres actualités pour le manager.
+ */
 function PiedActus({ actus }: { actus: PublicationActus | undefined }) {
   if (!actus) return null;
   if (actus.commencees === 0) {
     return (
       <PiedObjectif>
         <p className="font-label-sm text-sm text-on-surface-variant">
-          Aucune actualité commencée en 30 jours
+          Aucune actualité commencée en 30 j
         </p>
       </PiedObjectif>
     );
@@ -186,8 +189,11 @@ function PiedActus({ actus }: { actus: PublicationActus | undefined }) {
   const etat = etatObjectif(pourcentage, OBJECTIFS_TRIMESTRE.tauxPublicationActus, "plusHaut");
   return (
     <PiedObjectif>
-      <p className="font-label-sm text-sm text-on-surface">
-        {`${plural(actus.publiees, "actu publiée", "actus publiées")} sur ${formatNumberFr(actus.commencees)} commencée${actus.commencees > 1 ? "s" : ""} en 30 jours, soit ${formatObjectif(pourcentage, "%")}`}
+      <p className="font-label-sm text-sm text-[#68686D]">
+        {`${plural(actus.publiees, "actu publiée", "actus publiées")} sur ${formatNumberFr(actus.commencees)} commencée${actus.commencees > 1 ? "s" : ""} en 30 j : `}
+        <span className="inline-block rounded-[4px] bg-[#EDEBE6] px-xs font-semibold text-[#28282D]">
+          {formatObjectif(pourcentage, "%")}
+        </span>
       </p>
       <LigneEtat
         etat={etat}
@@ -263,7 +269,7 @@ export function ManagerCards({
         title="Actualités en attente"
         icon="edit_note"
         ariaLabel={plural(draftCount, "brouillon à finaliser", "brouillons à finaliser")}
-        footer={isAdmin ? <PiedActus actus={actus} /> : undefined}
+        footer={<PiedActus actus={actus} />}
       >
         <BigNumber
           value={formatNumberFr(draftCount)}
