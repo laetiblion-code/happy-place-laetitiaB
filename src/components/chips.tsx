@@ -142,6 +142,7 @@ const CLASSE_LIEN_BAS =
  */
 export function LienBasBloc({
   to,
+  search,
   href,
   onClick,
   align = "centre",
@@ -150,6 +151,8 @@ export function LienBasBloc({
   children,
 }: {
   to?: string;
+  /** Paramètres de recherche de l'adresse `to` (ex. `{ type: "idee" }`). */
+  search?: Record<string, string>;
   /** Ancre de la page (ex. « #alertes »). */
   href?: string;
   onClick?: () => void;
@@ -169,7 +172,7 @@ export function LienBasBloc({
   return (
     <div className={wrapper}>
       {to ? (
-        <Link to={to} aria-label={ariaLabel} className={CLASSE_LIEN_BAS}>
+        <Link to={to} search={search} aria-label={ariaLabel} className={CLASSE_LIEN_BAS}>
           {contenu}
         </Link>
       ) : href ? (

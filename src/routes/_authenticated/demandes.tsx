@@ -2,7 +2,7 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { SessionHeader } from "@/components/session-header";
-import { DemandesCabinet } from "@/components/cabinet-demandes";
+import { DemandesCabinet, TYPES_DEMANDE, type TypeDemande } from "@/components/cabinet-demandes";
 import { SubmissionReader } from "@/components/submission-reader";
 import type { Submission } from "@/lib/dashboard";
 import { buttonVariants } from "@/components/ui/button";
@@ -21,11 +21,15 @@ export const Route = createFileRoute("/_authenticated/demandes")({
   beforeLoad: ({ context }) => {
     if (context.role === "admin") throw redirect({ to: "/manage/submissions" });
   },
+  // Adresse « /demandes?type=idee » : n'affiche que ce bloc (type inconnu : tous les blocs)
+  validateSearch: (search: Record<string, unknown>): { type?: TypeDemande } =>
+    TYPES_DEMANDE.includes(search.type as TypeDemande) ? { type: search.type as TypeDemande } : {},
   component: DemandesPage,
 });
 
 function DemandesPage() {
   const { role, email } = Route.useRouteContext();
+  const { type } = Route.useSearch();
   const myEmail = (email ?? "").toLowerCase();
   const roleAffiche = role === "manager" ? "manager" : "collaborateur";
   const [lue, setLue] = useState<Submission | null>(null);
@@ -61,6 +65,7 @@ function DemandesPage() {
             managerTeams={myTeams.data ?? []}
             onRead={setLue}
             variante="page"
+            typeChoisi={type}
           />
         )}
       </main>

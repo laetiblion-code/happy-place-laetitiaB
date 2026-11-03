@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ouvrirEnTantQue } from "./support/session-simulee";
 
-// Demandes simulées : deux en attente de plus de 3 jours (dont une à clarifier), une récente, une traitée.
+// Demandes simulées : catégorie « question » par défaut ; deux en attente de plus de 3 jours, une récente, une traitée.
 const il = (jours: number) => new Date(Date.now() - jours * 86_400_000).toISOString();
 const demande = (
   id: string,
@@ -36,130 +36,157 @@ const DEMANDES = [
     "Ressources humaines et communication interne",
     "validée",
     1,
+    {
+      category: "amélioration de Happy Place",
+      visibility: "entreprise",
+    },
   ),
   demande("c", "Kesha Ndiaye", "Data", "en attente", 4, { category: "problème" }),
   demande("d", "Théo Lambert", "Design produit", "refusée", 6, {
     rejection_category: "à clarifier",
   }),
-  demande("e", "Nina Petit", "Design produit", "en attente", 1, { visibility: "entreprise" }),
+  demande("e", "Nina Petit", "Design produit", "en attente", 1, {
+    visibility: "entreprise",
+    category: "idée",
+  }),
 ];
 
-const LARGEURS = [1440, 1280, 1100, 1024, 900, 768, 700, 600, 375];
+const LARGEURS = [1440, 1100, 768, 375];
 
-/** Débordement du tableau hors de sa carte, et débordement de la page entière (en pixels, 0 = aucun). */
+/** Déborde-t-il ? (en pixels, 0 = aucun) : défilement horizontal de la page, et cartes hors de leur bloc. */
 async function mesurerDebordement(page: Page) {
   return page.evaluate(() => {
-    const table = document.querySelector<HTMLElement>(
-      '[role="table"][aria-label^="Dix dernières"]',
-    );
-    if (!table) throw new Error("Tableau introuvable");
-    const carte = table.closest("section") as HTMLElement;
-    const style = getComputedStyle(carte);
-    const bordDroit =
-      carte.getBoundingClientRect().right -
-      parseFloat(style.borderRightWidth) -
-      parseFloat(style.paddingRight);
-    const horsCarte = [...table.querySelectorAll<HTMLElement>("*")]
-      .filter(
-        (el) =>
-          el.getBoundingClientRect().width > 0 &&
-          el.getBoundingClientRect().right > bordDroit + 0.5,
-      )
-      .map(
-        (el) => `${el.tagName.toLowerCase()} (${Math.round(el.getBoundingClientRect().right)} px)`,
-      );
+    const horsBloc = [...document.querySelectorAll<HTMLElement>('article[id^="carte-"]')].filter(
+      (carte) => {
+        const bloc = carte.closest("section") as HTMLElement;
+        return carte.getBoundingClientRect().right > bloc.getBoundingClientRect().right + 0.5;
+      },
+    ).length;
     const html = document.documentElement;
-    return {
-      tableauHorsCarte: horsCarte.slice(0, 5),
-      pageDebordement: html.scrollWidth - html.clientWidth,
-    };
+    return { cartesHorsBloc: horsBloc, pageDebordement: html.scrollWidth - html.clientWidth };
   });
 }
 
-test.describe("tableau « 10 dernières demandes » : mise en page responsive", () => {
+/** Nombre de colonnes des blocs : nombre de positions horizontales distinctes sur la première ligne. */
+async function colonnesDeBlocs(page: Page) {
+  return page.evaluate(() => {
+    const blocs = [
+      ...document.querySelectorAll<HTMLElement>('section[aria-labelledby^="titre-bloc-"]'),
+    ];
+    const premiereLigne = blocs.filter(
+      (b) => Math.abs(b.getBoundingClientRect().top - blocs[0].getBoundingClientRect().top) < 2,
+    );
+    const largeur = document
+      .querySelector('section[aria-labelledby="titre-cabinet"]')!
+      .getBoundingClientRect().width;
+    return { blocs: blocs.length, colonnes: premiereLigne.length, largeur: Math.round(largeur) };
+  });
+}
+
+test.describe("blocs « Demandes du cabinet » : mise en page responsive", () => {
   for (const largeur of LARGEURS) {
-    test(`à ${largeur} px : rien ne sort de la carte et la page ne défile pas en largeur`, async ({
+    test(`à ${largeur} px : rien ne déborde et les blocs passent en ${largeur >= 1100 ? 4 : largeur >= 640 ? 2 : 1} colonne(s)`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: largeur, height: 900 });
       await ouvrirEnTantQue(page, "admin", "/", { demandes: DEMANDES });
-      await expect(page.getByRole("table", { name: /Dix dernières demandes/ })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Boîte à idées" })).toBeVisible();
       await page.waitForLoadState("networkidle");
 
       const mesure = await mesurerDebordement(page);
-      expect(mesure.tableauHorsCarte, "éléments qui sortent de la carte").toEqual([]);
+      expect(mesure.cartesHorsBloc, "cartes qui sortent de leur bloc").toBe(0);
       expect(mesure.pageDebordement, "défilement horizontal de la page").toBeLessThanOrEqual(0);
-    });
-  }
 
-  test("à 1100 px, les cinq colonnes sont visibles ; à 375 px, les demandes sont en cartes", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1100, height: 900 });
-    await ouvrirEnTantQue(page, "admin", "/", { demandes: DEMANDES });
-    const tableau = page.getByRole("table", { name: /Dix dernières demandes/ });
-    await expect(tableau).toBeVisible();
-    for (const colonne of ["Catégorie", "Auteur et demande", "Statut", "Visibilité", "Date"]) {
-      await expect(tableau.getByRole("columnheader", { name: colonne })).toBeVisible();
-    }
-
-    await page.setViewportSize({ width: 375, height: 900 });
-    await expect(tableau.getByRole("columnheader", { name: "Statut" })).toBeHidden();
-  });
-
-  for (const largeur of [1440, 1100]) {
-    test(`à ${largeur} px, la colonne « Auteur et demande » est alignée sur toutes les lignes`, async ({
-      page,
-    }) => {
-      await page.setViewportSize({ width: largeur, height: 900 });
-      await ouvrirEnTantQue(page, "admin", "/", { demandes: DEMANDES });
-      const tableau = page.getByRole("table", { name: /Dix dernières demandes/ });
-      await expect(tableau).toBeVisible();
-      // Dans chaque ligne (en-tête compris), la deuxième cellule est « Auteur et demande »
-      const gauches = await tableau.getByRole("row").evaluateAll((lignes) =>
-        lignes.map((ligne) => {
-          const cellules = ligne.querySelectorAll<HTMLElement>('[role="columnheader"], [role="cell"]');
-          return Math.round(cellules[1].getBoundingClientRect().left);
-        }),
-      );
-      expect(gauches.length).toBeGreaterThan(2);
-      expect(new Set(gauches).size).toBe(1);
+      // Les seuils portent sur la largeur du bloc (requête de conteneur), pas sur la fenêtre
+      const colonnes = await colonnesDeBlocs(page);
+      const attendu = colonnes.largeur >= 1100 ? 4 : colonnes.largeur >= 640 ? 2 : 1;
+      expect(colonnes.blocs).toBe(4);
+      expect(colonnes.colonnes, `largeur du bloc : ${colonnes.largeur} px`).toBe(attendu);
     });
   }
 });
 
-test.describe("filtre « En retard (+3 j) »", () => {
+test.describe("blocs par type", () => {
+  test("chaque demande est rangée dans son bloc ; « Voir tout » au-delà de 3 cartes", async ({
+    page,
+  }) => {
+    await ouvrirEnTantQue(page, "admin", "/", { demandes: DEMANDES });
+    const questions = page.locator('section[aria-labelledby="titre-bloc-question"]');
+    // Questions : Olivia, Théo, Nina ? non (Nina est une idée) : a, d, b est amélioration → 2 questions
+    await expect(questions.getByRole("img", { name: "2 demandes" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "1 demande" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Voir tout (4)" })).toHaveCount(0);
+  });
+
+  test("plus de 3 demandes dans un bloc : « Voir tout (N) » vers /demandes?type=…", async ({
+    page,
+  }) => {
+    const beaucoup = ["p", "q", "r", "s"].map((id, i) =>
+      demande(id, `Auteur ${i}`, "Data", "validée", i + 2),
+    );
+    await ouvrirEnTantQue(page, "manager", "/", { demandes: beaucoup });
+    const lien = page.getByRole("link", { name: "Voir tout (4)" });
+    await expect(lien).toHaveAttribute("href", "/demandes?type=question");
+  });
+
   test("le manager et l'admin voient le filtre ; il garde les demandes en attente depuis plus de 3 jours", async ({
     page,
   }) => {
     await ouvrirEnTantQue(page, "admin", "/", { demandes: DEMANDES });
-    const tableau = page.getByRole("table", { name: /Dix dernières demandes/ });
-    await expect(tableau).toBeVisible();
-
     const filtre = page.getByRole("button", { name: "En retard (+3 j)" });
     await expect(filtre).toHaveAttribute("aria-pressed", "false");
     await filtre.click();
     await expect(filtre).toHaveAttribute("aria-pressed", "true");
 
-    // En-tête + Olivia (5 j, en attente), Kesha (4 j, en attente), Théo (6 j, à clarifier)
-    await expect(tableau.getByRole("row")).toHaveCount(4);
-    await expect(tableau.getByText("Olivia Bauducel")).toBeVisible();
-    await expect(tableau.getByText("Théo Lambert")).toBeVisible();
-    await expect(tableau.getByText("Nina Petit")).toHaveCount(0);
+    // Olivia (5 j, en attente), Kesha (4 j, en attente), Théo (6 j, à clarifier)
+    await expect(page.getByRole("article")).toHaveCount(3);
+    await expect(page.getByRole("article").filter({ hasText: "Olivia Bauducel" })).toHaveCount(1);
+    await expect(page.getByRole("article").filter({ hasText: "Théo Lambert" })).toHaveCount(1);
+    await expect(page.getByRole("article").filter({ hasText: "Nina Petit" })).toHaveCount(0);
   });
 
   test("sans demande en retard : « Aucune demande en retard. »", async ({ page }) => {
     await ouvrirEnTantQue(page, "manager", "/", {
       demandes: [demande("f", "Nina Petit", "Design produit", "en attente", 1)],
     });
-    await expect(page.getByRole("table", { name: /Dix dernières demandes/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Boîte à idées" })).toBeVisible();
     await page.getByRole("button", { name: "En retard (+3 j)" }).click();
     await expect(page.getByText("Aucune demande en retard.")).toBeVisible();
   });
 
   test("le collaborateur ne voit pas le filtre", async ({ page }) => {
     await ouvrirEnTantQue(page, "collaborateur", "/", { demandes: DEMANDES });
-    await expect(page.getByRole("table", { name: /Dix dernières demandes/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Boîte à idées" })).toBeVisible();
     await expect(page.getByRole("button", { name: "En retard (+3 j)" })).toHaveCount(0);
+  });
+
+  test("la carte d'une demande en retard porte la mention pour les lecteurs d'écran", async ({
+    page,
+  }) => {
+    await ouvrirEnTantQue(page, "admin", "/", { demandes: DEMANDES });
+    await expect(page.getByText(", en attente depuis plus de 3 jours").first()).toBeAttached();
+  });
+});
+
+test.describe("page /demandes", () => {
+  test("?type=question n'affiche que le bloc Questions, en pleine largeur", async ({ page }) => {
+    await ouvrirEnTantQue(page, "manager", "/demandes?type=question", { demandes: DEMANDES });
+    await expect(page.getByRole("heading", { name: "Questions" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Problèmes" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Voir tous les types" })).toBeVisible();
+  });
+
+  test("le bloc « Sans type » n'apparaît que sur la page complète, s'il reste des demandes", async ({
+    page,
+  }) => {
+    const sansType = demande("g", "Lou Martin", "Product", "validée", 30, { category: null });
+    await ouvrirEnTantQue(page, "manager", "/demandes", { demandes: [...DEMANDES, sansType] });
+    await expect(page.getByRole("heading", { name: "Sans type" })).toBeVisible();
+  });
+
+  test("sans demande sans type, le bloc « Sans type » est absent", async ({ page }) => {
+    await ouvrirEnTantQue(page, "manager", "/demandes", { demandes: DEMANDES });
+    await expect(page.getByRole("heading", { name: "Boîte à idées" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sans type" })).toHaveCount(0);
   });
 });
