@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 
 mock.module("@/integrations/supabase/client", () => ({ supabase: {} }));
-const { computeAdminGaps } = await import("./home-counts");
+const { computeAdminGaps, calculerDelaiValidation } = await import("./home-counts");
 
 describe("admin gaps: teams without manager and users without team", () => {
   const teams = [
@@ -71,5 +71,42 @@ describe("admin gaps: teams without manager and users without team", () => {
     });
     expect(gaps.teamsWithoutManager).toEqual([{ name: "Product", personnes: 1 }]);
     expect(gaps.usersWithoutTeam).toBe(0);
+  });
+});
+
+describe("délai de validation : la première décision termine le délai", () => {
+  const JOUR = 86_400_000;
+  const debut = Date.parse("2026-10-06T00:00:00Z");
+  const le = (jour) => new Date(Date.parse("2026-10-01T00:00:00Z") + jour * JOUR).toISOString();
+
+  test("une demande clarifiée puis validée compte jusqu'à la clarification (décision du 2026-11-03)", () => {
+    const premiere = new Map([["a", le(8)]]); // clarification deux jours après la création ; la validation ultérieure n'est pas prise en compte
+    const creation = new Map([["a", le(6)]]);
+    expect(calculerDelaiValidation(premiere, creation, debut)).toEqual({ jours: 2, nb: 1 });
+  });
+
+  test("une demande seulement clarifiée sort du délai, comme une demande refusée", () => {
+    const premiere = new Map([["a", le(7)]]);
+    const creation = new Map([["a", le(6)]]);
+    expect(calculerDelaiValidation(premiere, creation, debut)).toEqual({ jours: 1, nb: 1 });
+  });
+
+  test("moyenne sur les demandes décidées dans la fenêtre, une décimale", () => {
+    const premiere = new Map([
+      ["a", le(7)],
+      ["b", le(9)],
+    ]);
+    const creation = new Map([
+      ["a", le(6)],
+      ["b", le(7)],
+    ]);
+    expect(calculerDelaiValidation(premiere, creation, debut)).toEqual({ jours: 1.5, nb: 2 });
+  });
+
+  test("décision avant la fenêtre, demande hors périmètre ou aucune donnée : pas de délai", () => {
+    const avant = new Map([["a", le(2)]]);
+    expect(calculerDelaiValidation(avant, new Map([["a", le(1)]]), debut)).toBeNull();
+    expect(calculerDelaiValidation(new Map([["b", le(8)]]), new Map(), debut)).toBeNull();
+    expect(calculerDelaiValidation(new Map(), new Map(), debut)).toBeNull();
   });
 });

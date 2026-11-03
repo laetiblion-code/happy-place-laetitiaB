@@ -10,7 +10,7 @@ import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card
 import { SubmissionReader } from "@/components/submission-reader";
 import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS } from "@/components/submission-choices";
 import { ManagerCards } from "@/components/home-counters";
-import { fetchAlertCounts, fetchDelaiValidation, fetchDraftCounts, fetchMyCounts, fetchPublicationActus, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
+import { fetchAdminDirectory, fetchAlertCounts, fetchDelaiValidation, fetchDraftCounts, fetchMesActus, fetchMyCounts, fetchPublicationActus, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
 import { AlertsKanban } from "@/components/alerts-kanban";
 import { buttonVariants } from "@/components/ui/button";
 import { LienBasBloc } from "@/components/chips";
@@ -183,10 +183,26 @@ function ManagerSpace() {
     queryFn: () => fetchDelaiValidation(isAdmin ? null : (myTeams.data ?? [])),
     retry: false,
   });
+  // Historique de la personne connectée : incitations à publier dans la carte « Actualités en attente »
+  const homeMesActus = useQuery({
+    queryKey: ["home-counts", "mes-actus", myEmail],
+    enabled: canReview && !!myEmail,
+    queryFn: () => fetchMesActus(myEmail),
+    retry: false,
+  });
+  // Admin : tout le cabinet ; manager : ses propres actualités
   const homeActus = useQuery({
-    queryKey: ["home-counts", "actus"],
+    queryKey: ["home-counts", "actus", role, myEmail],
+    enabled: canReview && !!myEmail,
+    queryFn: () => fetchPublicationActus(isAdmin ? null : myEmail),
+    retry: false,
+  });
+
+  // Annuaire (admin) : nomme les managers de chaque équipe dans « Attend chez … » (même clé que les départs)
+  const annuaire = useQuery({
+    queryKey: ["admin-directory"],
+    queryFn: fetchAdminDirectory,
     enabled: isAdmin,
-    queryFn: fetchPublicationActus,
     retry: false,
   });
 
@@ -236,13 +252,19 @@ function ManagerSpace() {
     onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
   });
 
+  // Manager sans équipe : pas encore rattaché (une fois les équipes chargées)
+  const sansEquipe = role === "manager" && myTeams.isSuccess && myTeams.data.length === 0;
   const roleIntro =
-    role === "manager"
+    sansEquipe
+      ? "Ton administratrice doit encore te rattacher à une équipe."
+      : role === "manager"
       ? "Gère les validations prioritaires de ton équipe et consulte les actualités du cabinet."
       : role === "admin"
         ? "Suis ce qui attend une action dans tout le cabinet."
         : "Suis tes demandes et retrouve les actualités du cabinet.";
-  const greeting = profile.data?.first_name?.trim() ? `Bonjour ${profile.data.first_name.trim()}` : "Bonjour";
+  const prenom = profile.data?.first_name?.trim();
+  // Sans prénom (compte sans fiche complète) : pas de « Bonjour » seul
+  const greeting = prenom ? `Bonjour ${prenom}` : "Bienvenue sur Happy Place";
 
   function openSubmissionForm() {
     setSubmissionErrors({});
@@ -309,6 +331,8 @@ function ManagerSpace() {
             alerts={homeAlerts.data}
             delai={homeDelai.data}
             actus={homeActus.data}
+            mesActus={homeMesActus.data}
+            onRediger={() => setOuvertureActu((n) => n + 1)}
           />
         )}
 
@@ -327,6 +351,8 @@ function ManagerSpace() {
           <div className="grid grid-cols-1 items-start gap-md lg:grid-cols-2">
             <DemandesATraiter
               email={myEmail}
+              admin={isAdmin}
+              annuaire={annuaire.data}
               items={toReview.data}
               error={toReview.isError}
               pending={homeReview.data?.pending ?? 0}
@@ -370,7 +396,7 @@ function ManagerSpace() {
           {/* Performance Hub */}
           <section aria-labelledby="titre-indicateurs" className="rounded-lg bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
             <div className="flex items-center justify-between mb-md">
-              <h2 id="titre-indicateurs" className="font-headline-sm text-headline-sm text-primary">Indicateurs clés</h2>
+              <h2 id="titre-indicateurs" className="font-headline-sm text-headline-sm text-primary">Performance et objectifs de Bigger Boat en 4 chiffres clés</h2>
             </div>
             {dashMetrics.isError && (
               <p className="text-body-sm text-error mb-md">Les indicateurs sont indisponibles.</p>
@@ -398,6 +424,11 @@ function ManagerSpace() {
         submission={reading}
         onClose={() => setReading(null)}
         onReject={reading && canReview && reading.status === "en attente" ? () => startReject(reading) : undefined}
+        onClarify={
+          reading && canReview && reading.status === "en attente"
+            ? () => startReject(reading, "clarification")
+            : undefined
+        }
         onApprove={
           reading && canReview && reading.status === "en attente"
             ? () => review.mutate({ id: reading.id, status: "validée" })
@@ -406,18 +437,20 @@ function ManagerSpace() {
         approving={review.isPending}
       />
       {rejecting && (
-        <Modal title={modeRefus === "clarification" ? "Demander une clarification" : "Refuser la demande"} onClose={() => setRejecting(null)} modifie={rejectForm.rejection_note !== ""}>
-          <form
-            noValidate
-            className="space-y-sm"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const res = validate(rejectionSchema, rejectForm);
-              if (!res.ok) return setRejectErrors(res.errors);
-              setRejectErrors({});
-              review.mutate({ id: rejecting.id, status: "refusée", ...res.data });
-            }}
-          >
+        <Modal
+          title={modeRefus === "clarification" ? "Demander une clarification" : "Refuser la demande"}
+          onClose={() => setRejecting(null)}
+          modifie={rejectForm.rejection_note !== ""}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const res = validate(rejectionSchema, rejectForm);
+            if (!res.ok) return setRejectErrors(res.errors);
+            setRejectErrors({});
+            review.mutate({ id: rejecting.id, status: "refusée", ...res.data });
+          }}
+          pied={<FormActions pending={review.isPending} onCancel={() => setRejecting(null)} />}
+        >
+          <div className="space-y-sm">
             <p className="max-h-48 overflow-y-auto border border-outline-variant bg-surface-container-low p-xs text-body-sm italic text-on-surface-variant whitespace-pre-line wrap-anywhere">“{rejecting.content}”</p>
             <ErrorSummary errors={rejectErrors} />
             <Field label="Motif du refus" error={rejectErrors.rejection_category}>
@@ -441,13 +474,23 @@ function ManagerSpace() {
               />
               <CharCounter value={rejectForm.rejection_note} max={500} />
             </Field>
-            <FormActions pending={review.isPending} onCancel={() => setRejecting(null)} />
-          </form>
+          </div>
         </Modal>
       )}
       {submissionForm && (
-        <Modal title="Nouvelle demande" onClose={() => setSubmissionForm(null)} modifie={!!submissionForm.content || !!submissionForm.author_name}>
-          <form onSubmit={sendSubmission} className="space-y-sm" noValidate>
+        <Modal
+          title="Nouvelle demande"
+          onClose={() => setSubmissionForm(null)}
+          onSubmit={sendSubmission}
+          pied={
+            <FormActions
+              pending={submit.isPending || profile.isPending}
+              submitLabel="Envoyer"
+              onCancel={() => setSubmissionForm(null)}
+            />
+          }
+        >
+          <div className="space-y-sm">
             <ErrorSummary errors={submissionErrors} />
             <ChoiceGroup
               legend="Type de demande"
@@ -573,12 +616,7 @@ function ManagerSpace() {
                 )}
               </div>
             </Field>
-            <FormActions
-              pending={submit.isPending || profile.isPending}
-              submitLabel="Envoyer"
-              onCancel={() => setSubmissionForm(null)}
-            />
-          </form>
+          </div>
         </Modal>
       )}
     </div>

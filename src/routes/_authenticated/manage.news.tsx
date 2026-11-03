@@ -191,8 +191,11 @@ function ManageNews() {
       </div>
 
       {form && (
-        <Modal title={editing ? "Modifier l'actualité" : "Nouvelle actualité"} onClose={close} modifie={!editing && (!!form.title || !!form.body)}>
-          <form onSubmit={submit} className="space-y-sm" noValidate>
+        <Modal title={editing ? "Modifier l'actualité" : "Nouvelle actualité"} onClose={close} modifie={!editing && (!!form.title || !!form.body)}
+          onSubmit={submit}
+          pied={<FormActions pending={save.isPending} onCancel={close} />}
+        >
+          <div className="space-y-sm">
             <ErrorSummary errors={errors} />
             <Field label="Titre" error={errors.title}>
               <TextInput
@@ -234,8 +237,7 @@ function ManageNews() {
                 <option value="publiée">Publiée</option>
               </Select>
             </Field>
-            <FormActions pending={save.isPending} onCancel={close} />
-          </form>
+          </div>
         </Modal>
       )}
 

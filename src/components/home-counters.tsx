@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { formatNumberFr, formatObjectif } from "@/lib/dashboard";
+import { formatDateCourte, formatNumberFr, formatObjectif } from "@/lib/dashboard";
 import { Unite } from "@/components/duree-courte";
 import { ChipStatut, LienBasBloc, COULEUR_STATUT } from "@/components/chips";
 import { texteAttenteAncienne } from "@/lib/duree-libelles";
@@ -9,11 +9,23 @@ import {
   type AlertCounts,
   type DelaiValidation,
   type DraftCounts,
+  type MesActus,
   type MyCounts,
   type PublicationActus,
   type ReviewCounts,
 } from "@/lib/home-counts";
 import { etatObjectif, OBJECTIFS_TRIMESTRE, type EtatObjectif } from "@/lib/objectifs";
+import { AideCompteur } from "@/components/aide-compteur";
+
+/** Textes des info-bulles « Comment est calculé ce chiffre ? » (décision du 2026-11-03 sur le délai). */
+const INFO_DELAI_CABINET =
+  "Calcul effectué sur le délai de traitement des demandes en attente du cabinet sur les 30 derniers jours. Une demande de clarification et un refus sont considérés comme un traitement.";
+const INFO_DELAI_MANAGER =
+  "Calcul effectué sur le délai de traitement des demandes en attente chez toi sur les 30 derniers jours. Une demande de clarification et un refus sont considérés comme un traitement.";
+const INFO_ACTUS_CABINET =
+  "Nombre d'actualités publiées par rapport au nombre d'actualités commencées sur les 30 derniers jours.";
+const INFO_ACTUS_MANAGER =
+  "Nombre d'actualités que tu as publiées par rapport au nombre d'actualités que tu as commencées sur les 30 derniers jours.";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -101,20 +113,23 @@ function LigneObjectif({ icon, texte }: { icon: string; texte: ReactNode }) {
   );
 }
 
-const ETAT_STYLE: Record<EtatObjectif, { icon: string; classe: string; accord: string }> = {
-  atteint: { icon: "check_circle", classe: "text-[#1F6B38]", accord: "atteint" },
-  presque: { icon: "info", classe: "text-[#68686D]", accord: "presque atteint" },
-  non: { icon: "trending_down", classe: "text-[#A81E25]", accord: "non atteint" },
+/** Icône, couleur et suite du texte pour chaque état (icône et texte, jamais la couleur seule). */
+const ETAT_STYLE: Record<EtatObjectif, { icon: string; classe: string; suite: string }> = {
+  atteint: { icon: "check_circle", classe: "text-[#1F6B38]", suite: " atteint" },
+  presque: { icon: "track_changes", classe: "text-[#3F3F44]", suite: " : on y est presque" },
+  // Sable foncé, contraste AA (environ 6,8:1 sur blanc)
+  non: { icon: "flag", classe: "text-[#7A5312]", suite: " : un petit effort" },
 };
 
-/** État d'un objectif : icône et texte (jamais la couleur seule). */
+/** État d'un objectif : « Objectif de 70 % atteint », « … : on y est presque », « … : un petit effort ». */
 function LigneEtat({ etat, objectif }: { etat: EtatObjectif; objectif: ReactNode }) {
   const style = ETAT_STYLE[etat];
   return (
     <p className={`flex items-start gap-xs font-label-sm text-sm font-semibold ${style.classe}`}>
       <Icon name={style.icon} className="text-base shrink-0" />
       <span>
-        Objectif {objectif} {style.accord}
+        Objectif {objectif}
+        {style.suite}
       </span>
     </p>
   );
@@ -147,47 +162,45 @@ function PiedDelai({
   const jours = formatNumberFr(delai.jours, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   // Accord : moins de 2 jours au singulier (« 1,4 j » pour la lecture : « 1,4 jour »), à partir de 2 au pluriel
   const pluriel = delai.jours >= 2;
-  const libelle = isAdmin ? "Délai de validation du cabinet sur " : "Ton délai de validation sur ";
+  const libelle = isAdmin ? "Délai de validation : " : "Ton délai de validation : ";
   const etat = etatObjectif(delai.jours, delaiValidationJours, "plusBas");
-  const objectif = (
-    <>
-      de moins de{" "}
-      <Unite valeur={String(delaiValidationJours)} unite="j" pluriel={delaiValidationJours >= 2} />
-    </>
-  );
+  // Abréviation « j » comme dans le texte de l'objectif (« Objectif de moins de 2 j : … »)
+  const objectif = `de moins de ${delaiValidationJours}\u00a0j`;
   return (
     <PiedObjectif>
-      <p className="font-label-sm text-sm text-[#68686D]">
-        {libelle}
-        <Unite valeur="30" unite="j" pluriel />
-        {" : "}
+      <p className="flex flex-wrap items-center gap-xs font-label-sm text-sm text-[#68686D]">
+        <span>{libelle}</span>
         <span className="inline-block rounded-[4px] bg-[#EDEBE6] px-xs font-semibold text-[#28282D]">
           <Unite valeur={jours} unite="j" pluriel={pluriel} />
         </span>
+        <AideCompteur texte={isAdmin ? INFO_DELAI_CABINET : INFO_DELAI_MANAGER} />
       </p>
       <LigneEtat etat={etat} objectif={objectif} />
     </PiedObjectif>
   );
 }
 
-/** Taux de publication des actualités créées dans les 30 derniers jours (admin seulement). */
-function PiedActus({ actus }: { actus: PublicationActus | undefined }) {
-  if (!actus) return null;
-  if (actus.commencees === 0) {
-    return (
-      <PiedObjectif>
-        <p className="font-label-sm text-sm text-on-surface-variant">
-          Aucune actualité commencée en 30 jours
-        </p>
-      </PiedObjectif>
-    );
-  }
-  const pourcentage = Math.round((100 * actus.publiees) / actus.commencees);
+/**
+ * Taux de publication des actualités créées dans les 30 derniers jours : tout le cabinet pour l'admin,
+ * ses propres actualités pour le manager.
+ */
+function PiedActus({ actus, isAdmin }: { actus: PublicationActus | undefined; isAdmin: boolean }) {
+  // Aucune actualité commencée sur 30 jours : pas de ligne d'objectif (pas de « 0 / 0 »)
+  if (!actus || actus.commencees === 0) return null;
+  const pourcentage = (100 * actus.publiees) / actus.commencees;
   const etat = etatObjectif(pourcentage, OBJECTIFS_TRIMESTRE.tauxPublicationActus, "plusHaut");
+  const pourcentageAffiche = `${formatNumberFr(pourcentage, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })}\u00a0%`;
   return (
     <PiedObjectif>
-      <p className="font-label-sm text-sm text-on-surface">
-        {`${plural(actus.publiees, "actu publiée", "actus publiées")} sur ${formatNumberFr(actus.commencees)} commencée${actus.commencees > 1 ? "s" : ""} en 30 jours, soit ${formatObjectif(pourcentage, "%")}`}
+      <p className="flex flex-wrap items-center gap-xs font-label-sm text-sm text-[#68686D]">
+        <span>{`${formatNumberFr(actus.publiees)} publiées / ${formatNumberFr(actus.commencees)} ·`}</span>
+        <span className="inline-block rounded-[4px] bg-[#EDEBE6] px-xs font-semibold text-[#28282D]">
+          {pourcentageAffiche}
+        </span>
+        <AideCompteur texte={isAdmin ? INFO_ACTUS_CABINET : INFO_ACTUS_MANAGER} />
       </p>
       <LigneEtat
         etat={etat}
@@ -205,6 +218,8 @@ export function ManagerCards({
   alerts,
   delai,
   actus,
+  mesActus,
+  onRediger,
 }: {
   isAdmin: boolean;
   review: ReviewCounts | undefined;
@@ -212,6 +227,10 @@ export function ManagerCards({
   alerts: AlertCounts | undefined;
   delai: DelaiValidation | null | undefined;
   actus: PublicationActus | undefined;
+  /** Historique de la personne connectée, pour les incitations à publier. */
+  mesActus: MesActus | undefined;
+  /** Ouvre la fenêtre « Nouvelle actualité ». */
+  onRediger: () => void;
 }) {
   const pending = review?.pending ?? 0;
   const old = review?.pendingOverThreeDays ?? 0;
@@ -219,6 +238,14 @@ export function ManagerCards({
   const draftCount = drafts?.drafts ?? 0;
   const draftsMine = drafts?.draftsMine ?? 0;
   const alertTotal = alerts?.open ?? 0;
+  // Rien à finaliser : on invite à publier, sauf si l'historique n'est pas encore chargé
+  const rienAFinaliser = draftCount === 0 && mesActus !== undefined;
+  const premiere = rienAFinaliser && mesActus.total === 0;
+  const relance =
+    rienAFinaliser &&
+    mesActus.total > 0 &&
+    mesActus.recentes === 0 &&
+    mesActus.dernierePubliee !== null;
   const texteOld = texteAttenteAncienne(old, formatNumberFr, 3);
   const parts = [
     alerts?.ouverte ? plural(alerts.ouverte, "ouverte", "ouvertes") : null,
@@ -263,7 +290,19 @@ export function ManagerCards({
         title="Actualités en attente"
         icon="edit_note"
         ariaLabel={plural(draftCount, "brouillon à finaliser", "brouillons à finaliser")}
-        footer={isAdmin ? <PiedActus actus={actus} /> : undefined}
+        footer={
+          premiere ? (
+            <LienBasBloc onClick={onRediger} align="droite">
+              Rédiger ma première actu
+            </LienBasBloc>
+          ) : relance ? (
+            <LienBasBloc onClick={onRediger} align="droite">
+              Rédiger une actu
+            </LienBasBloc>
+          ) : (
+            <PiedActus actus={actus} isAdmin={isAdmin} />
+          )
+        }
       >
         <BigNumber
           value={formatNumberFr(draftCount)}
@@ -273,6 +312,16 @@ export function ManagerCards({
           <div className="flex flex-wrap gap-xs">
             <Chip icon="person" label={`dont ${draftsMine} à toi`} className={ROSE} />
           </div>
+        )}
+        {premiere && (
+          <p className="font-label-sm text-sm text-[#68686D]">
+            Partage ta première actualité avec le cabinet.
+          </p>
+        )}
+        {relance && mesActus.dernierePubliee && (
+          <p className="font-label-sm text-sm text-[#68686D]">
+            {`Ta dernière actualité date du ${formatDateCourte(mesActus.dernierePubliee)}. Une nouvelle à partager ?`}
+          </p>
         )}
       </StatCard>
 

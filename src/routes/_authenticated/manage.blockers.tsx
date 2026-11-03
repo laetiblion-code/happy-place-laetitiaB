@@ -163,8 +163,11 @@ function ManageBlockers() {
         <Modal
           title={editing ? "Modifier l'alerte" : "Nouvelle alerte"}
           onClose={close}
+        
+          onSubmit={submit}
+          pied={<FormActions pending={save.isPending} onCancel={close} />}
         >
-          <form onSubmit={submit} className="space-y-sm" noValidate>
+          <div className="space-y-sm">
             <ErrorSummary errors={errors} />
             <Field label="Titre" error={errors.title}>
               <TextInput
@@ -211,8 +214,7 @@ function ManageBlockers() {
                 ))}
               </Select>
             </Field>
-            <FormActions pending={save.isPending} onCancel={close} />
-          </form>
+          </div>
         </Modal>
       )}
 

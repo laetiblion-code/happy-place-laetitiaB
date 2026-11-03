@@ -306,8 +306,11 @@ function ManageMetrics() {
       </div>
 
       {form && (
-        <Modal title={editing ? "Modifier l'indicateur" : "Nouvel indicateur"} onClose={close}>
-          <form onSubmit={submit} className="space-y-sm" noValidate>
+        <Modal title={editing ? "Modifier l'indicateur" : "Nouvel indicateur"} onClose={close}
+          onSubmit={submit}
+          pied={<FormActions pending={save.isPending} onCancel={close} />}
+        >
+          <div className="space-y-sm">
             <ErrorSummary errors={errors} />
             <Field label="Libellé" error={errors.label ?? errors.key} required>
               <TextInput
@@ -387,8 +390,7 @@ function ManageMetrics() {
               />
               Plus bas est mieux
             </label>
-            <FormActions pending={save.isPending} onCancel={close} />
-          </form>
+          </div>
         </Modal>
       )}
 

@@ -2,11 +2,14 @@ import { createPortal } from "react-dom";
 import {
   Children,
   cloneElement,
+  createContext,
   isValidElement,
+  useContext,
   useEffect,
   useId,
   useRef,
   useState,
+  type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactElement,
   type ReactNode,
@@ -86,28 +89,55 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={`${inputBase} ${props.className ?? ""}`} />;
 }
 
+type ModaleContexte = { demanderFermeture: () => void };
+const ModaleContext = createContext<ModaleContexte | null>(null);
+
 /**
  * Fenêtre modale commune. Rendue dans un portail (document.body) : voile et fenêtre sont dans le même conteneur,
- * la fenêtre est placée après le voile, donc au-dessus. Clic sur le voile, bouton Fermer ou Échap : la fenêtre
- * se ferme, sauf si `modifie` est vrai : une confirmation s'affiche alors dans la fenêtre.
+ * la fenêtre est placée après le voile, donc au-dessus.
+ * Structure : en-tête (titre, croix), corps défilant, pied fixe (`pied`, par exemple « Annuler » et l'envoi).
+ * Croix, clic sur le voile, Échap et « Annuler » ferment la fenêtre ; si `modifie` est vrai, une confirmation
+ * (« Abandonner ta saisie ? ») s'affiche d'abord. Avec `onSubmit`, le corps et le pied forment un formulaire.
  */
 export function Modal({
   title,
   onClose,
   children,
   modifie = false,
+  pied,
+  onSubmit,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
-  /** Un champ a été rempli : fermer demande confirmation. */
+  /** Un état non visible dans les champs (image, liste) a changé : fermer demande confirmation. */
   modifie?: boolean;
+  /** Actions fixes en bas de la fenêtre, visibles sans défiler. */
+  pied?: ReactNode;
+  /** Présent : le corps et le pied sont un formulaire qui appelle cette fonction à l'envoi. */
+  onSubmit?: (e: FormEvent<HTMLFormElement>) => void;
 }) {
   const titreId = useId();
   const boite = useRef<HTMLDivElement>(null);
   const [confirmer, setConfirmer] = useState(false);
   const fermer = useRef(onClose);
   fermer.current = onClose;
+  // Valeurs des champs à l'ouverture, et indicateur de saisie par la personne (événements input et change) :
+  // une saisie est « modifiée » si la personne a touché un champ et que les valeurs ont changé.
+  // Les valeurs posées par un effet après l'ouverture ne comptent pas.
+  const valeursInitiales = useRef<string | null>(null);
+  const touche = useRef(false);
+
+  function valeursDesChamps(): string {
+    return Array.from(boite.current?.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+      "[data-corps-modale] input, [data-corps-modale] textarea, [data-corps-modale] select",
+    ) ?? [])
+      .map((el) => (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio") ? String(el.checked) : el.value))
+      .join("\u0001");
+  }
+  function saisieModifiee(): boolean {
+    return modifie || (touche.current && valeursInitiales.current !== null && valeursInitiales.current !== valeursDesChamps());
+  }
 
   // Focus placé dans la fenêtre au montage, rendu au bouton d'origine au démontage.
   // La fenêtre n'est montée que lorsqu'elle est ouverte (les appelants font `{ouvert && <Modal …/>}`) :
@@ -120,13 +150,22 @@ export function Modal({
     const champ = dansCorps('input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])')[0];
     const bouton = dansCorps("button:not([disabled]), a[href]")[0];
     (champ ?? bouton ?? boite.current)?.focus();
+    valeursInitiales.current = valeursDesChamps();
+    const marquer = () => {
+      touche.current = true;
+    };
+    const fenetre = boite.current;
+    fenetre?.addEventListener("input", marquer);
+    fenetre?.addEventListener("change", marquer);
     return () => {
+      fenetre?.removeEventListener("input", marquer);
+      fenetre?.removeEventListener("change", marquer);
       origine?.focus?.();
     };
   }, []);
 
   function demanderFermeture() {
-    if (modifie) setConfirmer(true);
+    if (saisieModifiee()) setConfirmer(true);
     else fermer.current();
   }
 
@@ -156,8 +195,19 @@ export function Modal({
     }
   }
 
+  const corps = (
+    <>
+      <div data-corps-modale className="min-h-0 flex-1 space-y-md overflow-y-auto px-md py-md">
+        {children}
+      </div>
+      {pied !== undefined && (
+        <div className="shrink-0 border-t border-outline-variant bg-surface-container-lowest px-md py-sm">{pied}</div>
+      )}
+    </>
+  );
+
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-sm md:p-lg">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-sm md:p-lg">
       <div aria-hidden="true" onClick={demanderFermeture} className="fixed inset-0 bg-black/50" />
       <div
         ref={boite}
@@ -166,9 +216,9 @@ export function Modal({
         aria-labelledby={titreId}
         tabIndex={-1}
         onKeyDown={surTouche}
-        className="relative w-full max-w-2xl rounded-lg bg-surface-container-lowest border border-outline p-md space-y-md focus:outline-none"
+        className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded-lg border border-outline bg-surface-container-lowest focus:outline-none"
       >
-        <div className="flex items-center justify-between border-b border-outline-variant pb-sm">
+        <div className="flex shrink-0 items-center justify-between border-b border-outline-variant px-md py-sm">
           <h2 id={titreId} className="font-headline-sm text-headline-sm text-primary">{title}</h2>
           <button
             type="button"
@@ -179,24 +229,36 @@ export function Modal({
             <ManageIcon name="close" />
           </button>
         </div>
-        <div data-corps-modale className="space-y-md">{children}</div>
+        <ModaleContext.Provider value={{ demanderFermeture }}>
+          {onSubmit ? (
+            <form onSubmit={onSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
+              {corps}
+            </form>
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col">{corps}</div>
+          )}
+        </ModaleContext.Provider>
         {confirmer && (
           <div
             role="group"
             aria-label="Confirmer la fermeture"
-            className="flex flex-wrap items-center justify-between gap-sm border-t border-outline-variant bg-card -mx-md -mb-md px-md py-sm"
+            className="flex shrink-0 flex-wrap items-center justify-between gap-sm border-t border-outline-variant bg-card px-md py-sm"
           >
             <p className="min-w-0 text-body-sm font-semibold text-on-surface">
-              Abandonner les modifications ? Les changements non enregistrés seront perdus.
+              Abandonner ta saisie ? Les champs remplis seront perdus.
             </p>
             <div className="flex flex-wrap gap-xs">
               <button
                 type="button"
                 autoFocus
-                onClick={() => setConfirmer(false)}
+                onClick={() => {
+                  // La barre disparaît : le focus revient dans la fenêtre (Échap et Tab restent actifs)
+                  setConfirmer(false);
+                  boite.current?.focus();
+                }}
                 className={buttonVariants({ variant: "secondary", size: "sm" })}
               >
-                Continuer la rédaction
+                Continuer la saisie
               </button>
               <button
                 type="button"
@@ -214,6 +276,21 @@ export function Modal({
   );
 }
 
+/** « Annuler » d'une fenêtre : même fermeture que la croix (confirmation si la saisie est modifiée). */
+export function BoutonAnnuler({ onClick, disabled }: { onClick?: () => void; disabled?: boolean }) {
+  const modale = useContext(ModaleContext);
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick ?? modale?.demanderFermeture}
+      className={buttonVariants({ variant: "secondary" })}
+    >
+      Annuler
+    </button>
+  );
+}
+
 export function FormActions({
   pending,
   onCancel,
@@ -224,10 +301,8 @@ export function FormActions({
   submitLabel?: string;
 }) {
   return (
-    <div className="flex justify-end gap-xs pt-sm">
-      <button type="button" onClick={onCancel} className={buttonVariants({ variant: "secondary" })}>
-        Annuler
-      </button>
+    <div className="flex justify-end gap-xs">
+      <BoutonAnnuler onClick={onCancel} />
       <button type="submit" disabled={pending} className={buttonVariants({ variant: "default" })}>
         {pending ? "…" : submitLabel}
       </button>
@@ -288,19 +363,22 @@ export function ConfirmDelete({
   pending?: boolean;
 }) {
   return (
-    <Modal title="Confirmer la suppression" onClose={onCancel}>
+    <Modal
+      title="Confirmer la suppression"
+      onClose={onCancel}
+      pied={
+        <div className="flex justify-end gap-xs">
+          <BoutonAnnuler onClick={onCancel} />
+          <button type="button" onClick={onConfirm} disabled={pending} className={buttonVariants({ variant: "destructive" })}>
+            {pending ? "Suppression…" : "Supprimer"}
+          </button>
+        </div>
+      }
+    >
       <p className="font-body-md text-on-surface">
         Supprimer définitivement <strong className="text-primary">{label}</strong> ? Cette action est
         irréversible.
       </p>
-      <div className="flex justify-end gap-xs pt-sm">
-        <button type="button" onClick={onCancel} className={buttonVariants({ variant: "secondary" })}>
-          Annuler
-        </button>
-        <button type="button" onClick={onConfirm} disabled={pending} className={buttonVariants({ variant: "destructive" })}>
-          {pending ? "Suppression…" : "Supprimer"}
-        </button>
-      </div>
     </Modal>
   );
 }

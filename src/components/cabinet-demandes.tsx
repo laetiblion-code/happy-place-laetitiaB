@@ -8,23 +8,59 @@ import { buttonVariants } from "@/components/ui/button";
 import { AttachmentLink } from "@/components/attachment-link";
 import { cn } from "@/lib/utils";
 import { fetchCabinetSubmissions, type Submission } from "@/lib/dashboard";
-import { ilYaCourt } from "@/lib/noms";
+import { CLARIFY_CATEGORY } from "@/components/status-badge";
+import { decouperContenu } from "@/lib/historique-demande";
 
 /** Accueil : 10 dernières demandes, avec un lien vers la page complète. Page /demandes : 20, puis 20 de plus. */
 const PAGE_ACCUEIL = 10;
 const PAGE_COMPLETE = 20;
 
-type Filtre = "toutes" | "mes" | "pj";
-const FILTRES: { valeur: Filtre; libelle: string }[] = [
+type Filtre = "toutes" | "mes" | "pj" | "retard";
+/** « En retard » n'est proposé qu'aux managers et à l'admin (ils traitent les demandes). */
+const FILTRES: { valeur: Filtre; libelle: string; reserveAuxManagers?: boolean }[] = [
   { valeur: "toutes", libelle: "Toutes" },
   { valeur: "mes", libelle: "Mes demandes" },
   { valeur: "pj", libelle: "Avec pièce jointe" },
+  { valeur: "retard", libelle: "En retard (+3 j)", reserveAuxManagers: true },
 ];
 
-const CELLULE = "block px-sm py-xs align-middle md:table-cell md:px-sm md:py-sm";
-/** Sur petit écran, chaque cellule affiche son nom de colonne avant la valeur. */
-const ETIQUETTE =
-  "before:mb-xs before:block before:font-label-sm before:text-sm before:uppercase before:text-on-surface-variant before:content-[attr(data-label)] md:before:hidden";
+/**
+ * Mise en page selon la largeur du bloc (requêtes de conteneur, pas de la fenêtre). Une seule grille pour tout le
+ * tableau : le conteneur porte les colonnes (variable --colonnes), chaque ligne les reprend en sous-grille (subgrid).
+ * Sans subgrid, chaque ligne reprend les mêmes largeurs fixes : l'alignement reste le même.
+ * - moins de 700 px : une carte par demande (Catégorie et date ; auteur et texte ; statut ; visibilité) ;
+ * - de 700 à 1000 px : trois colonnes, « Suivi » empile statut, visibilité et date ;
+ * - 1000 px et plus : cinq colonnes (Catégorie 210 px, Auteur et demande, Statut 190 px, Visibilité 140 px, Date 56 px).
+ * La sémantique reste celle d'un tableau (role table, row, columnheader, cell).
+ */
+const TABLEAU =
+  "grid grid-cols-[var(--colonnes)] [--colonnes:minmax(0,1fr)_96px] @min-[700px]:[--colonnes:210px_minmax(0,1fr)_196px] @min-[1000px]:[--colonnes:210px_minmax(0,1fr)_190px_140px_56px]";
+/** Ligne du tableau (en-tête compris) : pleine largeur, colonnes reprises du tableau. */
+const LIGNE_GRILLE =
+  "col-span-full grid grid-cols-[var(--colonnes)] supports-[grid-template-columns:subgrid]:grid-cols-subgrid gap-y-xs";
+const LIGNE = `${LIGNE_GRILLE} border-b border-outline-variant py-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`;
+/** Marge horizontale : sépare les colonnes ; la colonne Catégorie est collée au bord (pl-0). */
+const CELLULE = "min-w-0 self-center px-xs";
+/** Demande en attente (ou à clarifier) depuis plus de 3 jours : date en rouge, filtre « En retard ». */
+const SEUIL_ATTENTE_MS = 3 * 24 * 60 * 60 * 1000;
+
+/** Date courte d'une demande : « 11 h », « 4 j ». L'heure exacte est dans le titre de la balise. */
+function dateCourteDemande(iso: string, maintenant = Date.now()): string {
+  const min = Math.round((maintenant - new Date(iso).getTime()) / 60000);
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `${min}\u00a0min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h}\u00a0h`;
+  return `${Math.round(h / 24)}\u00a0j`;
+}
+
+/** Demande en attente de traitement : en attente, ou à clarifier (refusée avec cette catégorie). */
+function demandeEnAttente(s: Submission): boolean {
+  return (
+    s.status === "en attente" ||
+    (s.status === "refusée" && s.rejection_category === CLARIFY_CATEGORY)
+  );
+}
 
 /**
  * « 10 dernières demandes du cabinet » (accueil) ou tableau complet (page /demandes) : tous statuts, les plus
@@ -67,18 +103,27 @@ export function DemandesCabinet({
   const [filtre, setFiltre] = useState<Filtre>("toutes");
   const [equipe, setEquipe] = useState("");
   const [limite, setLimite] = useState(PAGE);
-  const premiereAjoutee = useRef<HTMLTableRowElement>(null);
+  const premiereAjoutee = useRef<HTMLDivElement>(null);
+
+  const maintenant = Date.now();
+  /** En attente (ou à clarifier) depuis plus de 3 jours : même seuil que la date en rouge. */
+  function attendLongtemps(s: Submission) {
+    return demandeEnAttente(s) && maintenant - new Date(s.created_at).getTime() > SEUIL_ATTENTE_MS;
+  }
 
   const toutes = useMemo(() => q.data ?? [], [q.data]);
   const equipes = useMemo(
     () => [...new Set(toutes.map((s) => s.team))].sort((a, b) => a.localeCompare(b, "fr")),
     [toutes],
   );
-  const filtrees = toutes.filter(
-    (s) =>
-      (filtre === "toutes" || (filtre === "mes" ? estMoi(s) : !!s.attachment_path)) &&
-      (!equipe || s.team === equipe),
-  );
+  const filtres = FILTRES.filter((f) => !f.reserveAuxManagers || role !== "collaborateur");
+  function correspond(s: Submission) {
+    if (filtre === "mes") return estMoi(s);
+    if (filtre === "pj") return !!s.attachment_path;
+    if (filtre === "retard") return attendLongtemps(s);
+    return true;
+  }
+  const filtrees = toutes.filter((s) => correspond(s) && (!equipe || s.team === equipe));
   const visibles = filtrees.slice(0, limite);
 
   // Après « Afficher 20 de plus », le focus va sur la première ligne ajoutée
@@ -91,10 +136,15 @@ export function DemandesCabinet({
     setLimite(PAGE);
   }
 
+  const titreTableau =
+    variante === "accueil"
+      ? "Dix dernières demandes du cabinet, de la plus récente à la plus ancienne"
+      : "Demandes du cabinet, de la plus récente à la plus ancienne";
+
   return (
     <section
       aria-labelledby="titre-cabinet"
-      className="min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest p-md"
+      className="@container min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest p-sm min-[900px]:p-md"
     >
       {variante === "accueil" ? (
         <div className="space-y-xs border-b border-outline-variant pb-sm">
@@ -114,7 +164,7 @@ export function DemandesCabinet({
 
       <div className="mt-md flex flex-wrap items-center justify-between gap-sm">
         <div role="group" aria-label="Filtrer les demandes" className="flex flex-wrap gap-xs">
-          {FILTRES.map((f) => (
+          {filtres.map((f) => (
             <button
               key={f.valeur}
               type="button"
@@ -134,9 +184,9 @@ export function DemandesCabinet({
         </div>
         <label
           htmlFor="filtre-equipe-cabinet"
-          className="flex min-h-11 items-center gap-xs font-label-sm text-sm text-on-surface"
+          className="flex min-h-11 min-w-0 max-w-full items-center gap-xs font-label-sm text-sm text-on-surface"
         >
-          <span>Équipe :</span>
+          <span className="shrink-0">Équipe :</span>
           <select
             id="filtre-equipe-cabinet"
             name="equipe"
@@ -145,7 +195,7 @@ export function DemandesCabinet({
               setEquipe(e.target.value);
               setLimite(PAGE);
             }}
-            className="min-h-11 max-w-full border border-[#8A8A90] bg-card px-sm py-xs font-label-sm text-sm focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="min-h-11 min-w-0 max-w-full border border-[#8A8A90] bg-card px-sm py-xs font-label-sm text-sm focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <option value="">Toutes</option>
             {equipes.map((t) => (
@@ -162,110 +212,165 @@ export function DemandesCabinet({
       )}
       {q.isSuccess && filtrees.length === 0 && (
         <p className="mt-md text-body-sm italic text-on-surface-variant">
-          Aucune demande ne correspond à ces filtres.
+          {filtre === "retard"
+            ? "Aucune demande en retard."
+            : "Aucune demande ne correspond à ces filtres."}
         </p>
       )}
 
       {visibles.length > 0 && (
-        <div className="mt-md">
-          <table className="w-full border-collapse text-left md:table-fixed">
-            {/* Largeurs fixes pour Catégorie, Statut, Visibilité et Date ; Auteur prend le reste */}
-            <colgroup>
-              <col className="md:w-[220px]" />
-              <col />
-              <col className="md:w-[180px]" />
-              <col className="md:w-[150px]" />
-              <col className="md:w-[90px]" />
-            </colgroup>
-            <caption className="sr-only">
-              Dix dernières demandes du cabinet, de la plus récente à la plus ancienne
-            </caption>
-            <thead className="sr-only md:not-sr-only">
-              <tr className="border-b border-outline-variant bg-[#F5F4F1] font-label-sm text-sm text-on-surface-variant">
-                <th scope="col" className="px-sm py-xs font-semibold uppercase">
-                  Catégorie
-                </th>
-                <th scope="col" className="px-sm py-xs font-semibold uppercase">
-                  Auteur et demande
-                </th>
-                <th scope="col" className="px-sm py-xs font-semibold uppercase">
-                  Statut
-                </th>
-                <th scope="col" className="px-sm py-xs font-semibold uppercase">
-                  Visibilité
-                </th>
-                <th scope="col" className="px-sm py-xs font-semibold uppercase">
-                  Date
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibles.map((s, i) => (
-                <tr
-                  key={s.id}
-                  ref={i === limite - PAGE ? premiereAjoutee : undefined}
-                  tabIndex={-1}
-                  className="block border-b border-outline-variant py-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary md:table-row md:py-0"
+        <div role="table" aria-label={titreTableau} className={cn(TABLEAU, "mt-md min-w-0")}>
+          <div
+            role="row"
+            className={cn(
+              LIGNE_GRILLE,
+              "sr-only border-b border-outline-variant bg-[#F5F4F1] font-label-sm text-sm text-on-surface-variant @min-[700px]:not-sr-only",
+            )}
+          >
+            <div
+              role="columnheader"
+              className="col-start-1 row-start-1 min-w-0 py-xs pl-0 pr-xs font-semibold uppercase"
+            >
+              Catégorie
+            </div>
+            <div
+              role="columnheader"
+              className="col-start-2 row-start-1 min-w-0 px-xs py-xs font-semibold uppercase"
+            >
+              Auteur et demande
+            </div>
+            <div
+              role="columnheader"
+              className="col-start-3 row-start-1 hidden min-w-0 px-xs py-xs font-semibold uppercase @min-[700px]:block @min-[1000px]:hidden"
+            >
+              Suivi
+            </div>
+            <div
+              role="columnheader"
+              className="col-start-3 row-start-1 hidden min-w-0 px-xs py-xs font-semibold uppercase @min-[1000px]:block"
+            >
+              Statut
+            </div>
+            <div
+              role="columnheader"
+              className="col-start-4 row-start-1 hidden min-w-0 px-xs py-xs font-semibold uppercase @min-[1000px]:block"
+            >
+              Visibilité
+            </div>
+            <div
+              role="columnheader"
+              className="col-start-5 row-start-1 hidden min-w-0 px-xs py-xs text-right font-semibold uppercase @min-[1000px]:block"
+            >
+              Date
+            </div>
+          </div>
+
+          {visibles.map((s, i) => {
+            const attenteLongue = attendLongtemps(s);
+            return (
+              <div
+                key={s.id}
+                role="row"
+                ref={i === limite - PAGE ? premiereAjoutee : undefined}
+                tabIndex={-1}
+                className={LIGNE}
+              >
+                <div role="cell" className={cn(CELLULE, "col-start-1 row-start-1 pl-0")}>
+                  {s.category ? (
+                    <CategoryChip category={s.category} />
+                  ) : (
+                    <span className="text-on-surface-variant">Non renseignée</span>
+                  )}
+                </div>
+
+                <div
+                  role="cell"
+                  className={cn(
+                    CELLULE,
+                    "col-span-2 col-start-1 row-start-2 @min-[700px]:col-span-1 @min-[700px]:col-start-2 @min-[700px]:row-span-3 @min-[700px]:row-start-1 @min-[1000px]:row-span-1",
+                  )}
                 >
-                  <td data-label="Catégorie" className={`${CELLULE} ${ETIQUETTE}`}>
-                    {s.category ? (
-                      <CategoryChip category={s.category} />
-                    ) : (
-                      <span className="text-on-surface-variant">Non renseignée</span>
-                    )}
-                  </td>
-                  <td data-label="Auteur et demande" className={`${CELLULE} ${ETIQUETTE} min-w-0`}>
-                    <p className="flex flex-wrap items-center gap-x-xs font-body-sm font-bold text-primary wrap-anywhere">
-                      <span>{`${s.author_name} · ${s.team}`}</span>
-                      {estMoi(s) && <EtiquetteSoi>Moi</EtiquetteSoi>}
+                  <p className="flex min-w-0 flex-wrap items-center gap-x-xs font-body-sm font-bold text-primary break-normal">
+                    <span>{`${s.author_name} · ${s.team}`}</span>
+                    {estMoi(s) && <EtiquetteSoi>Moi</EtiquetteSoi>}
+                  </p>
+                  {/* Texte sur deux lignes au plus ; « Voir » est posé à la fin de la dernière ligne, dans la marge réservée */}
+                  <div className="relative min-w-0">
+                    <p
+                      className="line-clamp-2 min-w-0 break-words pr-14 whitespace-normal"
+                      title={decouperContenu(s.content).texte}
+                    >
+                      {decouperContenu(s.content).texte}
                     </p>
-                    {/* Texte tronqué sur une ligne ; « Voir » juste après (après les « … » s'il y en a) */}
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-sm">
-                      <div className="flex min-w-0 max-w-full items-center gap-xs">
-                        <span
-                          className="min-w-0 truncate font-body-sm text-on-surface"
-                          title={s.content}
-                        >
-                          {s.content}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => onRead(s)}
-                          aria-haspopup="dialog"
-                          aria-label={`Voir la demande de ${s.author_name}`}
-                          className="inline-flex min-h-11 shrink-0 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                        >
-                          <span className="underline underline-offset-2">Voir</span>
-                        </button>
-                      </div>
-                      {s.attachment_path &&
-                        (peutLirePiece(s) ? (
-                          <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-                        ) : (
-                          <p className="font-label-sm text-sm text-on-surface-variant wrap-anywhere">
-                            {`${s.attachment_name ?? "Pièce jointe"} · réservée à l'équipe`}
-                          </p>
-                        ))}
-                    </div>
-                  </td>
-                  <td data-label="Statut" className={`${CELLULE} ${ETIQUETTE}`}>
-                    <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
-                  </td>
-                  <td data-label="Visibilité" className={`${CELLULE} ${ETIQUETTE}`}>
-                    <VisibilityChip visibility={s.visibility} />
-                  </td>
-                  <td
-                    data-label="Date"
-                    className={`${CELLULE} ${ETIQUETTE} font-label-sm text-sm text-on-surface-variant whitespace-nowrap`}
+                    <button
+                      type="button"
+                      onClick={() => onRead(s)}
+                      aria-haspopup="dialog"
+                      aria-label={`Voir la demande de ${s.author_name}`}
+                      className="absolute bottom-0 right-0 inline-flex h-6 items-center bg-surface-container-lowest pl-xs font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    >
+                      <span className="underline underline-offset-2">Voir</span>
+                    </button>
+                  </div>
+                  {s.attachment_path &&
+                    (peutLirePiece(s) ? (
+                      <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+                    ) : (
+                      <p className="font-label-sm text-sm text-on-surface-variant wrap-anywhere">
+                        {`${s.attachment_name ?? "Pièce jointe"} · réservée à l'équipe`}
+                      </p>
+                    ))}
+                </div>
+
+                <div
+                  role="cell"
+                  className={cn(
+                    CELLULE,
+                    "col-start-1 row-start-3 @min-[700px]:col-start-3 @min-[700px]:row-start-1",
+                  )}
+                >
+                  <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
+                </div>
+
+                <div
+                  role="cell"
+                  className={cn(
+                    CELLULE,
+                    "col-start-2 row-start-3 justify-self-end @min-[700px]:col-start-3 @min-[700px]:row-start-2 @min-[700px]:justify-self-start @min-[1000px]:col-start-4 @min-[1000px]:row-start-1",
+                  )}
+                >
+                  <VisibilityChip visibility={s.visibility} />
+                </div>
+
+                <div
+                  role="cell"
+                  className={cn(
+                    CELLULE,
+                    "col-start-2 row-start-1 justify-self-end font-label-sm text-sm @min-[700px]:col-start-3 @min-[700px]:row-start-3 @min-[700px]:justify-self-start @min-[1000px]:col-start-5 @min-[1000px]:row-start-1 @min-[1000px]:justify-self-end",
+                  )}
+                >
+                  <time
+                    dateTime={s.created_at}
+                    title={formatExactDate(s.created_at)}
+                    className={cn(
+                      "inline-flex items-center gap-xs whitespace-nowrap",
+                      attenteLongue ? "font-semibold text-[#A81E25]" : "text-on-surface-variant",
+                    )}
                   >
-                    <time dateTime={s.created_at} title={formatExactDate(s.created_at)}>
-                      {ilYaCourt(s.created_at)}
-                    </time>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    {attenteLongue && (
+                      <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
+                        schedule
+                      </span>
+                    )}
+                    {dateCourteDemande(s.created_at, maintenant)}
+                    {attenteLongue && (
+                      <span className="sr-only">, en attente depuis plus de 3 jours</span>
+                    )}
+                  </time>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

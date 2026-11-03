@@ -81,11 +81,16 @@ export function ActualitesCabinet({
   const drafts = (news.data ?? []).filter(
     (n) => n.status === "brouillon" && (isAdmin || (n.author_email ?? "").toLowerCase() === email),
   );
+  // Lien « Voir toutes mes actualités » : l'admin voit tout le cabinet, le manager ses propres publications
+  const aPublie = isAdmin
+    ? published.length > 0
+    : published.some((n) => (n.author_email ?? "").toLowerCase() === email);
   const noms = useNomsAffiches(
     (news.data ?? []).flatMap((n) => [n.author ?? "", n.delegated_by_email ?? ""]),
   ).data;
 
   const [lue, setLue] = useState<News | null>(null);
+  const [apercu, setApercu] = useState<News | null>(null);
   // Fenêtre de rédaction ouverte : news null = nouvelle actualité
   const [editeur, setEditeur] = useState<{ news: News | null } | null>(null);
 
@@ -184,11 +189,15 @@ export function ActualitesCabinet({
                   key={n.id}
                   className="flex flex-col gap-sm rounded-md border border-outline-variant bg-card p-sm"
                 >
-                  <div className="min-w-0 space-y-xs">
-                    <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
-                    <p className="font-label-sm text-sm text-on-surface-variant">
-                      {libelleBrouillon(n, noms)}
-                    </p>
+                  {/* Vignette carrée (si image) à gauche, comme pour les actualités publiées */}
+                  <div className="flex min-w-0 gap-sm">
+                    {n.image_path && <NewsVignette path={n.image_path} alt={n.title} />}
+                    <div className="min-w-0 flex-1 space-y-xs">
+                      <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
+                      <p className="font-label-sm text-sm text-on-surface-variant">
+                        {libelleBrouillon(n, noms)}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-sm">
                     <div className="flex flex-wrap items-center gap-md">
@@ -210,6 +219,16 @@ export function ActualitesCabinet({
                       >
                         <Icon name="edit" className="text-base" />
                         <span className={TEXTE_SOULIGNE}>Modifier</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setApercu(n)}
+                        aria-haspopup="dialog"
+                        aria-label={`Aperçu du brouillon « ${n.title} »`}
+                        className={CLASSE_LIEN_ACTION}
+                      >
+                        <Icon name="visibility" className="text-base" />
+                        <span className={TEXTE_SOULIGNE}>Aperçu</span>
                       </button>
                     </div>
                     <button
@@ -239,9 +258,11 @@ export function ActualitesCabinet({
               ))}
             </ul>
           )}
-          <LienBasBloc to="/actualites" align="centre">
-            Voir toutes mes actualités
-          </LienBasBloc>
+          {(drafts.length > 0 || aPublie) && (
+            <LienBasBloc to="/actualites" align="centre">
+              Voir toutes mes actualités
+            </LienBasBloc>
+          )}
         </div>
       )}
 
@@ -347,6 +368,44 @@ export function ActualitesCabinet({
       )}
 
       <NewsReader news={lue} onClose={() => setLue(null)} />
+      <NewsReader
+        news={apercu}
+        apercu
+        onClose={() => setApercu(null)}
+        pied={
+          apercu && (
+            <>
+              <button
+                type="button"
+                onClick={() => setApercu(null)}
+                className={buttonVariants({ variant: "secondary" })}
+              >
+                Fermer
+              </button>
+              <button
+                type="button"
+                disabled={publier.isPending}
+                onClick={async () => {
+                  const n = apercu;
+                  // La fenêtre d'aperçu se ferme avant la confirmation : deux fenêtres ne se superposent pas
+                  setApercu(null);
+                  if (
+                    await demander({
+                      titre: "Publier l'actualité",
+                      message: `Publier l'actualité « ${n.title} » ? Elle sera visible par tous.`,
+                      libelleConfirmer: "Publier",
+                    })
+                  )
+                    publier.mutate(n.id);
+                }}
+                className={buttonVariants({ variant: "default" })}
+              >
+                Publier
+              </button>
+            </>
+          )
+        }
+      />
       {dialogueConfirm}
     </section>
   );

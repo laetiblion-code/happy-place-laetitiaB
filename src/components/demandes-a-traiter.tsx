@@ -8,10 +8,19 @@ import { type Submission } from "@/lib/dashboard";
 import { DureeCourte } from "@/components/duree-courte";
 import { initialesDe } from "@/lib/noms";
 import { TexteDemande } from "@/components/echange-demande";
+import { teamKey, type AdminDirectory } from "@/lib/home-counts";
+
+/** « a », « a et b », « a, b et c » : liste française. */
+function listeFr(noms: string[]) {
+  if (noms.length <= 1) return noms.join("");
+  return `${noms.slice(0, -1).join(", ")} et ${noms[noms.length - 1]}`;
+}
 
 /** Demandes à traiter (manager et admin) : une carte par demande, les plus anciennes d'abord. */
 export function DemandesATraiter({
   email,
+  admin = false,
+  annuaire,
   items,
   error,
   pending,
@@ -24,6 +33,9 @@ export function DemandesATraiter({
 }: {
   /** Adresse de la personne connectée (« Toi » dans l'échange). */
   email: string;
+  /** Admin : la chip nomme les managers de l'équipe (annuaire), « chez toi » seulement sans manager. */
+  admin?: boolean;
+  annuaire?: AdminDirectory;
   items: Submission[] | undefined;
   error: boolean;
   /** Nombre de demandes à valider (même compte que la carte « Demandes en attente »). */
@@ -35,6 +47,17 @@ export function DemandesATraiter({
   onClarifier: (s: Submission) => void;
   onValider: (s: Submission) => void;
 }) {
+  /** Où la demande attend : chez les managers de l'équipe (admin), ou chez soi (manager, équipe sans manager). */
+  function attenteChez(equipe: string): string {
+    if (!admin || !annuaire) return "chez toi";
+    const noms = annuaire.users
+      .filter(
+        (u) => u.role === "manager" && u.managedTeams.some((t) => teamKey(t) === teamKey(equipe)),
+      )
+      .map((u) => u.first_name?.trim() || u.email);
+    return noms.length > 0 ? `chez ${listeFr(noms)}` : "chez toi";
+  }
+
   // Plus anciennes d'abord : une demande qui attend depuis longtemps reste en tête
   const triees = useMemo(
     () => [...(items ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at)),
@@ -92,7 +115,8 @@ export function DemandesATraiter({
                 </div>
                 <div className="flex flex-wrap items-center gap-xs">
                   <ChipStatut icon="hourglass_empty" couleur={COULEUR_STATUT.sable}>
-                    Attend chez toi depuis <DureeCourte iso={depuis} />
+                    {`Attend ${attenteChez(s.team)} depuis `}
+                    <DureeCourte iso={depuis} />
                   </ChipStatut>
                   <VisibilityChip visibility={s.visibility} />
                 </div>

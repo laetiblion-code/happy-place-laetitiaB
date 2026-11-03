@@ -8,13 +8,8 @@ import { Pencil, Trash2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { BulkImport } from "@/components/manage/bulk-import";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { BoutonAnnuler, Modal } from "@/components/manage/crud-ui";
+
 import { countAttachmentDeletionQueue, processAttachmentDeletionQueue } from "@/lib/dashboard";
 import {
   ChipStatut,
@@ -481,15 +476,28 @@ function UsersPage() {
               {initialesDe(nom || u.email)}
             </span>
             <div className="min-w-0">
-              <h3
-                id={`${idCarte}-titre`}
-                className="font-body-md font-bold text-primary wrap-anywhere"
-              >
-                {nom || u.email}
-                {u.email === me && (
-                  <span className="ml-xs font-normal text-on-surface-variant">(toi)</span>
-                )}
-              </h3>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-sm gap-y-xs">
+                <h3
+                  id={`${idCarte}-titre`}
+                  className="font-body-md font-bold text-primary wrap-anywhere"
+                >
+                  {nom || u.email}
+                  {u.email === me && (
+                    <span className="ml-xs font-normal text-on-surface-variant">(toi)</span>
+                  )}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditingName({ id: u.id, first: u.first_name ?? "", last: u.last_name ?? "" })
+                  }
+                  aria-label={`Modifier le nom de ${u.email}`}
+                  className={CLASSE_LIEN_ACTION}
+                >
+                  <Pencil aria-hidden="true" size={16} />
+                  <span className={TEXTE_SOULIGNE}>Modifier</span>
+                </button>
+              </div>
               {nom && (
                 <p className="text-body-sm text-on-surface-variant wrap-anywhere">{u.email}</p>
               )}
@@ -607,18 +615,6 @@ function UsersPage() {
         )}
 
         <div className="flex flex-wrap items-center gap-sm border-t border-outline-variant pt-sm">
-          <button
-            type="button"
-            onClick={() =>
-              setEditingName({ id: u.id, first: u.first_name ?? "", last: u.last_name ?? "" })
-            }
-            aria-label={`Modifier le nom de ${u.email}`}
-            className={CLASSE_LIEN_ACTION}
-          >
-            <Pencil aria-hidden="true" size={16} />
-            <span className={TEXTE_SOULIGNE}>Modifier</span>
-          </button>
-
           <select
             name="role-utilisateur"
             value={u.role}
@@ -1029,15 +1025,40 @@ function UsersPage() {
 
       <TeamsSection users={list.data ?? []} teams={teamsQuery.data ?? []} onChanged={refresh} />
 
-      <Dialog open={!!roleDialog} onOpenChange={(o) => !o && setRoleDialog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Équipe de {roleDialog?.email}</DialogTitle>
-          </DialogHeader>
+      {roleDialog && (
+        <Modal
+          title={`Équipe de ${roleDialog.email}`}
+          onClose={() => setRoleDialog(null)}
+          pied={
+            <div className="flex flex-wrap justify-end gap-xs">
+              <BoutonAnnuler />
+              <button
+                type="button"
+                disabled={!roleDialog.team || update.isPending}
+                title={!roleDialog.team ? "Choisis d'abord une équipe" : undefined}
+                onClick={() => {
+                  if (!roleDialog.team) return;
+                  update.mutate(
+                    { id: roleDialog.id, role: "collaborateur", team: roleDialog.team },
+                    {
+                      onSuccess: () => {
+                        toast.success("Rôle modifié");
+                        setRoleDialog(null);
+                      },
+                    },
+                  );
+                }}
+                className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md disabled:opacity-50"
+              >
+                {update.isPending ? "…" : "Enregistrer"}
+              </button>
+            </div>
+          }
+        >
           <select
             name="equipe-role"
-            value={roleDialog?.team ?? ""}
-            onChange={(e) => roleDialog && setRoleDialog({ ...roleDialog, team: e.target.value })}
+            value={roleDialog.team}
+            onChange={(e) => setRoleDialog({ ...roleDialog, team: e.target.value })}
             aria-label="Équipe du collaborateur"
             className="w-full border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
           >
@@ -1048,37 +1069,8 @@ function UsersPage() {
               </option>
             ))}
           </select>
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => setRoleDialog(null)}
-              className={buttonVariants({ variant: "secondary" })}
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              disabled={!roleDialog?.team || update.isPending}
-              title={!roleDialog?.team ? "Choisis d'abord une équipe" : undefined}
-              onClick={() => {
-                if (!roleDialog?.team) return;
-                update.mutate(
-                  { id: roleDialog.id, role: "collaborateur", team: roleDialog.team },
-                  {
-                    onSuccess: () => {
-                      toast.success("Rôle modifié");
-                      setRoleDialog(null);
-                    },
-                  },
-                );
-              }}
-              className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md disabled:opacity-50"
-            >
-              {update.isPending ? "…" : "Enregistrer"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </Modal>
+      )}
       {dialogueConfirm}
     </div>
   );

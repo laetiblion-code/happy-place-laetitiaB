@@ -130,6 +130,18 @@ export function ChoixAuteur({
         Publier au nom de <span aria-hidden="true">*</span>
       </label>
       <div className="relative">
+        <span
+          aria-hidden="true"
+          className="material-symbols-outlined pointer-events-none absolute left-sm top-1/2 -translate-y-1/2 text-[20px] text-on-surface-variant"
+        >
+          person
+        </span>
+        <span
+          aria-hidden="true"
+          className={`material-symbols-outlined pointer-events-none absolute right-sm top-1/2 -translate-y-1/2 text-[20px] text-on-surface-variant transition-transform ${ouvert ? "rotate-180" : ""}`}
+        >
+          expand_more
+        </span>
         <input
           id={`${idBase}-champ`}
           type="text"
@@ -155,7 +167,7 @@ export function ChoixAuteur({
             setRecherche(null);
             changerOuverture(false);
           }}
-          className="min-h-11 w-full rounded-[6px] border border-[#8A8A90] bg-card px-sm py-xs font-body-md text-on-surface focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60"
+          className="min-h-11 w-full cursor-pointer rounded-[6px] border border-[#8A8A90] bg-card py-xs pl-[40px] pr-[40px] font-body-md text-on-surface hover:border-primary hover:bg-[#F5F4F1] focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
         />
         {ouvert && (
           <ul
