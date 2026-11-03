@@ -10,7 +10,7 @@ import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card
 import { SubmissionReader } from "@/components/submission-reader";
 import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS } from "@/components/submission-choices";
 import { ManagerCards } from "@/components/home-counters";
-import { fetchAdminDirectory, fetchAlertCounts, fetchDelaiValidation, fetchDraftCounts, fetchMyCounts, fetchPublicationActus, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
+import { fetchAdminDirectory, fetchAlertCounts, fetchDelaiValidation, fetchDraftCounts, fetchMesActus, fetchMyCounts, fetchPublicationActus, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
 import { AlertsKanban } from "@/components/alerts-kanban";
 import { buttonVariants } from "@/components/ui/button";
 import { LienBasBloc } from "@/components/chips";
@@ -183,6 +183,13 @@ function ManagerSpace() {
     queryFn: () => fetchDelaiValidation(isAdmin ? null : (myTeams.data ?? [])),
     retry: false,
   });
+  // Historique de la personne connectée : incitations à publier dans la carte « Actualités en attente »
+  const homeMesActus = useQuery({
+    queryKey: ["home-counts", "mes-actus", myEmail],
+    enabled: canReview && !!myEmail,
+    queryFn: () => fetchMesActus(myEmail),
+    retry: false,
+  });
   // Admin : tout le cabinet ; manager : ses propres actualités
   const homeActus = useQuery({
     queryKey: ["home-counts", "actus", role, myEmail],
@@ -245,13 +252,19 @@ function ManagerSpace() {
     onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
   });
 
+  // Manager sans équipe : pas encore rattaché (une fois les équipes chargées)
+  const sansEquipe = role === "manager" && myTeams.isSuccess && myTeams.data.length === 0;
   const roleIntro =
-    role === "manager"
+    sansEquipe
+      ? "Ton administratrice doit encore te rattacher à une équipe."
+      : role === "manager"
       ? "Gère les validations prioritaires de ton équipe et consulte les actualités du cabinet."
       : role === "admin"
         ? "Suis ce qui attend une action dans tout le cabinet."
         : "Suis tes demandes et retrouve les actualités du cabinet.";
-  const greeting = profile.data?.first_name?.trim() ? `Bonjour ${profile.data.first_name.trim()}` : "Bonjour";
+  const prenom = profile.data?.first_name?.trim();
+  // Sans prénom (compte sans fiche complète) : pas de « Bonjour » seul
+  const greeting = prenom ? `Bonjour ${prenom}` : "Bienvenue sur Happy Place";
 
   function openSubmissionForm() {
     setSubmissionErrors({});
@@ -318,6 +331,8 @@ function ManagerSpace() {
             alerts={homeAlerts.data}
             delai={homeDelai.data}
             actus={homeActus.data}
+            mesActus={homeMesActus.data}
+            onRediger={() => setOuvertureActu((n) => n + 1)}
           />
         )}
 

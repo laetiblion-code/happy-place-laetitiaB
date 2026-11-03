@@ -81,6 +81,10 @@ export function ActualitesCabinet({
   const drafts = (news.data ?? []).filter(
     (n) => n.status === "brouillon" && (isAdmin || (n.author_email ?? "").toLowerCase() === email),
   );
+  // Lien « Voir toutes mes actualités » : l'admin voit tout le cabinet, le manager ses propres publications
+  const aPublie = isAdmin
+    ? published.length > 0
+    : published.some((n) => (n.author_email ?? "").toLowerCase() === email);
   const noms = useNomsAffiches(
     (news.data ?? []).flatMap((n) => [n.author ?? "", n.delegated_by_email ?? ""]),
   ).data;
@@ -254,9 +258,11 @@ export function ActualitesCabinet({
               ))}
             </ul>
           )}
-          <LienBasBloc to="/actualites" align="centre">
-            Voir toutes mes actualités
-          </LienBasBloc>
+          {(drafts.length > 0 || aPublie) && (
+            <LienBasBloc to="/actualites" align="centre">
+              Voir toutes mes actualités
+            </LienBasBloc>
+          )}
         </div>
       )}
 

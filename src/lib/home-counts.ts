@@ -359,3 +359,32 @@ export async function fetchPublicationActus(
   const rows = data ?? [];
   return { commencees: rows.length, publiees: rows.filter((n) => n.status === "publiée").length };
 }
+
+export type MesActus = {
+  /** Toutes les actualités de la personne, tous statuts et toutes dates. */
+  total: number;
+  /** Ses actualités créées dans les 30 derniers jours, tous statuts. */
+  recentes: number;
+  /** Date de création (ISO) de sa dernière actualité publiée, ou null. */
+  dernierePubliee: string | null;
+};
+
+/** Historique des actualités de la personne (ses seules actualités, quel que soit l'admin ou le manager). */
+export async function fetchMesActus(email: string): Promise<MesActus> {
+  const { data, error } = await supabase
+    .from("news")
+    .select("status, created_at")
+    .eq("author_email", email.toLowerCase());
+  if (error) throw error;
+  const rows = data ?? [];
+  const debut = Date.now() - FENETRE_MS;
+  const datesPubliees = rows
+    .filter((n) => n.status === "publiée")
+    .map((n) => Date.parse(n.created_at));
+  const derniere = datesPubliees.length > 0 ? Math.max(...datesPubliees) : null;
+  return {
+    total: rows.length,
+    recentes: rows.filter((n) => Date.parse(n.created_at) >= debut).length,
+    dernierePubliee: derniere === null ? null : new Date(derniere).toISOString(),
+  };
+}
