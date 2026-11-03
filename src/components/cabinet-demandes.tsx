@@ -8,7 +8,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { AttachmentLink } from "@/components/attachment-link";
 import { cn } from "@/lib/utils";
 import { fetchCabinetSubmissions, type Submission } from "@/lib/dashboard";
-import { ilYaCourt } from "@/lib/noms";
+import { CLARIFY_CATEGORY } from "@/components/status-badge";
 
 /** Accueil : 10 dernières demandes, avec un lien vers la page complète. Page /demandes : 20, puis 20 de plus. */
 const PAGE_ACCUEIL = 10;
@@ -21,16 +21,39 @@ const FILTRES: { valeur: Filtre; libelle: string }[] = [
   { valeur: "pj", libelle: "Avec pièce jointe" },
 ];
 
-const CELLULE = "block px-sm py-xs align-middle md:table-cell md:px-sm md:py-sm";
-/** Sur petit écran, chaque cellule affiche son nom de colonne avant la valeur. */
-const ETIQUETTE =
-  "before:mb-xs before:block before:font-label-sm before:text-sm before:uppercase before:text-on-surface-variant before:content-[attr(data-label)] md:before:hidden";
+/**
+ * Mise en page : sous 640 px, chaque demande est une carte (grille : type et date, auteur et texte, statut et
+ * visibilité). De 640 à 900 px, un tableau à quatre colonnes, la visibilité sous le statut. Dès 900 px, cinq colonnes.
+ */
+const LIGNE =
+  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-sm gap-y-xs border-b border-outline-variant py-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-[640px]:table-row min-[640px]:py-0";
+const CELLULE = "min-w-0 align-middle min-[640px]:px-xs min-[640px]:py-sm";
+/** Demande en attente (ou à clarifier) depuis plus de 4 jours : date en rouge. */
+const SEUIL_ATTENTE_MS = 4 * 24 * 60 * 60 * 1000;
 
 /**
  * « 10 dernières demandes du cabinet » (accueil) ou tableau complet (page /demandes) : tous statuts, les plus
  * récentes d'abord. Les règles d'accès (RLS) décident de ce qui est visible : les demandes privées des autres
  * équipes n'apparaissent pas.
  */
+/** Date courte d'une demande : « 11 h », « 4 j ». L'heure exacte est dans le titre de la balise. */
+function dateCourteDemande(iso: string, maintenant = Date.now()): string {
+  const min = Math.round((maintenant - new Date(iso).getTime()) / 60000);
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `${min}\u00a0min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h}\u00a0h`;
+  return `${Math.round(h / 24)}\u00a0j`;
+}
+
+/** Demande en attente de traitement : en attente, ou à clarifier (refusée avec cette catégorie). */
+function demandeEnAttente(s: Submission): boolean {
+  return (
+    s.status === "en attente" ||
+    (s.status === "refusée" && s.rejection_category === CLARIFY_CATEGORY)
+  );
+}
+
 export function DemandesCabinet({
   email,
   role,
@@ -94,7 +117,7 @@ export function DemandesCabinet({
   return (
     <section
       aria-labelledby="titre-cabinet"
-      className="min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest p-md"
+      className="min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest p-sm min-[900px]:p-md"
     >
       {variante === "accueil" ? (
         <div className="space-y-xs border-b border-outline-variant pb-sm">
@@ -168,102 +191,130 @@ export function DemandesCabinet({
 
       {visibles.length > 0 && (
         <div className="mt-md">
-          <table className="w-full border-collapse text-left md:table-fixed">
-            {/* Largeurs fixes pour Catégorie, Statut, Visibilité et Date ; Auteur prend le reste */}
-            <colgroup>
-              <col className="md:w-[220px]" />
-              <col />
-              <col className="md:w-[180px]" />
-              <col className="md:w-[150px]" />
-              <col className="md:w-[90px]" />
-            </colgroup>
+          <table className="w-full border-collapse text-left">
             <caption className="sr-only">
               Dix dernières demandes du cabinet, de la plus récente à la plus ancienne
             </caption>
-            <thead className="sr-only md:not-sr-only">
+            <thead className="sr-only min-[640px]:not-sr-only">
               <tr className="border-b border-outline-variant bg-[#F5F4F1] font-label-sm text-sm text-on-surface-variant">
-                <th scope="col" className="px-sm py-xs font-semibold uppercase">
+                <th scope="col" className="whitespace-nowrap px-xs py-xs font-semibold uppercase">
                   Catégorie
                 </th>
-                <th scope="col" className="px-sm py-xs font-semibold uppercase">
+                <th scope="col" className="px-xs py-xs font-semibold uppercase">
                   Auteur et demande
                 </th>
-                <th scope="col" className="px-sm py-xs font-semibold uppercase">
+                <th scope="col" className="whitespace-nowrap px-xs py-xs font-semibold uppercase">
                   Statut
                 </th>
-                <th scope="col" className="px-sm py-xs font-semibold uppercase">
+                <th
+                  scope="col"
+                  className="hidden whitespace-nowrap px-xs py-xs font-semibold uppercase min-[900px]:table-cell"
+                >
                   Visibilité
                 </th>
-                <th scope="col" className="px-sm py-xs font-semibold uppercase">
+                <th scope="col" className="whitespace-nowrap px-xs py-xs font-semibold uppercase">
                   Date
                 </th>
               </tr>
             </thead>
             <tbody>
-              {visibles.map((s, i) => (
-                <tr
-                  key={s.id}
-                  ref={i === limite - PAGE ? premiereAjoutee : undefined}
-                  tabIndex={-1}
-                  className="block border-b border-outline-variant py-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary md:table-row md:py-0"
-                >
-                  <td data-label="Catégorie" className={`${CELLULE} ${ETIQUETTE}`}>
-                    {s.category ? (
-                      <CategoryChip category={s.category} />
-                    ) : (
-                      <span className="text-on-surface-variant">Non renseignée</span>
-                    )}
-                  </td>
-                  <td data-label="Auteur et demande" className={`${CELLULE} ${ETIQUETTE} min-w-0`}>
-                    <p className="flex flex-wrap items-center gap-x-xs font-body-sm font-bold text-primary wrap-anywhere">
-                      <span>{`${s.author_name} · ${s.team}`}</span>
-                      {estMoi(s) && <EtiquetteSoi>Moi</EtiquetteSoi>}
-                    </p>
-                    {/* Texte tronqué sur une ligne ; « Voir » juste après (après les « … » s'il y en a) */}
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-sm">
-                      <div className="flex min-w-0 max-w-full items-center gap-xs">
-                        <span
-                          className="min-w-0 truncate font-body-sm text-on-surface"
-                          title={s.content}
-                        >
-                          {s.content}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => onRead(s)}
-                          aria-haspopup="dialog"
-                          aria-label={`Voir la demande de ${s.author_name}`}
-                          className="inline-flex min-h-11 shrink-0 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                        >
-                          <span className="underline underline-offset-2">Voir</span>
-                        </button>
-                      </div>
-                      {s.attachment_path &&
-                        (peutLirePiece(s) ? (
-                          <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-                        ) : (
-                          <p className="font-label-sm text-sm text-on-surface-variant wrap-anywhere">
-                            {`${s.attachment_name ?? "Pièce jointe"} · réservée à l'équipe`}
-                          </p>
-                        ))}
-                    </div>
-                  </td>
-                  <td data-label="Statut" className={`${CELLULE} ${ETIQUETTE}`}>
-                    <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
-                  </td>
-                  <td data-label="Visibilité" className={`${CELLULE} ${ETIQUETTE}`}>
-                    <VisibilityChip visibility={s.visibility} />
-                  </td>
-                  <td
-                    data-label="Date"
-                    className={`${CELLULE} ${ETIQUETTE} font-label-sm text-sm text-on-surface-variant whitespace-nowrap`}
+              {visibles.map((s, i) => {
+                const attenteLongue =
+                  demandeEnAttente(s) &&
+                  Date.now() - new Date(s.created_at).getTime() > SEUIL_ATTENTE_MS;
+                return (
+                  <tr
+                    key={s.id}
+                    ref={i === limite - PAGE ? premiereAjoutee : undefined}
+                    tabIndex={-1}
+                    className={LIGNE}
                   >
-                    <time dateTime={s.created_at} title={formatExactDate(s.created_at)}>
-                      {ilYaCourt(s.created_at)}
-                    </time>
-                  </td>
-                </tr>
-              ))}
+                    <td className={`${CELLULE} col-start-1 row-start-1`}>
+                      {s.category ? (
+                        <CategoryChip category={s.category} />
+                      ) : (
+                        <span className="text-on-surface-variant">Non renseignée</span>
+                      )}
+                    </td>
+                    <td
+                      className={`${CELLULE} col-span-2 row-start-2 w-full min-[640px]:col-auto min-[640px]:row-auto`}
+                    >
+                      <div className="min-w-0 min-[900px]:min-w-[15rem]">
+                        <p className="flex min-w-0 flex-wrap items-center gap-x-xs font-body-sm font-bold text-primary break-normal">
+                          <span>{`${s.author_name} · ${s.team}`}</span>
+                          {estMoi(s) && <EtiquetteSoi>Moi</EtiquetteSoi>}
+                        </p>
+                        {/* Texte sur trois lignes au plus (il ne peut pas élargir le tableau), « Voir » toujours visible. */}
+                        <div className="flex min-w-0 flex-wrap items-start gap-x-sm min-[640px]:flex-nowrap min-[640px]:items-center">
+                          <span
+                            className="line-clamp-3 min-w-0 break-words whitespace-normal min-[640px]:flex-1"
+                            title={s.content}
+                          >
+                            {s.content}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onRead(s)}
+                            aria-haspopup="dialog"
+                            aria-label={`Voir la demande de ${s.author_name}`}
+                            className="inline-flex min-h-11 shrink-0 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                          >
+                            <span className="underline underline-offset-2">Voir</span>
+                          </button>
+                        </div>
+                        {s.attachment_path &&
+                          (peutLirePiece(s) ? (
+                            <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+                          ) : (
+                            <p className="font-label-sm text-sm text-on-surface-variant wrap-anywhere">
+                              {`${s.attachment_name ?? "Pièce jointe"} · réservée à l'équipe`}
+                            </p>
+                          ))}
+                      </div>
+                    </td>
+                    <td
+                      className={`${CELLULE} whitespace-nowrap row-start-3 col-start-1 min-[640px]:row-auto min-[640px]:col-auto`}
+                    >
+                      <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
+                      {/* Entre 640 et 900 px, la visibilité passe sous le statut, dans la même cellule */}
+                      <div className="mt-xs hidden min-[640px]:block min-[900px]:hidden">
+                        <VisibilityChip visibility={s.visibility} />
+                      </div>
+                    </td>
+                    <td
+                      className={`${CELLULE} row-start-3 col-start-2 justify-self-end whitespace-nowrap min-[640px]:hidden min-[900px]:table-cell`}
+                    >
+                      <VisibilityChip visibility={s.visibility} />
+                    </td>
+                    <td
+                      className={`${CELLULE} row-start-1 col-start-2 justify-self-end whitespace-nowrap font-label-sm text-sm min-[640px]:justify-self-auto`}
+                    >
+                      <time
+                        dateTime={s.created_at}
+                        title={formatExactDate(s.created_at)}
+                        className={
+                          attenteLongue
+                            ? "inline-flex items-center gap-xs font-semibold text-[#A81E25]"
+                            : "text-on-surface-variant"
+                        }
+                      >
+                        {attenteLongue && (
+                          <span
+                            aria-hidden="true"
+                            className="material-symbols-outlined text-[16px]"
+                          >
+                            schedule
+                          </span>
+                        )}
+                        {dateCourteDemande(s.created_at)}
+                        {attenteLongue && (
+                          <span className="sr-only">, en attente depuis plus de 4 jours</span>
+                        )}
+                      </time>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
