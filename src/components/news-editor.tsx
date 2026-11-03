@@ -422,7 +422,7 @@ export function NewsEditor({
                 </div>
               )}
 
-              <footer className="flex flex-wrap items-center justify-between gap-sm border-t border-outline-variant bg-[#F5F4F1] px-md py-sm">
+              <footer className="space-y-sm border-t border-outline-variant bg-[#F5F4F1] px-md py-sm">
                 <p className="flex min-w-0 items-center gap-xs text-[13px] text-on-surface-variant">
                   <Icone
                     name={delegation ? "shield" : "visibility"}
@@ -436,33 +436,36 @@ export function NewsEditor({
                         : "Visible par tout Bigger Boat une fois publiée."}
                   </span>
                 </p>
-                <div className="flex flex-wrap items-center gap-xs">
+                {/* Une ligne : « Annuler » à gauche ; sous 480 px, les boutons s'empilent, « Publier » en premier */}
+                <div className="flex flex-col-reverse gap-xs min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
                   <button
                     type="button"
                     disabled={sauver.isPending}
                     onClick={demanderFermeture}
-                    className={buttonVariants({ variant: "secondary" })}
+                    className={buttonVariants({ variant: "secondary" }) + " w-full min-[480px]:w-auto"}
                   >
                     Annuler
                   </button>
-                  {!estPubliee && (
+                  <div className="flex flex-col-reverse gap-xs min-[480px]:flex-row min-[480px]:items-center">
+                    {!estPubliee && (
+                      <button
+                        type="button"
+                        disabled={sauver.isPending}
+                        onClick={() => soumettre("brouillon")}
+                        className={buttonVariants({ variant: "secondary" }) + " w-full min-[480px]:w-auto"}
+                      >
+                        {libelleEnregistrer}
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={sauver.isPending}
-                      onClick={() => soumettre("brouillon")}
-                      className="inline-flex min-h-11 items-center justify-center border border-[#28282D] bg-white px-md py-xs font-semibold text-[#28282D] hover:bg-[#EDEBE6] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#28282D] disabled:opacity-50"
+                      onClick={() => soumettre("publiée")}
+                      className={buttonVariants({ variant: "default" }) + " w-full min-[480px]:w-auto"}
                     >
-                      {libelleEnregistrer}
+                      {estPubliee ? "Enregistrer les modifications" : "Publier"}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={sauver.isPending}
-                    onClick={() => soumettre("publiée")}
-                    className={buttonVariants({ variant: "default" })}
-                  >
-                    {estPubliee ? "Enregistrer les modifications" : "Publier"}
-                  </button>
+                  </div>
                 </div>
               </footer>
             </form>
@@ -583,7 +586,7 @@ function ChampImage({
           {...depot.zone}
           data-testid="zone-depot-image"
           className={cn(
-            "border border-dashed transition-colors",
+            "rounded-md border border-dashed transition-colors",
             depot.glisse ? "border-primary border-2 bg-card" : "border-[#8A8A90] bg-transparent",
           )}
         >

@@ -250,6 +250,7 @@ export function NewsAiHelper({
 
   const sourcePrete = source === "lien" ? url.trim() !== "" : pdf !== null;
   const restant = utilises === null ? null : Math.max(0, LIMITE_PERSONNE - utilises);
+  const epuise = restant === 0;
   const idTitre = `${idBase}-titre`;
   const idSousTitre = `${idBase}-sous-titre`;
   const idSourceLibelle = `${idBase}-source`;
@@ -267,9 +268,9 @@ export function NewsAiHelper({
         <div className="space-y-xs">
           <h3
             id={idTitre}
-            className="flex items-center gap-xs font-label-md text-label-md text-primary"
+            className="flex items-center gap-xs font-['Bodoni_Moda',Georgia,serif] text-[20px] font-medium leading-snug text-[#28282D]"
           >
-            <Icone name="auto_awesome" className="text-[20px]" />
+            <Icone name="auto_awesome" className="shrink-0 text-[20px]" />
             Laisse l'IA rédiger un premier jet pour toi
           </h3>
           <p id={idSousTitre} className="text-body-sm text-on-surface-variant">
@@ -304,12 +305,7 @@ export function NewsAiHelper({
                   disabled={enCours}
                   onClick={() => choisirSource(s.id)}
                   onKeyDown={(e) => surToucheSource(e, index)}
-                  className={cn(
-                    "flex min-h-11 items-center justify-center gap-xs border px-sm py-xs font-semibold transition-colors focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50",
-                    actif
-                      ? "border-primary bg-primary text-on-primary"
-                      : "border-[#8A8A90] bg-card text-on-surface hover:border-primary",
-                  )}
+                  className={cn(buttonVariants({ variant: actif ? "default" : "secondary" }), "w-full")}
                 >
                   <Icone name={s.icone} className="text-[18px]" />
                   {s.libelle}
@@ -374,7 +370,7 @@ export function NewsAiHelper({
                 {...depot.zone}
                 data-testid="zone-depot-pdf"
                 className={cn(
-                  "border border-dashed transition-colors",
+                  "rounded-md border border-dashed transition-colors",
                   depot.glisse
                     ? "border-primary border-2 bg-card"
                     : "border-[#8A8A90] bg-transparent",
@@ -415,7 +411,7 @@ export function NewsAiHelper({
 
         <button
           type="button"
-          disabled={enCours || !sourcePrete}
+          disabled={enCours || !sourcePrete || epuise}
           onClick={proposer}
           className={cn(buttonVariants({ variant: "secondary" }), "w-full")}
         >
@@ -424,9 +420,27 @@ export function NewsAiHelper({
         </button>
         <p className="text-body-sm text-on-surface-variant">
           {`Tu as droit à ${LIMITE_PERSONNE} propositions par jour, et le cabinet à ${LIMITE_CABINET}.`}
-          {restant !== null &&
-            ` Il te reste ${restant} proposition${restant > 1 ? "s" : ""} aujourd'hui.`}
         </p>
+        {restant !== null && (
+          <p className="flex flex-wrap items-center gap-xs font-body-sm text-on-surface">
+            <span aria-hidden="true">🧑‍🏫</span>
+            {epuise ? (
+              <span>{`Tu as utilisé tes ${LIMITE_PERSONNE} propositions du jour. Reviens demain.`}</span>
+            ) : restant <= 2 ? (
+              <span>
+                Plus que{" "}
+                <span className="rounded-[4px] bg-[#F0D0BC] px-xs font-semibold text-[#28282D]">{restant}</span>{" "}
+                {restant > 1 ? "propositions" : "proposition"} aujourd'hui.
+              </span>
+            ) : (
+              <span>
+                Il te reste{" "}
+                <span className="rounded-[4px] bg-[#F5D5D4] px-xs font-semibold text-[#28282D]">{restant}</span>{" "}
+                propositions aujourd'hui.
+              </span>
+            )}
+          </p>
+        )}
         <p role="status" className="text-body-sm text-on-surface-variant">
           {enCours ? "L'IA prépare une proposition… (jusqu'à 30 secondes)" : ""}
         </p>
