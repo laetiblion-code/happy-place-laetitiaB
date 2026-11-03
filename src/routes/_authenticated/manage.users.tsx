@@ -8,13 +8,8 @@ import { Pencil, Trash2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { BulkImport } from "@/components/manage/bulk-import";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { BoutonAnnuler, Modal } from "@/components/manage/crud-ui";
+
 import { countAttachmentDeletionQueue, processAttachmentDeletionQueue } from "@/lib/dashboard";
 import {
   ChipStatut,
@@ -1029,15 +1024,40 @@ function UsersPage() {
 
       <TeamsSection users={list.data ?? []} teams={teamsQuery.data ?? []} onChanged={refresh} />
 
-      <Dialog open={!!roleDialog} onOpenChange={(o) => !o && setRoleDialog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Équipe de {roleDialog?.email}</DialogTitle>
-          </DialogHeader>
+      {roleDialog && (
+        <Modal
+          title={`Équipe de ${roleDialog.email}`}
+          onClose={() => setRoleDialog(null)}
+          pied={
+            <div className="flex flex-wrap justify-end gap-xs">
+              <BoutonAnnuler />
+              <button
+                type="button"
+                disabled={!roleDialog.team || update.isPending}
+                title={!roleDialog.team ? "Choisis d'abord une équipe" : undefined}
+                onClick={() => {
+                  if (!roleDialog.team) return;
+                  update.mutate(
+                    { id: roleDialog.id, role: "collaborateur", team: roleDialog.team },
+                    {
+                      onSuccess: () => {
+                        toast.success("Rôle modifié");
+                        setRoleDialog(null);
+                      },
+                    },
+                  );
+                }}
+                className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md disabled:opacity-50"
+              >
+                {update.isPending ? "…" : "Enregistrer"}
+              </button>
+            </div>
+          }
+        >
           <select
             name="equipe-role"
-            value={roleDialog?.team ?? ""}
-            onChange={(e) => roleDialog && setRoleDialog({ ...roleDialog, team: e.target.value })}
+            value={roleDialog.team}
+            onChange={(e) => setRoleDialog({ ...roleDialog, team: e.target.value })}
             aria-label="Équipe du collaborateur"
             className="w-full border border-[#8A8A90] bg-surface px-sm py-xs font-body-md"
           >
@@ -1048,37 +1068,8 @@ function UsersPage() {
               </option>
             ))}
           </select>
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => setRoleDialog(null)}
-              className={buttonVariants({ variant: "secondary" })}
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              disabled={!roleDialog?.team || update.isPending}
-              title={!roleDialog?.team ? "Choisis d'abord une équipe" : undefined}
-              onClick={() => {
-                if (!roleDialog?.team) return;
-                update.mutate(
-                  { id: roleDialog.id, role: "collaborateur", team: roleDialog.team },
-                  {
-                    onSuccess: () => {
-                      toast.success("Rôle modifié");
-                      setRoleDialog(null);
-                    },
-                  },
-                );
-              }}
-              className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md disabled:opacity-50"
-            >
-              {update.isPending ? "…" : "Enregistrer"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </Modal>
+      )}
       {dialogueConfirm}
     </div>
   );

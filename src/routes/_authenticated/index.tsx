@@ -406,18 +406,20 @@ function ManagerSpace() {
         approving={review.isPending}
       />
       {rejecting && (
-        <Modal title={modeRefus === "clarification" ? "Demander une clarification" : "Refuser la demande"} onClose={() => setRejecting(null)} modifie={rejectForm.rejection_note !== ""}>
-          <form
-            noValidate
-            className="space-y-sm"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const res = validate(rejectionSchema, rejectForm);
-              if (!res.ok) return setRejectErrors(res.errors);
-              setRejectErrors({});
-              review.mutate({ id: rejecting.id, status: "refusée", ...res.data });
-            }}
-          >
+        <Modal
+          title={modeRefus === "clarification" ? "Demander une clarification" : "Refuser la demande"}
+          onClose={() => setRejecting(null)}
+          modifie={rejectForm.rejection_note !== ""}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const res = validate(rejectionSchema, rejectForm);
+            if (!res.ok) return setRejectErrors(res.errors);
+            setRejectErrors({});
+            review.mutate({ id: rejecting.id, status: "refusée", ...res.data });
+          }}
+          pied={<FormActions pending={review.isPending} onCancel={() => setRejecting(null)} />}
+        >
+          <div className="space-y-sm">
             <p className="max-h-48 overflow-y-auto border border-outline-variant bg-surface-container-low p-xs text-body-sm italic text-on-surface-variant whitespace-pre-line wrap-anywhere">“{rejecting.content}”</p>
             <ErrorSummary errors={rejectErrors} />
             <Field label="Motif du refus" error={rejectErrors.rejection_category}>
@@ -441,13 +443,23 @@ function ManagerSpace() {
               />
               <CharCounter value={rejectForm.rejection_note} max={500} />
             </Field>
-            <FormActions pending={review.isPending} onCancel={() => setRejecting(null)} />
-          </form>
+          </div>
         </Modal>
       )}
       {submissionForm && (
-        <Modal title="Nouvelle demande" onClose={() => setSubmissionForm(null)} modifie={!!submissionForm.content || !!submissionForm.author_name}>
-          <form onSubmit={sendSubmission} className="space-y-sm" noValidate>
+        <Modal
+          title="Nouvelle demande"
+          onClose={() => setSubmissionForm(null)}
+          onSubmit={sendSubmission}
+          pied={
+            <FormActions
+              pending={submit.isPending || profile.isPending}
+              submitLabel="Envoyer"
+              onCancel={() => setSubmissionForm(null)}
+            />
+          }
+        >
+          <div className="space-y-sm">
             <ErrorSummary errors={submissionErrors} />
             <ChoiceGroup
               legend="Type de demande"
@@ -573,12 +585,7 @@ function ManagerSpace() {
                 )}
               </div>
             </Field>
-            <FormActions
-              pending={submit.isPending || profile.isPending}
-              submitLabel="Envoyer"
-              onCancel={() => setSubmissionForm(null)}
-            />
-          </form>
+          </div>
         </Modal>
       )}
     </div>

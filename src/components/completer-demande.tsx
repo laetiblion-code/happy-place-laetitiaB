@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { Linkify } from "@/components/linkify";
-import { Modal } from "@/components/manage/crud-ui";
+import { BoutonAnnuler, Modal } from "@/components/manage/crud-ui";
 import { buttonVariants } from "@/components/ui/button";
 import { completerMaDemande, type Submission } from "@/lib/dashboard";
 import { cn } from "@/lib/utils";
@@ -66,15 +66,24 @@ export function CompleterDemande({
   const idDemande = `${idBase}-demande`;
 
   return (
-    <Modal title="Compléter ma demande" onClose={onClose} modifie={modifie}>
-      <form
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          envoyer();
-        }}
-        className="space-y-md"
-      >
+    <Modal
+      title="Compléter ma demande"
+      onClose={onClose}
+      modifie={modifie}
+      onSubmit={(e) => {
+        e.preventDefault();
+        envoyer();
+      }}
+      pied={
+        <div className="flex flex-wrap items-center justify-end gap-xs">
+          <BoutonAnnuler disabled={envoi.isPending} />
+          <button type="submit" disabled={envoi.isPending} className={buttonVariants({ variant: "default" })}>
+            {envoi.isPending ? "Envoi en cours…" : "Envoyer ma réponse"}
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-md">
         <p className="text-[14px] text-[#68686D]">
           {`Ta réponse sera ajoutée à ta demande, qui repassera en attente chez ${attente}.`}
         </p>
@@ -156,21 +165,7 @@ export function CompleterDemande({
           )}
         </div>
 
-        {/* Pied fixe de la fenêtre */}
-        <div className="-mx-md -mb-md flex flex-wrap items-center justify-end gap-xs border-t border-outline-variant bg-[#F5F4F1] px-md py-sm">
-          <button
-            type="button"
-            disabled={envoi.isPending}
-            onClick={onClose}
-            className={buttonVariants({ variant: "secondary" })}
-          >
-            Annuler
-          </button>
-          <button type="submit" disabled={envoi.isPending} className={buttonVariants({ variant: "default" })}>
-            {envoi.isPending ? "Envoi en cours…" : "Envoyer ma réponse"}
-          </button>
-        </div>
-      </form>
+      </div>
     </Modal>
   );
 }

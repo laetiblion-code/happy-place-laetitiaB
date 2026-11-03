@@ -1,5 +1,5 @@
 import { useCallback, useState, type ReactNode } from "react";
-import { Modal } from "@/components/manage/crud-ui";
+import { BoutonAnnuler, Modal } from "@/components/manage/crud-ui";
 import { buttonVariants } from "@/components/ui/button";
 
 type Demande = {
@@ -29,24 +29,23 @@ export function useConfirm() {
   }
 
   const dialogue = demande ? (
-    <Modal title={demande.titre} onClose={() => repondre(false)}>
+    <Modal
+      title={demande.titre}
+      onClose={() => repondre(false)}
+      pied={
+        <div className="flex justify-end gap-xs">
+          <BoutonAnnuler onClick={() => repondre(false)} />
+          <button
+            type="button"
+            onClick={() => repondre(true)}
+            className={buttonVariants({ variant: demande.destructive ? "destructive" : "default" })}
+          >
+            {demande.libelleConfirmer}
+          </button>
+        </div>
+      }
+    >
       <div className="font-body-md text-on-surface">{demande.message}</div>
-      <div className="flex justify-end gap-xs pt-sm">
-        <button
-          type="button"
-          onClick={() => repondre(false)}
-          className={buttonVariants({ variant: "secondary" })}
-        >
-          Annuler
-        </button>
-        <button
-          type="button"
-          onClick={() => repondre(true)}
-          className={buttonVariants({ variant: demande.destructive ? "destructive" : "default" })}
-        >
-          {demande.libelleConfirmer}
-        </button>
-      </div>
     </Modal>
   ) : null;
 

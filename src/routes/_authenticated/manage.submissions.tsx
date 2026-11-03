@@ -178,8 +178,11 @@ function ManageSubmissions() {
         onClose={() => setReading(null)}
       />
       {form && (
-        <Modal title="Modifier la demande" onClose={close}>
-          <form onSubmit={submit} className="space-y-sm" noValidate>
+        <Modal title="Modifier la demande" onClose={close}
+          onSubmit={submit}
+          pied={<FormActions pending={save.isPending} onCancel={close} />}
+        >
+          <div className="space-y-sm">
             <ErrorSummary errors={errors} />
             <Field label="Auteur" error={errors.author_name}>
               <TextInput
@@ -258,8 +261,7 @@ function ManageSubmissions() {
                 </Field>
               </>
             )}
-            <FormActions pending={save.isPending} onCancel={close} />
-          </form>
+          </div>
         </Modal>
       )}
 
