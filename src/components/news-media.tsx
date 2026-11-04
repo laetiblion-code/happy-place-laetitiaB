@@ -49,7 +49,16 @@ export function NewsImage({
  * Vignette carrée de 72 px dans les listes : recadrage centré, coins arrondis de 6 px.
  * Texte alternatif : le titre de l'actualité. Rien à afficher sans image (pas d'espace réservé).
  */
-export function NewsVignette({ path, alt }: { path: string; alt: string }) {
+export function NewsVignette({
+  path,
+  alt,
+  taille = "normale",
+}: {
+  path: string;
+  alt: string;
+  /** « petite » : 56 px, pour les lignes d'actualités publiées ; « normale » : 72 px (brouillons). */
+  taille?: "normale" | "petite";
+}) {
   const q = useQuery({
     queryKey: ["news-image", path],
     queryFn: () => signedNewsImageUrl(path),
@@ -61,7 +70,7 @@ export function NewsVignette({ path, alt }: { path: string; alt: string }) {
     <img
       src={q.data}
       alt={alt}
-      className="size-[72px] shrink-0 rounded-[6px] border border-outline-variant object-cover object-center"
+      className={`${taille === "petite" ? "size-14" : "size-[72px]"} shrink-0 rounded-[6px] border border-outline-variant object-cover object-center`}
     />
   );
 }

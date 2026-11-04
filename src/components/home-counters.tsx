@@ -369,7 +369,7 @@ export function ManagerCards({
               Rédiger une actu
             </LienBasBloc>
           ) : (
-            <LienBasBloc align="droite" onClick={() => allerAuBloc("titre-actus")}>
+            <LienBasBloc align="droite" onClick={() => allerAuBloc("titre-brouillons")}>
               {libelleLienBrouillons(incitation?.nombre ?? draftCount, isAdmin)}
             </LienBasBloc>
           )
