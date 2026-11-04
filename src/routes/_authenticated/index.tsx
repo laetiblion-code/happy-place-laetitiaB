@@ -401,6 +401,7 @@ function ManagerSpace() {
               exporting={exporter.isPending}
               onExport={() => exporter.mutate()}
               onRead={setReading}
+              onNouvelle={openSubmissionForm}
             />
             <DernieresActualites email={myEmail} />
           </div>

@@ -63,6 +63,7 @@ export function MesDemandes({
   exporting,
   onExport,
   onRead,
+  onNouvelle,
 }: {
   items: Submission[] | undefined;
   isError: boolean;
@@ -73,6 +74,8 @@ export function MesDemandes({
   exporting: boolean;
   onExport: () => void;
   onRead: (s: Submission) => void;
+  /** Ouvre le formulaire « Nouvelle demande » (état vide). */
+  onNouvelle: () => void;
 }) {
   const [deplie, setDeplie] = useState(false);
   const [cible, setCible] = useState<Cible | null>(null);
@@ -85,6 +88,8 @@ export function MesDemandes({
   const managers = managersQuery.data ?? [];
   const toutes = items ?? [];
   const visibles = deplie ? toutes : toutes.slice(0, APERCU);
+  // Aucune demande (liste chargée) : pas d'export, pas de tri, pas de compteurs à zéro
+  const aucune = items !== undefined && toutes.length === 0;
 
   return (
     <section
@@ -99,20 +104,24 @@ export function MesDemandes({
         >
           Mes demandes
         </h2>
-        <button
-          type="button"
-          title={EXPORT_INFO_MES_DEMANDES}
-          disabled={exporting}
-          onClick={onExport}
-          className={buttonVariants({ variant: "secondary", size: "sm" })}
-        >
-          <Icon name="file_download" /> {exporting ? "Export en cours…" : "Exporter mes demandes (CSV)"}
-        </button>
+        {!aucune && (
+          <button
+            type="button"
+            title={EXPORT_INFO_MES_DEMANDES}
+            disabled={exporting}
+            onClick={onExport}
+            className={buttonVariants({ variant: "secondary", size: "sm" })}
+          >
+            <Icon name="file_download" /> {exporting ? "Export en cours…" : "Exporter mes demandes (CSV)"}
+          </button>
+        )}
       </div>
-      <div className="mb-md mt-md flex flex-wrap items-center justify-between gap-sm">
-        <MyChips counts={counts} />
-        <p className="font-label-sm text-sm text-on-surface-variant">Tri : Plus récentes d'abord</p>
-      </div>
+      {!aucune && (
+        <div className="mb-md mt-md flex flex-wrap items-center justify-between gap-sm">
+          <MyChips counts={counts} />
+          <p className="font-label-sm text-sm text-on-surface-variant">Tri : Plus récentes d'abord</p>
+        </div>
+      )}
 
       {/* Annonce des envois réussis (lecteurs d'écran) */}
       <p role="status" aria-live="polite" className="sr-only">
@@ -120,10 +129,19 @@ export function MesDemandes({
       </p>
 
       {isError && <p className="text-body-sm text-error">Les demandes sont indisponibles.</p>}
-      {items && toutes.length === 0 && (
-        <p className="text-body-sm italic text-on-surface-variant">
-          Tu n'as pas encore envoyé de demande.
-        </p>
+      {aucune && (
+        <div className="mb-md flex flex-col items-start gap-sm">
+          <p className="min-w-0 text-body-md text-on-surface">
+            Tu n'as pas encore envoyé de demande. Une question, une idée, un problème ?
+          </p>
+          <button
+            type="button"
+            onClick={onNouvelle}
+            className={buttonVariants({ variant: "secondary" })}
+          >
+            <Icon name="add" /> Nouvelle demande
+          </button>
+        </div>
       )}
 
       <ul className="flex flex-col gap-sm">
@@ -133,6 +151,7 @@ export function MesDemandes({
             s={s}
             changes={changes}
             managers={managersDeEquipe(s.team, managers)}
+            managersCharges={managersQuery.isSuccess}
             moi={email}
             onRead={onRead}
             onCompleter={(c) => setCible(c)}
@@ -176,6 +195,7 @@ function CarteDemande({
   s,
   changes,
   managers,
+  managersCharges,
   moi,
   onRead,
   onCompleter,
@@ -183,6 +203,8 @@ function CarteDemande({
   s: Submission;
   changes: Map<string, { new_status: string; changed_at: string }>;
   managers: ManagerEquipe[];
+  /** Liste des managers chargée : sans manager, l'historique dit « chez l'admin ». */
+  managersCharges: boolean;
   moi: string;
   onRead: (s: Submission) => void;
   onCompleter: (c: Cible) => void;
@@ -309,7 +331,7 @@ function CarteDemande({
         <SubmissionHistory
           submissionId={s.id}
           moi={moi}
-          attenteChez={prenoms || undefined}
+          attenteChez={managersCharges ? prenoms || "l'admin" : undefined}
           contenu={s.content}
         />
       </div>

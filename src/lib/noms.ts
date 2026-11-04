@@ -11,6 +11,23 @@ export function nomAffiche(valeur: string, noms: Map<string, string> | undefined
   return noms?.get(normaliser(valeur)) || valeur;
 }
 
+/**
+ * Auteur d'une actualité, comme il s'affiche : le nom connu, sinon jamais une adresse pour quelqu'un d'autre
+ * que l'admin. Sans nom : « un manager », ou « l'administration » quand c'est l'admin qui a délégué.
+ */
+export function nomAuteurActualite(
+  valeur: string,
+  noms: Map<string, string> | undefined,
+  admin: boolean,
+  delegant = false,
+): string {
+  if (!valeur.includes("@")) return valeur;
+  const nom = noms?.get(normaliser(valeur));
+  if (nom) return nom;
+  if (admin) return valeur;
+  return delegant ? "l'administration" : "un manager";
+}
+
 /** Noms de la liste blanche pour les e-mails donnés (fonction public.noms_affiches). */
 export async function fetchNoms(valeurs: string[]): Promise<Map<string, string>> {
   const emails = [...new Set(valeurs.filter((v) => v.includes("@")).map(normaliser))];

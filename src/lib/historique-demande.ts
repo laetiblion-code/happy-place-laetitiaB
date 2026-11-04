@@ -4,6 +4,7 @@ import {
   type SubmissionStatusHistory,
 } from "@/lib/dashboard";
 import { nomAffiche } from "@/lib/noms";
+import { teamKey, type AdminDirectory } from "@/lib/home-counts";
 
 /** « 02/11/2026 15:58 » */
 const fmt = new Intl.DateTimeFormat("fr-FR", {
@@ -14,7 +15,6 @@ const fmt = new Intl.DateTimeFormat("fr-FR", {
   minute: "2-digit",
 });
 
-/** Marqueur ajouté au texte de la demande par « Compléter ma demande ». */
 /** Marqueur ajouté au texte de la demande par « Compléter ma demande ». */
 export const MARQUEUR_REPONSE = "Réponse à la clarification : ";
 
@@ -78,10 +78,12 @@ export function lignesHistorique(
     const base = { id: h.id, quand };
 
     if (h.old_status === null) {
+      // Demande d'un manager ou d'un admin : validée dès l'envoi, elle n'attend personne
+      if (h.new_status === "validée") return { ...base, titre: "Envoyée · validée à l'envoi" };
       return { ...base, titre: `Envoyée · ${attente}` };
     }
     if (h.is_automatic && h.new_status === "en attente") {
-      return { ...base, titre: "Repassée en attente (revalidation annuelle)" };
+      return { ...base, titre: `Repassée ${attente} (revalidation annuelle)` };
     }
     if (h.new_status === "refusée" && h.rejection_category === CATEGORIE_CLARIFICATION) {
       return {
@@ -114,6 +116,28 @@ export function lignesHistorique(
       titre: `${libelleChangement(h, precedent)}${h.is_automatic ? " · automatique" : ""}`,
     };
   });
+}
+
+/**
+ * Où une demande attend, pour l'historique de la gestion : les managers de son équipe, par prénom et nom
+ * (« Kesha Martin et Sophie Marchand »), ou « l'admin » si l'équipe n'a pas de manager. Undefined tant que
+ * l'annuaire n'est pas chargé.
+ */
+export function attenteDeEquipe(
+  team: string,
+  annuaire: AdminDirectory | undefined,
+): string | undefined {
+  if (!annuaire) return undefined;
+  const cle = teamKey(team);
+  const noms = annuaire.users
+    .filter((u) => u.role === "manager" && u.managedTeams.some((t) => teamKey(t) === cle))
+    .map((u) => {
+      const nom = [u.first_name, u.last_name].map((p) => p?.trim() ?? "").filter(Boolean).join(" ");
+      return nom || u.email;
+    });
+  if (noms.length === 0) return "l'admin";
+  if (noms.length === 1) return noms[0];
+  return `${noms.slice(0, -1).join(", ")} et ${noms[noms.length - 1]}`;
 }
 
 /** Un complément : la demande repasse de « refusée » à « en attente » par son auteur (pas une revalidation). */

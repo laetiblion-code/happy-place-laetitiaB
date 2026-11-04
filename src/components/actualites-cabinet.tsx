@@ -25,7 +25,7 @@ import {
   publishDraftNews,
   type News,
 } from "@/lib/dashboard";
-import { nomAffiche, useNomsAffiches } from "@/lib/noms";
+import { nomAuteurActualite, useNomsAffiches } from "@/lib/noms";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -36,10 +36,10 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 }
 
 /** Auteur d'un brouillon : « Rédigé par Kesha » ou, si délégué, « Rédigé par Olivia pour Kesha ». */
-function libelleBrouillon(n: News, noms: Map<string, string> | undefined): string {
-  const auteur = nomAffiche(n.author ?? "", noms);
+function libelleBrouillon(n: News, noms: Map<string, string> | undefined, admin: boolean): string {
+  const auteur = nomAuteurActualite(n.author ?? "", noms, admin);
   const qui = n.delegated_by_email
-    ? `Rédigé par ${nomAffiche(n.delegated_by_email, noms)} pour ${auteur}`
+    ? `Rédigé par ${nomAuteurActualite(n.delegated_by_email, noms, admin, true)} pour ${auteur}`
     : `Rédigé par ${auteur}`;
   return `${qui} · Dernière modif ${ilYAShort(n.updated_at ?? n.created_at)}`;
 }
@@ -351,7 +351,7 @@ export function ActualitesCabinet({
               <div className="min-w-0 flex-1 space-y-xs">
                 <p className="font-body-md font-bold text-primary wrap-anywhere">{n.title}</p>
                 <p className="font-label-sm text-sm text-on-surface-variant">
-                  {libelleBrouillon(n, noms)}
+                  {libelleBrouillon(n, noms, isAdmin)}
                 </p>
               </div>
             </div>
