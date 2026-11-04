@@ -115,7 +115,11 @@ export function AlertsKanban({ isAdmin }: { isAdmin: boolean }) {
     >
       <div className="mb-md flex flex-wrap items-center justify-between gap-sm">
         <div className="flex flex-wrap items-center gap-sm">
-          <h2 id="titre-alertes" className="font-headline-sm text-headline-sm text-primary">
+          <h2
+            id="titre-alertes"
+            tabIndex={-1}
+            className="font-headline-sm text-headline-sm text-primary focus:outline-none"
+          >
             Alertes opérationnelles
           </h2>
           <ChipStatut icon="priority_high" couleur="bg-error-container text-on-error-container">

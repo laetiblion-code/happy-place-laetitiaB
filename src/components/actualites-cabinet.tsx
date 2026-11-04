@@ -156,7 +156,11 @@ export function ActualitesCabinet({
       className="flex min-w-0 flex-col gap-md rounded-lg border border-outline-variant bg-surface-container-lowest p-md"
     >
       <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm">
-        <h2 id="titre-actus" className="font-headline-sm text-headline-sm text-primary">
+        <h2
+          id="titre-actus"
+          tabIndex={-1}
+          className="font-headline-sm text-headline-sm text-primary focus:outline-none"
+        >
           Actualités du cabinet
         </h2>
         {canWrite && (

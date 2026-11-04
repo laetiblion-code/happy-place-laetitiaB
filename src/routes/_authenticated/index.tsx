@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ErrorSummary, Field, FormActions, Modal, TextArea, TextInput } from "@/components/manage/crud-ui";
 import { rejectionSchema, submissionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
@@ -10,6 +10,8 @@ import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card
 import { SubmissionReader } from "@/components/submission-reader";
 import { ChoiceGroup, SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS } from "@/components/submission-choices";
 import { ManagerCards } from "@/components/home-counters";
+import { attenteAncienne, nomCourt } from "@/lib/compteurs-accueil";
+import { nomAffiche, useNomsAffiches } from "@/lib/noms";
 import { fetchAdminDirectory, fetchAlertCounts, fetchDelaiValidation, fetchDraftCounts, fetchMesActus, fetchMyCounts, fetchPublicationActus, fetchReviewCounts, fetchReviewList } from "@/lib/home-counts";
 import { AlertsKanban } from "@/components/alerts-kanban";
 import { buttonVariants } from "@/components/ui/button";
@@ -142,6 +144,21 @@ function ManagerSpace() {
       queryFn: () => fetchLastStatusChanges(reviewIds),
       retry: false,
     }).data ?? SANS_CHANGEMENT;
+  // Demande en attente depuis le plus longtemps (même périmètre que le compteur) : phrase de retard de la carte
+  const nomsEnAttente = useNomsAffiches(
+    (toReview.data ?? []).map((s) => s.submitted_by_email ?? ""),
+  );
+  const plusAncienne = useMemo(() => {
+    const liste = toReview.data ?? [];
+    if (liste.length === 0) return null;
+    const premiere = liste.reduce((a, b) => (a.created_at <= b.created_at ? a : b));
+    const jours = attenteAncienne(premiere.created_at);
+    if (jours === null) return null;
+    const complet = premiere.submitted_by_email
+      ? nomAffiche(premiere.submitted_by_email, nomsEnAttente.data)
+      : premiere.author_name;
+    return { nom: nomCourt(complet), jours };
+  }, [toReview.data, nomsEnAttente.data]);
   const mineIds = (mine.data ?? []).map((s) => s.id);
   const mineChanges =
     useQuery({
@@ -327,6 +344,7 @@ function ManagerSpace() {
           <ManagerCards
             isAdmin={isAdmin}
             review={homeReview.data}
+            plusAncienne={plusAncienne}
             drafts={homeDrafts.data}
             alerts={homeAlerts.data}
             delai={homeDelai.data}
