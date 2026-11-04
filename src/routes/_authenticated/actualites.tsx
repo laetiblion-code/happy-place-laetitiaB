@@ -42,7 +42,7 @@ function ActualitesPage() {
     .map((p) => p?.trim() ?? "")
     .filter(Boolean)
     .join(" ");
-  // Compteur : chaque clic sur « Ajouter une actu » ouvre la rédaction
+  // Compteur : chaque clic sur « Nouvelle actu » ouvre la rédaction
   const [ouvertureActu, setOuvertureActu] = useState(0);
 
   return (
@@ -61,7 +61,7 @@ function ActualitesPage() {
                 onClick={() => setOuvertureActu((n) => n + 1)}
                 className={buttonVariants({ variant: "default" })}
               >
-                Ajouter une actu
+                <span aria-hidden="true" className="material-symbols-outlined">edit_note</span> Nouvelle actu
               </button>
             )}
           </div>

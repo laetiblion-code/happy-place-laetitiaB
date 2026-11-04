@@ -16,7 +16,7 @@ import { fetchAdminDirectory, fetchAlertCounts, fetchDelaiValidation, fetchDraft
 import { AlertsKanban } from "@/components/alerts-kanban";
 import { buttonVariants } from "@/components/ui/button";
 import { LienBasBloc } from "@/components/chips";
-import { ASuivre } from "@/components/a-suivre";
+import { ASuivre, useASuivreVide } from "@/components/a-suivre";
 import { ActualitesCabinet, DernieresActualites } from "@/components/actualites-cabinet";
 import { DemandesATraiter } from "@/components/demandes-a-traiter";
 import { MesDemandes } from "@/components/mes-demandes";
@@ -201,6 +201,8 @@ function ManagerSpace() {
     retry: false,
   });
   // Historique de la personne connectée : incitations à publier dans la carte « Actualités en attente »
+  // « À suivre » n'est pas affiché quand il n'a rien à montrer : « Demandes à traiter » prend toute la largeur
+  const aSuivreVide = useASuivreVide(email ?? "", roleAffiche, canReview);
   const homeMesActus = useQuery({
     queryKey: ["home-counts", "mes-actus", myEmail],
     enabled: canReview && !!myEmail,
@@ -354,10 +356,12 @@ function ManagerSpace() {
           />
         )}
 
-        {/* 2. Demandes à traiter (deux tiers) et « À suivre » (un tiers), à partir de 1000 px */}
+        {/* 2. Demandes à traiter (deux tiers) et « À suivre » (un tiers), à partir de 1000 px ; seule, la demande prend toute la largeur */}
         {canReview ? (
           <>
-            <div className="grid grid-cols-1 items-start gap-md min-[1000px]:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+            <div
+              className={`grid grid-cols-1 items-start gap-md${aSuivreVide ? "" : " min-[1000px]:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]"}`}
+            >
               <DemandesATraiter
                 email={myEmail}
                 admin={isAdmin}
@@ -372,7 +376,7 @@ function ManagerSpace() {
                 onClarifier={(s) => startReject(s, "clarification")}
                 onValider={(s) => review.mutate({ id: s.id, status: "validée" })}
               />
-              {email && (
+              {email && !aSuivreVide && (
                 <ASuivre
                   email={email}
                   role={roleAffiche}

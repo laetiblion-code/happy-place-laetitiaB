@@ -323,11 +323,6 @@ export function ActualitesCabinet({
           </button>
         </div>
       )}
-      {!page && published.length > 0 && (
-        <LienBasBloc to="/actualites" align="centre">
-          Voir toutes les actualités
-        </LienBasBloc>
-      )}
     </div>
   );
 
@@ -418,11 +413,6 @@ export function ActualitesCabinet({
           </li>
         ))}
       </ul>
-      {!page && (
-        <LienBasBloc to="/actualites" align="centre">
-          Voir toutes mes actualités
-        </LienBasBloc>
-      )}
     </div>
   );
 
@@ -496,9 +486,12 @@ export function ActualitesCabinet({
   );
 
   if (page) {
+    // Même bloc blanc que l'accueil : fond blanc, bordure fine, coins de 6 px, marge intérieure
     return (
       <div className="flex min-w-0 flex-col gap-md">
-        {contenu}
+        <div className="min-w-0 rounded-[6px] border border-outline-variant bg-white p-md">
+          {contenu}
+        </div>
         {modales}
       </div>
     );
@@ -528,6 +521,11 @@ export function ActualitesCabinet({
         )}
       </div>
       {contenu}
+      {published.length > 0 && (
+        <LienBasBloc to="/actualites" align="droite">
+          Voir toutes les actualités
+        </LienBasBloc>
+      )}
       {modales}
     </section>
   );

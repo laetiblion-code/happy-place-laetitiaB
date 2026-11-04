@@ -85,7 +85,7 @@ async function colonnesDeBlocs(page: Page) {
 
 test.describe("blocs « Demandes du cabinet » : mise en page responsive", () => {
   for (const largeur of LARGEURS) {
-    test(`à ${largeur} px : rien ne déborde et les blocs passent en ${largeur >= 1100 ? 4 : largeur >= 640 ? 2 : 1} colonne(s)`, async ({
+    test(`à ${largeur} px : rien ne déborde et les blocs passent en ${largeur >= 640 ? 2 : 1} colonne(s)`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: largeur, height: 900 });
@@ -99,7 +99,8 @@ test.describe("blocs « Demandes du cabinet » : mise en page responsive", () =>
 
       // Les seuils portent sur la largeur du bloc (requête de conteneur), pas sur la fenêtre
       const colonnes = await colonnesDeBlocs(page);
-      const attendu = colonnes.largeur >= 1100 ? 4 : colonnes.largeur >= 640 ? 2 : 1;
+      // Deux colonnes dès 640 px de large, une en dessous (les quatre blocs restent dans cet ordre)
+      const attendu = colonnes.largeur >= 640 ? 2 : 1;
       expect(colonnes.blocs).toBe(4);
       expect(colonnes.colonnes, `largeur du bloc : ${colonnes.largeur} px`).toBe(attendu);
     });

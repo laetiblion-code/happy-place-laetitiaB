@@ -424,7 +424,7 @@ export function ManagerCards({
                       )}
                     </>,
                   ]
-                : ["Rester informé des risques et points bloquants identifiés."]
+                : ["Rester informé des risques et points bloquants identifiés dans le cabinet."]
             }
           />
         )}

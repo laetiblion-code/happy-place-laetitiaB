@@ -124,9 +124,36 @@ function lignesDepart(
 }
 
 /**
+ * Vrai quand le bloc « À suivre » n'a rien à montrer : aucun départ prévu et, pour l'admin, aucune équipe sans
+ * manager. Le temps du chargement, ou en cas d'erreur, le bloc reste affiché. Mêmes requêtes que le bloc
+ * (même clé de cache, donc aucune lecture de plus).
+ */
+export function useASuivreVide(
+  email: string,
+  role: "admin" | "manager" | "collaborateur",
+  actif: boolean,
+) {
+  const isAdmin = role === "admin";
+  const q = useQuery({
+    queryKey: ["departure_notices", email.toLowerCase()],
+    queryFn: () => fetchMyDepartureNotices(email),
+    enabled: actif && !!email,
+  });
+  const annuaire = useQuery({
+    queryKey: ["admin-directory"],
+    queryFn: fetchAdminDirectory,
+    enabled: actif && isAdmin,
+    retry: false,
+  });
+  if (!actif || !q.isSuccess || q.data.length > 0) return false;
+  if (!isAdmin) return true;
+  return annuaire.isSuccess && computeAdminGaps(annuaire.data).teamsWithoutManager.length === 0;
+}
+
+/**
  * Bloc « À suivre » de l'accueil (manager et admin) : départs à venir, et pour l'admin les équipes sans
  * manager. Mêmes données et mêmes actions que les anciens blocs « Départs à venir » et « Utilisateurs et
- * équipes à suivre ».
+ * équipes à suivre ». L'accueil ne l'affiche pas quand `useASuivreVide` est vrai.
  */
 export function ASuivre({
   email,

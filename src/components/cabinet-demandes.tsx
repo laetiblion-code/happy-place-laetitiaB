@@ -35,8 +35,13 @@ export type TypeDemande = (typeof TYPES_DEMANDE)[number];
  * et seulement s'il reste des demandes sans type.
  */
 const SANS_TYPE = "sans-type";
-const BLOCS: { slug: string; categorie: string | null; titre: string }[] = [
-  { slug: "idee", categorie: "idée", titre: "Boîte à idées" },
+const BLOCS: { slug: string; categorie: string | null; titre: string; info?: string }[] = [
+  {
+    slug: "idee",
+    categorie: "idée",
+    titre: "Boîte à idées",
+    info: "Bientôt la possibilité de liker et noter les idées qui te plaisent le plus.",
+  },
   { slug: "amelioration", categorie: "amélioration de Happy Place", titre: "Améliorer Happy Place" },
   { slug: "question", categorie: "question", titre: "Questions" },
   { slug: "probleme", categorie: "problème", titre: "Problèmes" },
@@ -241,7 +246,8 @@ export function DemandesCabinet({
         <div
           className={cn(
             "grid gap-sm",
-            !pleineLargeur && "grid-cols-1 @min-[640px]:grid-cols-2 @min-[1100px]:grid-cols-4",
+            // Deux colonnes dès 640 px (sinon une), dans l'ordre : idées et amélioration, puis questions et problèmes
+            !pleineLargeur && "grid-cols-1 @min-[640px]:grid-cols-2",
           )}
         >
           {blocs.map((bloc) => {
@@ -256,23 +262,37 @@ export function DemandesCabinet({
                 aria-labelledby={titreId}
                 className="flex min-w-0 flex-col gap-sm rounded-md bg-[#EDEBE6] p-sm"
               >
-                <div className="flex items-center gap-xs">
-                  <span
-                    aria-hidden="true"
-                    className="inline-grid size-[22px] shrink-0 place-items-center rounded-full bg-[#28282D] text-white"
-                  >
-                    <Icone className="size-3.5" strokeWidth={2.25} />
-                  </span>
-                  <h3 id={titreId} className="min-w-0 font-label-md text-base font-bold text-on-surface">
-                    {bloc.titre}
-                  </h3>
-                  <span
-                    role="img"
-                    aria-label={plurielDemandes(items.length)}
-                    className="ml-auto shrink-0 rounded-full bg-[#F5D5D4] px-sm font-label-sm text-sm font-bold text-on-surface"
-                  >
-                    {items.length}
-                  </span>
+                {/* En-tête de colonne : titre, nombre, puis un espace de 12 px et un trait fin */}
+                <div className="flex flex-col gap-xs border-b border-[#CDCDD1] pb-[12px]">
+                  <div className="flex items-center gap-xs">
+                    <span
+                      aria-hidden="true"
+                      className="inline-grid size-7 shrink-0 place-items-center rounded-full bg-[#28282D] text-white"
+                    >
+                      <Icone className="size-4" strokeWidth={2.25} />
+                    </span>
+                    <h3
+                      id={titreId}
+                      className="min-w-0 font-['Bodoni_Moda',Georgia,serif] text-[20px] font-medium leading-snug text-primary"
+                    >
+                      {bloc.titre}
+                    </h3>
+                    <span
+                      role="img"
+                      aria-label={plurielDemandes(items.length)}
+                      className="ml-auto shrink-0 rounded-full bg-[#F5D5D4] px-sm text-[13px] font-bold tabular-nums text-on-surface"
+                    >
+                      {items.length}
+                    </span>
+                  </div>
+                  {bloc.info && (
+                    <p className="flex items-start gap-xs text-[13px] leading-snug text-on-surface-variant">
+                      <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[16px]">
+                        favorite
+                      </span>
+                      <span>{bloc.info}</span>
+                    </p>
+                  )}
                 </div>
 
                 {items.length === 0 ? (
@@ -361,23 +381,24 @@ function CarteDemande({
         attenteLongue && "border-l-[3px] border-l-[#A81E25]",
       )}
     >
-      <p className="flex min-w-0 flex-wrap items-center gap-x-xs font-body-sm text-sm">
+      <p className="flex min-w-0 flex-wrap items-center gap-x-xs text-[15px] leading-normal">
         <span className="min-w-0 font-bold text-primary [overflow-wrap:anywhere]">{s.author_name}</span>
         <span className="min-w-0 text-on-surface-variant [overflow-wrap:anywhere]">{`· ${s.team}`}</span>
         {moi && <EtiquetteSoi>Moi</EtiquetteSoi>}
       </p>
       <p
-        className="line-clamp-3 min-w-0 font-body-sm text-sm leading-snug [overflow-wrap:anywhere]"
+        className="line-clamp-3 min-w-0 text-[15px] leading-[1.5] [overflow-wrap:anywhere]"
         title={texte}
       >
         {texte}
       </p>
+      {/* « Voir » juste sous le texte, sans espace supplémentaire */}
       <button
         type="button"
         onClick={() => onRead(s)}
         aria-haspopup="dialog"
         aria-label={`Voir la demande de ${s.author_name}`}
-        className="inline-flex min-h-11 items-center self-start font-label-sm text-sm font-semibold text-on-surface focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        className="-mt-[10px] inline-flex min-h-11 items-center self-start text-[15px] font-semibold text-on-surface focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         <span className="underline underline-offset-2">Voir</span>
       </button>
@@ -385,19 +406,19 @@ function CarteDemande({
         (pieceLisible ? (
           <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
         ) : (
-          <p className="font-label-sm text-sm text-on-surface-variant [overflow-wrap:anywhere]">
+          <p className="text-[13px] text-on-surface-variant [overflow-wrap:anywhere]">
             {`${s.attachment_name ?? "Pièce jointe"} · réservée à l'équipe`}
           </p>
         ))}
 
-      <div className="mt-auto flex flex-wrap items-center gap-xs border-t border-outline-variant pt-xs">
+      <div className="mt-auto flex flex-wrap items-center gap-xs border-t border-outline-variant pt-xs text-[13px]">
         <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
         <VisibilityChip visibility={s.visibility} />
         <time
           dateTime={s.created_at}
           title={formatExactDate(s.created_at)}
           className={cn(
-            "ml-auto inline-flex items-center gap-xs whitespace-nowrap font-label-sm text-sm",
+            "ml-auto inline-flex items-center gap-xs whitespace-nowrap text-[13px]",
             attenteLongue ? "font-semibold text-[#A81E25]" : "text-on-surface-variant",
           )}
         >
