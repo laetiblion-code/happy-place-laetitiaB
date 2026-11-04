@@ -16,8 +16,8 @@ import { fetchAdminDirectory, fetchAlertCounts, fetchDelaiValidation, fetchDraft
 import { AlertsKanban } from "@/components/alerts-kanban";
 import { buttonVariants } from "@/components/ui/button";
 import { LienBasBloc } from "@/components/chips";
-import { DepartureNotices } from "@/components/departure-notices";
-import { ActualitesCabinet } from "@/components/actualites-cabinet";
+import { ASuivre, useASuivreVide } from "@/components/a-suivre";
+import { ActualitesCabinet, DernieresActualites } from "@/components/actualites-cabinet";
 import { DemandesATraiter } from "@/components/demandes-a-traiter";
 import { MesDemandes } from "@/components/mes-demandes";
 import { DemandesCabinet } from "@/components/cabinet-demandes";
@@ -201,6 +201,8 @@ function ManagerSpace() {
     retry: false,
   });
   // Historique de la personne connectée : incitations à publier dans la carte « Actualités en attente »
+  // « À suivre » n'est pas affiché quand il n'a rien à montrer : « Demandes à traiter » prend toute la largeur
+  const aSuivreVide = useASuivreVide(email ?? "", roleAffiche, canReview);
   const homeMesActus = useQuery({
     queryKey: ["home-counts", "mes-actus", myEmail],
     enabled: canReview && !!myEmail,
@@ -354,38 +356,42 @@ function ManagerSpace() {
           />
         )}
 
-        {/* 2. Départs à venir (et équipes à suivre pour l'admin) */}
-        {email && (
-          <DepartureNotices
-            email={email}
-            role={roleAffiche}
-            equipesGerees={myTeams.data ?? []}
-            demandesEnAttente={toReview.data}
-          />
-        )}
-
+        {/* 2. Demandes à traiter (deux tiers) et « À suivre » (un tiers), à partir de 1000 px ; seule, la demande prend toute la largeur */}
         {canReview ? (
-          /* 3. Demandes à traiter à gauche, actualités à droite */
-          <div className="grid grid-cols-1 items-start gap-md lg:grid-cols-2">
-            <DemandesATraiter
-              email={myEmail}
-              admin={isAdmin}
-              annuaire={annuaire.data}
-              items={toReview.data}
-              error={toReview.isError}
-              pending={homeReview.data?.pending ?? 0}
-              changes={reviewChanges}
-              validant={review.isPending}
-              onRead={setReading}
-              onRefuser={(s) => startReject(s)}
-              onClarifier={(s) => startReject(s, "clarification")}
-              onValider={(s) => review.mutate({ id: s.id, status: "validée" })}
-            />
-            <ActualitesCabinet role={roleAffiche} email={myEmail} auteur={myName} equipe={profile.data?.team ?? ""} ouvertureDemandee={ouvertureActu} />
-          </div>
-        ) : (
-          /* Collaborateur : ses demandes, puis les actualités du cabinet */
           <>
+            <div
+              className={`grid grid-cols-1 items-start gap-md${aSuivreVide ? "" : " min-[1000px]:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]"}`}
+            >
+              <DemandesATraiter
+                email={myEmail}
+                admin={isAdmin}
+                annuaire={annuaire.data}
+                items={toReview.data}
+                error={toReview.isError}
+                pending={homeReview.data?.pending ?? 0}
+                changes={reviewChanges}
+                validant={review.isPending}
+                onRead={setReading}
+                onRefuser={(s) => startReject(s)}
+                onClarifier={(s) => startReject(s, "clarification")}
+                onValider={(s) => review.mutate({ id: s.id, status: "validée" })}
+              />
+              {email && !aSuivreVide && (
+                <ASuivre
+                  email={email}
+                  role={roleAffiche}
+                  equipesGerees={myTeams.data ?? []}
+                  demandesEnAttente={toReview.data}
+                />
+              )}
+            </div>
+
+            {/* 3. Actualités du cabinet, en pleine largeur */}
+            <ActualitesCabinet role={roleAffiche} email={myEmail} auteur={myName} equipe={profile.data?.team ?? ""} ouvertureDemandee={ouvertureActu} />
+          </>
+        ) : (
+          /* Collaborateur : ses demandes à gauche, les dernières actualités à droite */
+          <div className="grid grid-cols-1 items-start gap-md min-[1000px]:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
             <MesDemandes
               items={mine.data}
               isError={mine.isError}
@@ -395,9 +401,10 @@ function ManagerSpace() {
               exporting={exporter.isPending}
               onExport={() => exporter.mutate()}
               onRead={setReading}
+              onNouvelle={openSubmissionForm}
             />
-            <ActualitesCabinet role={roleAffiche} email={myEmail} auteur={myName} equipe={profile.data?.team ?? ""} ouvertureDemandee={ouvertureActu} />
-          </>
+            <DernieresActualites email={myEmail} />
+          </div>
         )}
 
         {/* 4. 10 dernières demandes du cabinet (tous les rôles) */}

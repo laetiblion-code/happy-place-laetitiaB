@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { LienBasBloc } from "@/components/chips";
+import { CLASSE_LIEN_ACTION, LienBasBloc } from "@/components/chips";
 import { buttonVariants } from "@/components/ui/button";
 import {
   downloadAttachment,
@@ -109,7 +109,7 @@ function lignesDepart(
       }
     } else if (role === "manager") {
       // Le manager ne voit que ses propres rattachements : une seule équipe gérée donne l'équipe.
-      // Son propre nom n'est pas répété : la colonne Manager n'est pas affichée pour lui.
+      // Son propre nom n'est pas répété : la ligne ne nomme pas de manager.
       equipe = moi.equipesGerees.length === 1 ? (moi.equipesGerees[0] ?? null) : null;
     }
     return {
@@ -123,7 +123,39 @@ function lignesDepart(
   });
 }
 
-export function DepartureNotices({
+/**
+ * Vrai quand le bloc « À suivre » n'a rien à montrer : aucun départ prévu et, pour l'admin, aucune équipe sans
+ * manager. Le temps du chargement, ou en cas d'erreur, le bloc reste affiché. Mêmes requêtes que le bloc
+ * (même clé de cache, donc aucune lecture de plus).
+ */
+export function useASuivreVide(
+  email: string,
+  role: "admin" | "manager" | "collaborateur",
+  actif: boolean,
+) {
+  const isAdmin = role === "admin";
+  const q = useQuery({
+    queryKey: ["departure_notices", email.toLowerCase()],
+    queryFn: () => fetchMyDepartureNotices(email),
+    enabled: actif && !!email,
+  });
+  const annuaire = useQuery({
+    queryKey: ["admin-directory"],
+    queryFn: fetchAdminDirectory,
+    enabled: actif && isAdmin,
+    retry: false,
+  });
+  if (!actif || !q.isSuccess || q.data.length > 0) return false;
+  if (!isAdmin) return true;
+  return annuaire.isSuccess && computeAdminGaps(annuaire.data).teamsWithoutManager.length === 0;
+}
+
+/**
+ * Bloc « À suivre » de l'accueil (manager et admin) : départs à venir, et pour l'admin les équipes sans
+ * manager. Mêmes données et mêmes actions que les anciens blocs « Départs à venir » et « Utilisateurs et
+ * équipes à suivre ». L'accueil ne l'affiche pas quand `useASuivreVide` est vrai.
+ */
+export function ASuivre({
   email,
   role,
   equipesGerees,
@@ -153,121 +185,80 @@ export function DepartureNotices({
   const noms = useNomsAffiches(libelles).data;
   const lignes = lignesDepart(q.data ?? [], noms, role, { email, equipesGerees }, annuaire.data);
 
-  if (isAdmin) {
-    return (
-      <BlocAdmin
-        lignes={lignes}
-        gaps={gaps}
-        gapsError={annuaire.isError}
-        demandesEnAttente={demandesEnAttente ?? []}
-        email={email}
-      />
-    );
-  }
-
-  if (lignes.length === 0) return null;
   return (
     <section
-      aria-labelledby="titre-departs"
-      className="rounded-lg border border-outline-variant bg-surface-container-lowest p-md space-y-sm"
+      aria-labelledby="titre-a-suivre"
+      className="flex min-w-0 flex-col gap-md rounded-lg border border-outline-variant bg-surface-container-lowest p-md"
     >
-      <div className="space-y-xs">
-        <h2 id="titre-departs" className="font-headline-sm text-headline-sm text-primary">
-          Départs à venir
+      <div className="border-b border-outline-variant pb-sm">
+        <h2
+          id="titre-a-suivre"
+          tabIndex={-1}
+          className="font-headline-sm text-headline-sm text-primary focus:outline-none"
+        >
+          À suivre
         </h2>
-        {role === "manager" && (
-          <p className="font-body-md text-on-surface-variant">
-            {plural(
-              lignes.length,
-              "départ prévu dans tes équipes",
-              "départs prévus dans tes équipes",
-            )}
-          </p>
-        )}
       </div>
-      <ListeDeparts lignes={lignes} email={email} />
-    </section>
-  );
-}
 
-/** Bloc admin « Utilisateurs et équipes à suivre » : départs du cabinet, équipes sans manager, sans équipe. */
-function BlocAdmin({
-  lignes,
-  gaps,
-  gapsError,
-  demandesEnAttente,
-  email,
-}: {
-  lignes: LigneDepart[];
-  gaps:
-    | { teamsWithoutManager: { name: string; personnes: number }[]; usersWithoutTeam: number }
-    | undefined;
-  gapsError: boolean;
-  demandesEnAttente: Submission[];
-  email: string;
-}) {
-  return (
-    <section
-      aria-labelledby="titre-suivi"
-      className="rounded-lg border border-outline-variant bg-surface-container-lowest p-md space-y-md"
-    >
-      <h2 id="titre-suivi" className="font-headline-sm text-headline-sm text-primary">
-        Utilisateurs et équipes à suivre
-      </h2>
-
-      <section aria-labelledby="titre-departs-admin" className="space-y-xs">
-        <h3
-          id="titre-departs-admin"
-          className="font-label-md text-label-md text-on-surface-variant uppercase"
-        >
+      <section aria-labelledby="titre-departs" className="space-y-sm">
+        <h3 id="titre-departs" className="font-label-md text-label-md text-on-surface-variant uppercase">
           Départs à venir
         </h3>
-        {lignes.length === 0 ? (
-          <p className="font-body-md italic text-on-surface-variant">Aucun départ prévu</p>
-        ) : (
-          <ListeDeparts lignes={lignes} email={email} />
-        )}
-      </section>
-
-      <section aria-labelledby="titre-sans-manager" className="space-y-xs">
-        <h3
-          id="titre-sans-manager"
-          className="font-label-md text-label-md text-on-surface-variant uppercase"
-        >
-          Équipes sans manager
-        </h3>
-        {gapsError && <p className="text-body-sm text-error">Les équipes sont indisponibles.</p>}
-        {gaps && gaps.teamsWithoutManager.length === 0 && (
-          <p className="font-body-md italic text-on-surface-variant">
-            Toutes les équipes ont un manager
+        {q.isError && <p className="text-body-sm text-error">Les départs sont indisponibles.</p>}
+        {q.isSuccess && lignes.length === 0 ? (
+          <p className="font-body-sm italic text-on-surface-variant">
+            {role === "manager" ? "Aucun départ prévu dans tes équipes." : "Aucun départ prévu."}
           </p>
-        )}
-        {gaps && gaps.teamsWithoutManager.length > 0 && (
-          <EquipesSansManager
-            equipes={gaps.teamsWithoutManager}
-            demandesEnAttente={demandesEnAttente}
-          />
+        ) : (
+          <ListeDeparts lignes={lignes} email={email} avecManager={isAdmin} />
         )}
       </section>
 
-      {gaps && gaps.usersWithoutTeam > 0 && (
-        <p className="flex items-start gap-xs font-body-md">
-          <Icon name="person_off" className="text-base shrink-0" />
-          <span>
-            {plural(gaps.usersWithoutTeam, "utilisateur sans équipe", "utilisateurs sans équipe")}
-          </span>
-        </p>
-      )}
+      {isAdmin && (
+        <>
+          <section aria-labelledby="titre-sans-manager" className="space-y-sm">
+            <h3
+              id="titre-sans-manager"
+              className="font-label-md text-label-md text-on-surface-variant uppercase"
+            >
+              Équipes sans manager
+            </h3>
+            {annuaire.isError && (
+              <p className="text-body-sm text-error">Les équipes sont indisponibles.</p>
+            )}
+            {gaps && gaps.teamsWithoutManager.length === 0 && (
+              <p className="font-body-sm italic text-on-surface-variant">
+                Toutes les équipes ont un manager.
+              </p>
+            )}
+            {gaps && gaps.teamsWithoutManager.length > 0 && (
+              <EquipesSansManager
+                equipes={gaps.teamsWithoutManager}
+                demandesEnAttente={demandesEnAttente ?? []}
+              />
+            )}
+          </section>
 
-      <LienBasBloc to="/manage/users" align="centre">
-        Gérer les utilisateurs et équipes
-      </LienBasBloc>
+          {gaps && gaps.usersWithoutTeam > 0 && (
+            <p className="flex items-start gap-xs font-body-md">
+              <Icon name="person_off" className="text-base shrink-0" />
+              <span>
+                {plural(gaps.usersWithoutTeam, "utilisateur sans équipe", "utilisateurs sans équipe")}
+              </span>
+            </p>
+          )}
+
+          <LienBasBloc to="/manage/users" align="centre">
+            Gérer les utilisateurs et équipes
+          </LienBasBloc>
+        </>
+      )}
     </section>
   );
 }
 
 /**
- * Équipes sans manager : une ligne de synthèse, puis une liste compacte. Fond sable seulement pour les
+ * Équipes sans manager : une ligne d'avertissement, puis une liste compacte. Fond sable seulement pour les
  * équipes qui ont des demandes en attente ; les équipes sans membre sont regroupées sur une ligne.
  */
 function EquipesSansManager({
@@ -285,9 +276,9 @@ function EquipesSansManager({
       <p className="flex items-start gap-xs font-body-sm text-sm font-semibold text-on-surface">
         <Icon name="warning" className="text-base shrink-0" />
         <span>
-          {`${plural(n, "équipe sans manager", "équipes sans manager")} : ${
+          {`${plural(n, "équipe", "équipes")} : ${
             n > 1 ? "leurs demandes privées arrivent" : "ses demandes privées arrivent"
-          } chez toi`}
+          } chez toi.`}
         </span>
       </p>
       {avecMembres.length > 0 && (
@@ -302,16 +293,7 @@ function EquipesSansManager({
                 className={`flex flex-wrap items-center justify-between gap-x-sm gap-y-xs px-sm py-xs font-label-sm text-sm text-on-surface ${attente > 0 ? "bg-[#F0D0BC]" : ""}`}
               >
                 <span className="min-w-0 font-semibold wrap-anywhere">{t.name}</span>
-                <span className="flex flex-wrap gap-x-sm">
-                  <span>{plural(t.personnes, "personne", "personnes")}</span>
-                  <span>
-                    {plural(
-                      attente,
-                      "demande en attente à modérer",
-                      "demandes en attente à modérer",
-                    )}
-                  </span>
-                </span>
+                <span className="tabular-nums">{`${t.personnes} pers. · ${attente} à modérer`}</span>
               </li>
             );
           })}
@@ -326,17 +308,34 @@ function EquipesSansManager({
   );
 }
 
-function ListeDeparts({ lignes, email }: { lignes: LigneDepart[]; email: string }) {
+function ListeDeparts({
+  lignes,
+  email,
+  avecManager,
+}: {
+  lignes: LigneDepart[];
+  email: string;
+  avecManager: boolean;
+}) {
   return (
-    <ul className="divide-y divide-outline-variant">
+    <ul className="flex flex-col gap-sm">
       {lignes.map((l) => (
-        <LigneDepartItem key={l.notice.id} ligne={l} email={email} />
+        <LigneDepartItem key={l.notice.id} ligne={l} email={email} avecManager={avecManager} />
       ))}
     </ul>
   );
 }
 
-function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }) {
+/** Une carte compacte par départ : identité, date et délai, manager (admin), puis documents. */
+function LigneDepartItem({
+  ligne,
+  email,
+  avecManager,
+}: {
+  ligne: LigneDepart;
+  email: string;
+  avecManager: boolean;
+}) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [zipping, setZipping] = useState(false);
@@ -364,18 +363,13 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
     }
   }
 
-  // Sous 600 px, le bouton prend toute la largeur
-  const bouton = buttonVariants({ variant: "secondary", size: "sm" }) + " min-h-11 w-full min-[600px]:w-auto";
-
   // Texte lu par les lecteurs d'écran seulement : la chip J-N reste visible
   const texteUrgence =
     ligne.jours === 0 ? ", aujourd'hui" : `, dans ${plural(ligne.jours, "jour", "jours")}`;
 
-  // Au-dessus de 900 px : une ligne, trois zones sur une grille fixe. De 600 à 900 px : nom et date sur la
-  // première ligne, état des documents à gauche et boutons à droite sur la seconde. Sous 600 px : tout empilé.
   return (
-    <li className="grid grid-cols-1 items-center gap-sm py-sm min-[600px]:grid-cols-2 min-[600px]:gap-x-md min-[900px]:grid-cols-[minmax(0,17rem)_minmax(0,15rem)_minmax(0,1fr)] min-[900px]:gap-md">
-      {/* Gauche : initiales, nom, équipe et manager */}
+    <li className="min-w-0 space-y-sm rounded-md border border-outline-variant bg-card p-sm">
+      {/* Identité : initiales, nom et équipe */}
       <div className="flex min-w-0 items-center gap-sm">
         <span
           aria-hidden="true"
@@ -383,57 +377,51 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
         >
           {ligne.initiales}
         </span>
-        <div className="min-w-0">
-          <p className="font-body-md text-on-surface wrap-anywhere">
-            <span className="font-bold">{ligne.nom}</span>
-            {ligne.equipe && <span className="text-[#68686D]">{` · ${ligne.equipe}`}</span>}
-          </p>
-          {ligne.managers !== null &&
-            (ligne.managers.length === 0 ? (
-              <p className={`flex items-start gap-xs font-label-sm text-sm font-semibold ${ROUGE}`}>
-                <Icon name="warning" className="text-base shrink-0" />
-                <span>Sans manager</span>
-              </p>
-            ) : (
-              <p
-                className="font-label-sm text-sm text-[#68686D] wrap-anywhere"
-                title={`Manager : ${ligne.managers.join(" et ")}`}
-              >
-                {`Manager : ${ligne.managers.join(" et ")}`}
-              </p>
-            ))}
-        </div>
+        <p className="min-w-0 font-body-md text-on-surface wrap-anywhere">
+          <span className="font-bold">{ligne.nom}</span>
+          {ligne.equipe && <span className="text-[#68686D]">{` · ${ligne.equipe}`}</span>}
+        </p>
       </div>
 
-      {/* Milieu : date de départ et délai, colonne fixe */}
-      <p
+      {/* Date de départ avec icône calendrier, et chip de délai */}
+      <div
         className={`flex flex-wrap items-center gap-x-xs gap-y-xs font-label-sm text-sm ${urgent ? `font-semibold ${ROUGE}` : "text-on-surface"}`}
       >
         <Icon name="calendar_month" className="text-base shrink-0" />
-        <span className="whitespace-nowrap">{`Départ le ${FR_LONG.format(dateDepart(n.departure_date))}`}</span>
+        <span>{`Départ le ${FR_LONG.format(dateDepart(n.departure_date))}`}</span>
         {urgent && <span className="sr-only">{texteUrgence}</span>}
         <span
-          className={`shrink-0 rounded-full px-sm py-[2px] text-sm font-semibold ${urgent ? "bg-[#FFDAD6] text-[#A81E25]" : "bg-[#EDEBE6] text-[#28282D]"}`}
+          className={`shrink-0 rounded-full px-sm py-[2px] font-semibold ${urgent ? "bg-[#FFDAD6] text-[#A81E25]" : "bg-[#EDEBE6] text-[#28282D]"}`}
         >
           {passe ? "Passé" : ligne.jours === 0 ? "Aujourd'hui" : `J-${ligne.jours}`}
         </span>
-      </p>
+      </div>
 
-      {/* Droite : état des documents, puis le bouton, alignés à droite */}
-      <div className="flex min-w-0 flex-col gap-xs min-[600px]:col-span-2 min-[600px]:flex-row min-[600px]:flex-wrap min-[600px]:items-center min-[600px]:justify-between min-[900px]:col-auto min-[900px]:justify-end">
-        {count > 0 ? (
-          <p className={`flex items-center gap-xs whitespace-nowrap font-label-sm text-sm font-semibold ${ROUGE}`}>
-            <Icon name="attach_file" className="text-base shrink-0" />
-            {plural(count, "document", "documents")}
+      {/* Admin : managers de l'équipe, ou alerte sans manager */}
+      {avecManager &&
+        ligne.managers !== null &&
+        (ligne.managers.length === 0 ? (
+          <p className={`flex items-start gap-xs font-label-sm text-sm font-semibold ${ROUGE}`}>
+            <Icon name="warning" className="text-base shrink-0" />
+            <span>Sans manager</span>
           </p>
         ) : (
-          <p className="whitespace-nowrap font-label-sm text-sm text-on-surface-variant">Aucun document requis</p>
-        )}
-        {count > 0 ? (
-          <div className="flex w-full flex-col gap-xs min-[600px]:w-auto min-[600px]:flex-row min-[600px]:flex-wrap min-[600px]:justify-end">
+          <p className="font-label-sm text-sm text-[#68686D] wrap-anywhere">
+            {`Managers : ${ligne.managers.join(" et ")}`}
+          </p>
+        ))}
+
+      {/* Documents : état, puis les actions */}
+      {count > 0 ? (
+        <div className="space-y-xs border-t border-outline-variant pt-sm">
+          <p className={`flex items-center gap-xs font-label-sm text-sm font-semibold ${ROUGE}`}>
+            <Icon name="attach_file" className="text-base shrink-0" />
+            {plural(count, "document à récupérer", "documents à récupérer")}
+          </p>
+          <div className="flex flex-wrap items-center gap-xs">
             <button
               type="button"
-              className={bouton}
+              className={`${buttonVariants({ variant: "secondary", size: "sm" })} min-h-11`}
               onClick={zipAll}
               disabled={zipping}
               aria-label={`Télécharger les documents de ${ligne.nom} avant le ${limiteCourte}`}
@@ -442,27 +430,32 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
             </button>
             <button
               type="button"
-              className={bouton}
+              className={`${CLASSE_LIEN_ACTION} text-sm`}
               onClick={() => setOpen((o) => !o)}
               aria-expanded={open}
               aria-label={`${open ? "Masquer" : "Voir"} les documents de ${ligne.nom}`}
             >
-              {open ? "Masquer les documents" : "Voir les documents"}
-            </button>
-            <button
-              type="button"
-              className={bouton}
-              onClick={() => mark.mutate()}
-              disabled={mark.isPending}
-              aria-label={`J'ai téléchargé les documents de ${ligne.nom}`}
-            >
-              J'ai téléchargé les documents
+              <span className="underline underline-offset-2">
+                {open ? "Masquer les documents" : "Voir les documents"}
+              </span>
             </button>
           </div>
-        ) : (
           <button
             type="button"
-            className={bouton}
+            className={`${CLASSE_LIEN_ACTION} text-sm`}
+            onClick={() => mark.mutate()}
+            disabled={mark.isPending}
+            aria-label={`J'ai téléchargé les documents de ${ligne.nom}`}
+          >
+            J'ai téléchargé les documents
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-xs border-t border-outline-variant pt-sm">
+          <p className="font-label-sm text-sm text-on-surface-variant">Aucun document requis</p>
+          <button
+            type="button"
+            className={`${buttonVariants({ variant: "secondary", size: "sm" })} min-h-11`}
             onClick={() => mark.mutate()}
             disabled={mark.isPending}
             aria-label={`J'ai pris note du départ de ${ligne.nom}`}
@@ -470,19 +463,15 @@ function LigneDepartItem({ ligne, email }: { ligne: LigneDepart; email: string }
             <Icon name="check" className="text-base" />
             J'ai pris note
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
-      {open && (
-        <ul className="space-y-xs border-t border-outline-variant pt-xs min-[600px]:col-span-2 min-[900px]:col-span-3">
+      {open && count > 0 && (
+        <ul className="space-y-xs border-t border-outline-variant pt-xs">
           {n.documents.map((d) => (
-            <li
-              key={d.path}
-              className="flex flex-wrap items-center justify-between gap-xs text-body-sm"
-            >
-              <span>
-                <span className="font-bold">{FR_LONG.format(new Date(d.created_at))}</span> ·{" "}
-                {d.excerpt}
+            <li key={d.path} className="flex flex-wrap items-center justify-between gap-xs text-body-sm">
+              <span className="min-w-0 wrap-anywhere">
+                <span className="font-bold">{FR_LONG.format(new Date(d.created_at))}</span> · {d.excerpt}
               </span>
               <button
                 type="button"

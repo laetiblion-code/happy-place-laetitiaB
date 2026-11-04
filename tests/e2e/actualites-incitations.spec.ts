@@ -94,7 +94,9 @@ test.describe("incitations à publier", () => {
     page,
   }) => {
     await ouvrirEnTantQue(page, "admin", "/", { actualites: [] });
-    await expect(page.getByText("Aucun brouillon en cours.")).toBeVisible();
+    // Sans brouillon, la colonne des brouillons n'existe pas : les publiées occupent toute la largeur
+    await expect(page.getByRole("heading", { name: "Publiées récemment" })).toBeVisible();
+    await expect(page.getByText("Aucun brouillon en cours.")).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Voir toutes mes actualités/ })).toHaveCount(0);
   });
 });

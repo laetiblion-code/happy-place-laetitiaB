@@ -19,7 +19,19 @@ import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card
 import { Linkify } from "@/components/linkify";
 import { SubmissionReader } from "@/components/submission-reader";
 import { SubmissionHistory } from "@/components/manage/submission-history";
-import { SUBMISSION_CATEGORY_OPTIONS, SUBMISSION_VISIBILITY_OPTIONS } from "@/components/submission-choices";
+import {
+  SUBMISSION_CATEGORY_OPTIONS,
+  SUBMISSION_VISIBILITY_OPTIONS,
+  VisibilityChip,
+} from "@/components/submission-choices";
+import {
+  correspondFiltre,
+  FILTRES,
+  FiltresDemandes,
+  type Filtre,
+} from "@/components/filtres-demandes";
+import { attenteDeEquipe } from "@/lib/historique-demande";
+import { fetchAdminDirectory } from "@/lib/home-counts";
 import { submissionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import {
   REJECTION_CATEGORIES,
@@ -49,7 +61,17 @@ export const Route = createFileRoute("/_authenticated/manage/submissions")({
 
 function ManageSubmissions() {
   const { email } = Route.useRouteContext();
+  const moi = (email ?? "").toLowerCase();
   const qc = useQueryClient();
+  // Filtres de la liste, comme sur l'accueil (« Demandes du cabinet »)
+  const [filtre, setFiltre] = useState<Filtre>("toutes");
+  const [equipe, setEquipe] = useState("");
+  // Annuaire : nomme les managers de chaque équipe dans l'historique (« en attente chez … »)
+  const annuaire = useQuery({
+    queryKey: ["admin-directory"],
+    queryFn: fetchAdminDirectory,
+    retry: false,
+  });
   const [form, setForm] = useState<SubmissionInput | null>(null);
   const [editing, setEditing] = useState<Submission | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -61,6 +83,11 @@ function ManageSubmissions() {
     retry: false,
   });
   const [reading, setReading] = useState<Submission | null>(null);
+  const toutes = list.data ?? [];
+  const equipes = [...new Set(toutes.map((s) => s.team))].sort((a, b) => a.localeCompare(b, "fr"));
+  const visibles = toutes.filter(
+    (s) => correspondFiltre(s, filtre, moi) && (!equipe || s.team === equipe),
+  );
   const invalidate = () => qc.invalidateQueries({ queryKey: ["submissions"] });
   const onError = (e: unknown) => toast.error((e as Error).message);
 
@@ -117,8 +144,20 @@ function ManageSubmissions() {
         <p className="text-body-sm text-error">Impossible de charger les demandes.</p>
       )}
 
+      {list.isSuccess && (
+        <FiltresDemandes
+          filtres={FILTRES}
+          filtre={filtre}
+          onFiltre={setFiltre}
+          equipe={equipe}
+          equipes={equipes}
+          onEquipe={setEquipe}
+          idEquipe="filtre-equipe-gestion"
+        />
+      )}
+
       <div className="space-y-xs">
-        {list.data?.map((s) => (
+        {visibles.map((s) => (
           <article
             key={s.id}
             className="flex min-w-0 overflow-hidden items-start justify-between gap-sm p-sm bg-card border border-outline-variant"
@@ -139,6 +178,7 @@ function ManageSubmissions() {
               <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
               <div className="mt-xs flex flex-wrap items-center gap-xs text-body-sm text-[#68686D]">
                 <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
+                <VisibilityChip visibility={s.visibility} />
                 <span>{timeAgo(s.created_at)}</span>
               </div>
               {s.status === "refusée" && s.rejection_category && (
@@ -146,7 +186,10 @@ function ManageSubmissions() {
                   <RejectionNote category={s.rejection_category} note={s.rejection_note} />
                 </div>
               )}
-              <SubmissionHistory submissionId={s.id} />
+              <SubmissionHistory
+                submissionId={s.id}
+                attenteChez={attenteDeEquipe(s.team, annuaire.data)}
+              />
             </div>
             <RowActions
               onEdit={() => {
@@ -169,6 +212,11 @@ function ManageSubmissions() {
         ))}
         {list.data?.length === 0 && (
           <p className="text-body-sm italic text-on-surface-variant">Aucune demande.</p>
+        )}
+        {list.data && list.data.length > 0 && visibles.length === 0 && (
+          <p className="text-body-sm italic text-on-surface-variant">
+            Aucune demande avec ces filtres.
+          </p>
         )}
       </div>
 

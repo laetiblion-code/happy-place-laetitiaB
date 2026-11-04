@@ -63,6 +63,7 @@ export function MesDemandes({
   exporting,
   onExport,
   onRead,
+  onNouvelle,
 }: {
   items: Submission[] | undefined;
   isError: boolean;
@@ -73,6 +74,8 @@ export function MesDemandes({
   exporting: boolean;
   onExport: () => void;
   onRead: (s: Submission) => void;
+  /** Ouvre le formulaire « Nouvelle demande » (état vide). */
+  onNouvelle: () => void;
 }) {
   const [deplie, setDeplie] = useState(false);
   const [cible, setCible] = useState<Cible | null>(null);
@@ -85,6 +88,8 @@ export function MesDemandes({
   const managers = managersQuery.data ?? [];
   const toutes = items ?? [];
   const visibles = deplie ? toutes : toutes.slice(0, APERCU);
+  // Aucune demande (liste chargée) : pas d'export, pas de tri, pas de compteurs à zéro
+  const aucune = items !== undefined && toutes.length === 0;
 
   return (
     <section
@@ -99,20 +104,24 @@ export function MesDemandes({
         >
           Mes demandes
         </h2>
-        <button
-          type="button"
-          title={EXPORT_INFO_MES_DEMANDES}
-          disabled={exporting}
-          onClick={onExport}
-          className={buttonVariants({ variant: "secondary", size: "sm" })}
-        >
-          <Icon name="file_download" /> {exporting ? "Export en cours…" : "Exporter mes demandes (CSV)"}
-        </button>
+        {!aucune && (
+          <button
+            type="button"
+            title={EXPORT_INFO_MES_DEMANDES}
+            disabled={exporting}
+            onClick={onExport}
+            className={buttonVariants({ variant: "secondary", size: "sm" })}
+          >
+            <Icon name="file_download" /> {exporting ? "Export en cours…" : "Exporter mes demandes (CSV)"}
+          </button>
+        )}
       </div>
-      <div className="mb-md mt-md flex flex-wrap items-center justify-between gap-sm">
-        <MyChips counts={counts} />
-        <p className="font-label-sm text-sm text-on-surface-variant">Tri : Plus récentes d'abord</p>
-      </div>
+      {!aucune && (
+        <div className="mb-md mt-md flex flex-wrap items-center justify-between gap-sm">
+          <MyChips counts={counts} />
+          <p className="font-label-sm text-sm text-on-surface-variant">Tri : Plus récentes d'abord</p>
+        </div>
+      )}
 
       {/* Annonce des envois réussis (lecteurs d'écran) */}
       <p role="status" aria-live="polite" className="sr-only">
@@ -120,10 +129,19 @@ export function MesDemandes({
       </p>
 
       {isError && <p className="text-body-sm text-error">Les demandes sont indisponibles.</p>}
-      {items && toutes.length === 0 && (
-        <p className="text-body-sm italic text-on-surface-variant">
-          Tu n'as pas encore envoyé de demande.
-        </p>
+      {aucune && (
+        <div className="mb-md flex flex-col items-start gap-sm">
+          <p className="min-w-0 text-body-md text-on-surface">
+            Tu n'as pas encore envoyé de demande. Une question, une idée, un problème ?
+          </p>
+          <button
+            type="button"
+            onClick={onNouvelle}
+            className={buttonVariants({ variant: "secondary" })}
+          >
+            <Icon name="add" /> Nouvelle demande
+          </button>
+        </div>
       )}
 
       <ul className="flex flex-col gap-sm">
@@ -133,6 +151,7 @@ export function MesDemandes({
             s={s}
             changes={changes}
             managers={managersDeEquipe(s.team, managers)}
+            managersCharges={managersQuery.isSuccess}
             moi={email}
             onRead={onRead}
             onCompleter={(c) => setCible(c)}
@@ -176,6 +195,7 @@ function CarteDemande({
   s,
   changes,
   managers,
+  managersCharges,
   moi,
   onRead,
   onCompleter,
@@ -183,6 +203,8 @@ function CarteDemande({
   s: Submission;
   changes: Map<string, { new_status: string; changed_at: string }>;
   managers: ManagerEquipe[];
+  /** Liste des managers chargée : sans manager, l'historique dit « chez l'admin ». */
+  managersCharges: boolean;
   moi: string;
   onRead: (s: Submission) => void;
   onCompleter: (c: Cible) => void;
@@ -190,6 +212,8 @@ function CarteDemande({
   const changement = changes.get(s.id)?.changed_at ?? s.created_at;
   const clarification = s.status === "refusée" && s.rejection_category === CLARIFY_CATEGORY;
   const enAttente = s.status === "en attente";
+  // Attente de plus de trois jours : chip en rouge
+  const attenteLongue = Date.now() - new Date(changement).getTime() > 3 * 86_400_000;
   // Prénoms affichés : « Kesha » ou « Kesha et Sophie ». Sans manager identifiable, « ton manager ».
   const prenoms = listePrenoms(managers);
   const qui = prenoms || "ton manager";
@@ -207,37 +231,44 @@ function CarteDemande({
     <li
       className={`min-w-0 space-y-sm overflow-hidden rounded-md border border-outline-variant bg-card p-sm ${clarification ? "border-l-4 border-l-[#C99695]" : ""}`}
     >
+      {/* En-tête : où la demande est envoyée, et où et depuis quand elle attend (ou son statut) */}
       <div className="flex flex-wrap items-start justify-between gap-sm">
-        <p className="min-w-0 font-body-md text-primary wrap-anywhere">{envoi}</p>
-        <div className="flex flex-wrap items-center gap-xs">
-          {enAttente ? (
-            <ChipStatut icon="hourglass_empty" couleur={COULEUR_STATUT.sable}>
-              En attente chez {managers.length ? prenoms : "ton manager"} depuis{" "}
-              <DureeCourte iso={changement} />
-            </ChipStatut>
-          ) : (
-            <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
-          )}
-          <VisibilityChip visibility={s.visibility} />
-        </div>
+        <p className="min-w-0 font-body-md font-bold text-primary wrap-anywhere">{envoi}</p>
+        {enAttente ? (
+          <ChipStatut
+            icon="hourglass_empty"
+            couleur={attenteLongue ? COULEUR_STATUT.rouge : COULEUR_STATUT.sable}
+          >
+            En attente chez {managers.length ? prenoms : "ton manager"} depuis{" "}
+            <DureeCourte iso={changement} />
+          </ChipStatut>
+        ) : (
+          <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
+        )}
       </div>
 
-      <div className="flex flex-col gap-sm rounded-md bg-[#F5F4F1] p-sm">
-        {/* Étiquette de type sur sa propre ligne, puis le texte de la demande sur toute la largeur */}
-        {s.category && (
-          <div>
-            <CategoryChip category={s.category} />
-          </div>
-        )}
-        <p className="whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
+      {/* Corps : texte sur trois lignes, « Voir », pièce jointe, échange et motif dans l'encadré clair */}
+      <div className="flex flex-col gap-sm rounded-md border border-[#E4E2DD] bg-[#FAF9F7] p-sm">
+        <p className="line-clamp-3 whitespace-pre-line font-body-md text-on-surface wrap-anywhere">
           {`« ${echange.texte} »`}
         </p>
-        <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+        <div className="-mt-2 flex flex-wrap items-center gap-sm">
+          <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+          <button
+            type="button"
+            onClick={() => onRead(s)}
+            aria-haspopup="dialog"
+            aria-label={`Voir plus d'infos sur ma demande du ${dateCourteLongue(s.created_at)}`}
+            className="ml-auto inline-flex min-h-11 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            <span className="underline underline-offset-2">Voir</span>
+          </button>
+        </div>
 
         <EchangeDemande echange={echange} />
 
         {s.status === "refusée" && !clarification && s.rejection_category && (
-          <div className="border border-[#CDCDD1] bg-white p-sm text-body-sm text-on-surface wrap-anywhere">
+          <div className="border border-[#E4E2DD] bg-white p-sm text-body-sm text-on-surface wrap-anywhere">
             <p className="whitespace-pre-line">
               <strong>{`Motif de ${qui} :`}</strong> {s.rejection_category}
               {s.rejection_note ? (
@@ -249,18 +280,9 @@ function CarteDemande({
             </p>
           </div>
         )}
-        {/* Pied : lire la demande en entier, et « Compléter ma demande » quand une clarification attend */}
-        <div className="flex flex-wrap items-center justify-end gap-sm">
-          <button
-            type="button"
-            onClick={() => onRead(s)}
-            aria-haspopup="dialog"
-            aria-label={`Voir plus d'infos sur ma demande du ${dateCourteLongue(s.created_at)}`}
-            className="inline-flex min-h-11 items-center font-label-sm text-sm text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            <span className="underline underline-offset-2">Voir plus d'infos</span>
-          </button>
-          {clarification && (
+
+        {clarification && (
+          <div className="flex flex-wrap items-center justify-end gap-sm">
             <button
               type="button"
               aria-haspopup="dialog"
@@ -272,8 +294,8 @@ function CarteDemande({
               <Icon name="edit" className="text-[18px]" />
               Compléter ma demande
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {clarification && (
@@ -300,11 +322,16 @@ function CarteDemande({
         <p className="font-label-sm text-sm text-on-surface-variant">{`Refusée le ${formatDateCourte(changement)}`}</p>
       )}
 
-      <div className="ml-auto">
+      {/* Pied : étiquette de type et pilule de visibilité, « Historique » replié à droite */}
+      <div className="flex flex-wrap items-center justify-between gap-sm border-t border-outline-variant pt-sm">
+        <div className="flex flex-wrap items-center gap-xs">
+          {s.category && <CategoryChip category={s.category} />}
+          <VisibilityChip visibility={s.visibility} />
+        </div>
         <SubmissionHistory
           submissionId={s.id}
           moi={moi}
-          attenteChez={prenoms || undefined}
+          attenteChez={managersCharges ? prenoms || "l'admin" : undefined}
           contenu={s.content}
         />
       </div>

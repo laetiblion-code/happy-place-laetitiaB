@@ -1,12 +1,5 @@
 import { z } from "zod";
 
-export const newsSchema = z.object({
-  title: z.string().trim().min(3, "Le titre doit faire au moins 3 caractères").max(160, "160 caractères maximum"),
-  body: z.string().trim().max(5000, "5000 caractères maximum"),
-  author: z.string().trim().min(2, "Auteur requis").max(80, "80 caractères maximum"),
-  status: z.enum(["brouillon", "publiée"], { errorMap: () => ({ message: "Statut invalide" }) }),
-});
-
 export const REJECTION_CATEGORY_VALUES = ["à clarifier", "en désaccord avec les process", "doublon", "autre"] as const;
 export const SUBMISSION_CATEGORY_VALUES = ["question", "idée", "problème", "amélioration de Happy Place"] as const;
 export const SUBMISSION_VISIBILITY_VALUES = ["privée", "équipe", "entreprise"] as const;

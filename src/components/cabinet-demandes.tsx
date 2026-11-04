@@ -2,10 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Circle } from "lucide-react";
 import { VisibilityChip, SUBMISSION_CATEGORY_OPTIONS } from "@/components/submission-choices";
-import { StatusBadge, CLARIFY_CATEGORY } from "@/components/status-badge";
+import {
+  attendLongtemps,
+  correspondFiltre,
+  FILTRES,
+  FiltresDemandes,
+  type Filtre,
+} from "@/components/filtres-demandes";
+import { StatusBadge } from "@/components/status-badge";
 import { EtiquetteSoi, LienBasBloc } from "@/components/chips";
 import { formatExactDate } from "@/components/expandable-card";
-import { buttonVariants } from "@/components/ui/button";
 import { AttachmentLink } from "@/components/attachment-link";
 import { cn } from "@/lib/utils";
 import { fetchCabinetSubmissions, type Submission } from "@/lib/dashboard";
@@ -15,14 +21,6 @@ import { decouperContenu } from "@/lib/historique-demande";
 const PAR_BLOC_ACCUEIL = 3;
 const PAR_BLOC_PAGE = 10;
 
-type Filtre = "toutes" | "mes" | "pj" | "retard";
-/** « En retard » n'est proposé qu'aux managers et à l'admin (ils traitent les demandes). */
-const FILTRES: { valeur: Filtre; libelle: string; reserveAuxManagers?: boolean }[] = [
-  { valeur: "toutes", libelle: "Toutes" },
-  { valeur: "mes", libelle: "Mes demandes" },
-  { valeur: "pj", libelle: "Avec pièce jointe" },
-  { valeur: "retard", libelle: "En retard (+3 j)", reserveAuxManagers: true },
-];
 
 /**
  * Types des adresses `/demandes?type=…` (slugs), dans l'ordre de l'accueil.
@@ -35,24 +33,18 @@ export type TypeDemande = (typeof TYPES_DEMANDE)[number];
  * et seulement s'il reste des demandes sans type.
  */
 const SANS_TYPE = "sans-type";
-const BLOCS: { slug: string; categorie: string | null; titre: string }[] = [
-  { slug: "idee", categorie: "idée", titre: "Boîte à idées" },
+const BLOCS: { slug: string; categorie: string | null; titre: string; info?: string }[] = [
+  {
+    slug: "idee",
+    categorie: "idée",
+    titre: "Boîte à idées",
+    info: "Bientôt la possibilité de liker et noter les idées qui te plaisent le plus.",
+  },
   { slug: "amelioration", categorie: "amélioration de Happy Place", titre: "Améliorer Happy Place" },
   { slug: "question", categorie: "question", titre: "Questions" },
   { slug: "probleme", categorie: "problème", titre: "Problèmes" },
   { slug: SANS_TYPE, categorie: null, titre: "Sans type" },
 ];
-
-/** Demande en attente de traitement : en attente, ou à clarifier (refusée avec cette catégorie). */
-function demandeEnAttente(s: Submission): boolean {
-  return (
-    s.status === "en attente" ||
-    (s.status === "refusée" && s.rejection_category === CLARIFY_CATEGORY)
-  );
-}
-
-/** Demande en attente (ou à clarifier) depuis plus de 3 jours : date en rouge, filtre « En retard ». */
-const SEUIL_ATTENTE_MS = 3 * 24 * 60 * 60 * 1000;
 
 /** Date courte d'une demande : « 11 h », « 4 j ». L'heure exacte est dans le titre de la balise. */
 function dateCourteDemande(iso: string, maintenant = Date.now()): string {
@@ -128,21 +120,14 @@ export function DemandesCabinet({
   });
 
   const maintenant = Date.now();
-  /** En attente (ou à clarifier) depuis plus de 3 jours : même seuil que la date en rouge. */
-  function attendLongtemps(s: Submission) {
-    return demandeEnAttente(s) && maintenant - new Date(s.created_at).getTime() > SEUIL_ATTENTE_MS;
-  }
+  const enRetard = (s: Submission) => attendLongtemps(s, maintenant);
 
   const toutes = q.data ?? [];
   const equipes = [...new Set(toutes.map((s) => s.team))].sort((a, b) => a.localeCompare(b, "fr"));
   const filtres = FILTRES.filter((f) => !f.reserveAuxManagers || role !== "collaborateur");
-  function correspond(s: Submission) {
-    if (filtre === "mes") return estMoi(s);
-    if (filtre === "pj") return !!s.attachment_path;
-    if (filtre === "retard") return attendLongtemps(s);
-    return true;
-  }
-  const filtrees = toutes.filter((s) => correspond(s) && (!equipe || s.team === equipe));
+  const filtrees = toutes.filter(
+    (s) => correspondFiltre(s, filtre, email, maintenant) && (!equipe || s.team === equipe),
+  );
   const groupes: Record<string, Submission[]> = {};
   for (const s of filtrees) (groupes[blocDe(s)] ??= []).push(s);
 
@@ -185,50 +170,18 @@ export function DemandesCabinet({
         </h2>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-sm">
-        <div role="group" aria-label="Filtrer les demandes" className="flex flex-wrap gap-xs">
-          {filtres.map((f) => (
-            <button
-              key={f.valeur}
-              type="button"
-              aria-pressed={filtre === f.valeur}
-              onClick={() => changerFiltre(f.valeur)}
-              className={cn(
-                buttonVariants({
-                  variant: filtre === f.valeur ? "default" : "secondary",
-                  size: "sm",
-                }),
-                "min-h-11 text-sm",
-              )}
-            >
-              {f.libelle}
-            </button>
-          ))}
-        </div>
-        <label
-          htmlFor="filtre-equipe-cabinet"
-          className="flex min-h-11 min-w-0 max-w-full items-center gap-xs font-label-sm text-sm text-on-surface"
-        >
-          <span className="shrink-0">Équipe :</span>
-          <select
-            id="filtre-equipe-cabinet"
-            name="equipe"
-            value={equipe}
-            onChange={(e) => {
-              setEquipe(e.target.value);
-              setLimites({});
-            }}
-            className="min-h-11 min-w-0 max-w-full border border-[#8A8A90] bg-card px-sm py-xs font-label-sm text-sm focus:border-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            <option value="">Toutes</option>
-            {equipes.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <FiltresDemandes
+        filtres={filtres}
+        filtre={filtre}
+        onFiltre={changerFiltre}
+        equipe={equipe}
+        equipes={equipes}
+        onEquipe={(e) => {
+          setEquipe(e);
+          setLimites({});
+        }}
+        idEquipe="filtre-equipe-cabinet"
+      />
 
       {q.isError && (
         <p className="text-body-sm text-error">Les demandes du cabinet sont indisponibles.</p>
@@ -241,7 +194,8 @@ export function DemandesCabinet({
         <div
           className={cn(
             "grid gap-sm",
-            !pleineLargeur && "grid-cols-1 @min-[640px]:grid-cols-2 @min-[1100px]:grid-cols-4",
+            // Deux colonnes dès 640 px (sinon une), dans l'ordre : idées et amélioration, puis questions et problèmes
+            !pleineLargeur && "grid-cols-1 @min-[640px]:grid-cols-2",
           )}
         >
           {blocs.map((bloc) => {
@@ -254,25 +208,40 @@ export function DemandesCabinet({
               <section
                 key={bloc.slug}
                 aria-labelledby={titreId}
-                className="flex min-w-0 flex-col gap-sm rounded-md bg-[#EDEBE6] p-sm"
+                className="flex min-w-0 flex-col gap-sm rounded-[12px] border border-[#E4E2DD] bg-[#F7F5F1] p-sm"
               >
-                <div className="flex items-center gap-xs">
-                  <span
-                    aria-hidden="true"
-                    className="inline-grid size-[22px] shrink-0 place-items-center rounded-full bg-[#28282D] text-white"
-                  >
-                    <Icone className="size-3.5" strokeWidth={2.25} />
-                  </span>
-                  <h3 id={titreId} className="min-w-0 font-label-md text-base font-bold text-on-surface">
-                    {bloc.titre}
-                  </h3>
-                  <span
-                    role="img"
-                    aria-label={plurielDemandes(items.length)}
-                    className="ml-auto shrink-0 rounded-full bg-[#F5D5D4] px-sm font-label-sm text-sm font-bold text-on-surface"
-                  >
-                    {items.length}
-                  </span>
+                {/* En-tête de colonne : titre, nombre, puis un espace de 12 px et un trait fin */}
+                <div className="flex flex-col gap-xs border-b border-[#CDCDD1] pb-[12px]">
+                  <div className="flex items-center gap-xs">
+                    <span
+                      aria-hidden="true"
+                      className="inline-grid size-7 shrink-0 place-items-center rounded-full bg-[#28282D] text-white"
+                    >
+                      <Icone className="size-4" strokeWidth={2.25} />
+                    </span>
+                    <h3
+                      id={titreId}
+                      className="min-w-0 font-['Bodoni_Moda',Georgia,serif] text-[20px] font-medium leading-snug text-primary"
+                    >
+                      {bloc.titre}
+                    </h3>
+                    <span
+                      role="img"
+                      aria-label={plurielDemandes(items.length)}
+                      className="ml-auto shrink-0 rounded-full bg-[#F5D5D4] px-sm text-[13px] font-bold tabular-nums text-on-surface"
+                    >
+                      {items.length}
+                    </span>
+                  </div>
+                  {bloc.info && (
+                    // Encadré sable, texte d'encre (le gris ne passe pas le contraste sur ce fond), contenu centré
+                    <p className="flex items-center justify-center gap-xs rounded-[6px] bg-[#F0D0BC] p-[10px] text-center text-[13px] leading-snug text-on-surface">
+                      <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[16px]">
+                        favorite
+                      </span>
+                      <span>{bloc.info}</span>
+                    </p>
+                  )}
                 </div>
 
                 {items.length === 0 ? (
@@ -292,7 +261,7 @@ export function DemandesCabinet({
                           id={`carte-${bloc.slug}-${i}`}
                           s={s}
                           maintenant={maintenant}
-                          attenteLongue={attendLongtemps(s)}
+                          attenteLongue={enRetard(s)}
                           moi={estMoi(s)}
                           pieceLisible={!!s.attachment_path && peutLirePiece(s)}
                           onRead={onRead}
@@ -303,11 +272,7 @@ export function DemandesCabinet({
                 )}
 
                 {variante === "accueil" && items.length > PAR_BLOC_ACCUEIL && (
-                  <LienBasBloc
-                    to={role === "admin" ? "/manage/submissions" : "/demandes"}
-                    search={role === "admin" ? undefined : { type: bloc.slug }}
-                    align="centre"
-                  >
+                  <LienBasBloc to="/demandes" search={{ type: bloc.slug as TypeDemande }} align="centre">
                     {`Voir tout (${items.length})`}
                   </LienBasBloc>
                 )}
@@ -361,23 +326,24 @@ function CarteDemande({
         attenteLongue && "border-l-[3px] border-l-[#A81E25]",
       )}
     >
-      <p className="flex min-w-0 flex-wrap items-center gap-x-xs font-body-sm text-sm">
+      <p className="flex min-w-0 flex-wrap items-center gap-x-xs text-[15px] leading-normal">
         <span className="min-w-0 font-bold text-primary [overflow-wrap:anywhere]">{s.author_name}</span>
         <span className="min-w-0 text-on-surface-variant [overflow-wrap:anywhere]">{`· ${s.team}`}</span>
         {moi && <EtiquetteSoi>Moi</EtiquetteSoi>}
       </p>
       <p
-        className="line-clamp-3 min-w-0 font-body-sm text-sm leading-snug [overflow-wrap:anywhere]"
+        className="line-clamp-3 min-w-0 text-[15px] leading-[1.5] [overflow-wrap:anywhere]"
         title={texte}
       >
         {texte}
       </p>
+      {/* « Voir » juste sous le texte, sans espace supplémentaire */}
       <button
         type="button"
         onClick={() => onRead(s)}
         aria-haspopup="dialog"
         aria-label={`Voir la demande de ${s.author_name}`}
-        className="inline-flex min-h-11 items-center self-start font-label-sm text-sm font-semibold text-on-surface focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        className="-mt-[10px] inline-flex min-h-11 items-center self-start text-[15px] font-semibold text-on-surface focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         <span className="underline underline-offset-2">Voir</span>
       </button>
@@ -385,19 +351,19 @@ function CarteDemande({
         (pieceLisible ? (
           <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
         ) : (
-          <p className="font-label-sm text-sm text-on-surface-variant [overflow-wrap:anywhere]">
+          <p className="text-[13px] text-on-surface-variant [overflow-wrap:anywhere]">
             {`${s.attachment_name ?? "Pièce jointe"} · réservée à l'équipe`}
           </p>
         ))}
 
-      <div className="mt-auto flex flex-wrap items-center gap-xs border-t border-outline-variant pt-xs">
+      <div className="mt-auto flex flex-wrap items-center gap-xs border-t border-outline-variant pt-xs text-[13px]">
         <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
         <VisibilityChip visibility={s.visibility} />
         <time
           dateTime={s.created_at}
           title={formatExactDate(s.created_at)}
           className={cn(
-            "ml-auto inline-flex items-center gap-xs whitespace-nowrap font-label-sm text-sm",
+            "ml-auto inline-flex items-center gap-xs whitespace-nowrap text-[13px]",
             attenteLongue ? "font-semibold text-[#A81E25]" : "text-on-surface-variant",
           )}
         >

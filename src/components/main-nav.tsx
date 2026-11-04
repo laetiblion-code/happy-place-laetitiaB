@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 const ONGLETS = [
   { to: "/", label: "Accueil", exact: true },
   { to: "/manage/submissions", label: "Demandes", exact: false },
-  { to: "/manage/news", label: "Actualités", exact: false },
+  { to: "/actualites", label: "Actualités", exact: false },
   { to: "/manage/blockers", label: "Alertes opérationnelles", exact: false },
   { to: "/manage/metrics", label: "Indicateurs", exact: false },
   { to: "/manage/users", label: "Utilisateurs et équipes", exact: false },
