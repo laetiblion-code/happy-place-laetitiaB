@@ -23,6 +23,7 @@ import {
   fetchNews,
   formatDateCourte,
   publishDraftNews,
+  unpublishNews,
   type News,
 } from "@/lib/dashboard";
 import { nomAuteurActualite, useNomsAffiches } from "@/lib/noms";
@@ -83,6 +84,7 @@ export function LigneActualite({
   onLire,
   onModifier,
   onSupprimer,
+  onRepasser,
   supprimerPending = false,
 }: {
   news: News;
@@ -98,6 +100,8 @@ export function LigneActualite({
   onLire: (n: News) => void;
   onModifier?: (n: News) => void;
   onSupprimer?: (n: News) => void;
+  /** Admin seulement : repasse l'actualité publiée en brouillon. */
+  onRepasser?: (n: News) => void;
   supprimerPending?: boolean;
 }) {
   // Ses propres actualités : badge « Toi » et, à côté, son rôle et son équipe (connus pour soi seulement)
@@ -134,8 +138,19 @@ export function LigneActualite({
         <span className={TEXTE_SOULIGNE}>Lire</span>
         <Icon name="chevron_right" className="text-base" />
       </button>
-      {peutModifier && (onModifier || onSupprimer) && (
+      {peutModifier && (onModifier || onSupprimer || onRepasser) && (
         <div className="col-start-2 flex flex-wrap items-center gap-md">
+          {onRepasser && (
+            <button
+              type="button"
+              onClick={() => onRepasser(news)}
+              aria-label={`Repasser en brouillon l'actualité « ${news.title} »`}
+              className={CLASSE_LIEN_ACTION}
+            >
+              <Icon name="drafts" className="text-base" />
+              <span className={TEXTE_SOULIGNE}>Repasser en brouillon</span>
+            </button>
+          )}
           {onModifier && (
             <button
               type="button"
@@ -253,6 +268,26 @@ export function ActualitesCabinet({
     onError,
   });
 
+  const repasser = useMutation({
+    mutationFn: unpublishNews,
+    onSuccess: () => {
+      toast.success("Actualité repassée en brouillon");
+      invaliderActus();
+    },
+    onError,
+  });
+
+  async function confirmerRepasser(n: News) {
+    if (
+      await demander({
+        titre: "Repasser en brouillon",
+        message: `Repasser « ${n.title} » en brouillon ? Elle ne sera plus visible par le cabinet.`,
+        libelleConfirmer: "Repasser en brouillon",
+      })
+    )
+      repasser.mutate(n.id);
+  }
+
   const supprimer = useMutation({
     mutationFn: (n: News) =>
       n.status === "publiée" ? deleteNews(n.id, n.image_path) : deleteDraftNews(n.id, n.image_path),
@@ -282,7 +317,7 @@ export function ActualitesCabinet({
   const colonnePubliees = (
     <div className={cn("min-w-0 space-y-sm", avecBrouillons && "order-2 min-[1000px]:order-1")}>
       <Titre className="font-label-md text-label-md uppercase text-on-surface-variant">
-        {page ? "Publiées" : "Publiées récemment"}
+        {page ? `Publiées (${published.length})` : "Publiées récemment"}
       </Titre>
       {news.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
       {news.isError && <p className="text-body-sm text-error">Les actualités sont indisponibles.</p>}
@@ -305,7 +340,8 @@ export function ActualitesCabinet({
             onLire={setLue}
             onModifier={(x) => ouvrir(x)}
             onSupprimer={confirmerSuppression}
-            supprimerPending={supprimer.isPending}
+            onRepasser={isAdmin ? confirmerRepasser : undefined}
+            supprimerPending={supprimer.isPending || repasser.isPending}
           />
         ))}
       </ul>

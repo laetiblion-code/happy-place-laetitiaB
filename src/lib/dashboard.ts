@@ -213,6 +213,18 @@ export async function publishDraftNews(id: string) {
   if (!data?.length) throw new Error("Vous n'avez pas le droit de publier cette actualité.");
 }
 
+/** Admin : repasse une actualité publiée en brouillon (elle n'est plus visible par le cabinet). */
+export async function unpublishNews(id: string) {
+  const { data, error } = await db
+    .from("news")
+    .update({ status: "brouillon" })
+    .eq("id", id)
+    .eq("status", "publiée")
+    .select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("Cette actualité n'est plus publiée.");
+}
+
 export async function deleteDraftNews(id: string, imagePath?: string | null) {
   await removeNewsImageFile(imagePath);
   const { data, error } = await db.from("news").delete().eq("id", id).select("id");
@@ -555,24 +567,8 @@ export type MetricInput = {
   dashboard_position?: number | null;
 };
 
-export async function fetchAllNews(): Promise<News[]> {
-  const { data, error } = await db
-    .from("news")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as News[];
-}
-
 function newsRow(input: NewsInput) {
   return { ...input, links: (input.links ?? []) as unknown as Json, status: input.status as Enums["news_status"] };
-}
-
-/** Admin : crée l'actualité (pour obtenir son id), puis envoie l'image. */
-export async function createNews(input: NewsInput, media?: MediaDraft) {
-  const { data, error } = await db.from("news").insert(newsRow(input)).select("id").single();
-  if (error) throw error;
-  if (media) await applyNewsImage(data.id, media);
 }
 
 export async function updateNews(id: string, input: NewsInput, media?: MediaDraft) {

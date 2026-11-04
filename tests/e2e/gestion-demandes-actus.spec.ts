@@ -79,3 +79,40 @@ test.describe("auteur d'une actualité sans nom", () => {
     await expect(page.getByText(/example\.com/)).toHaveCount(0);
   });
 });
+
+test.describe("une seule page d'actualités (admin)", () => {
+  const publiee = {
+    id: "n1",
+    title: "Actualité publiée",
+    body: "Texte",
+    author: "Olivia Bauducel",
+    author_email: "test-admin@example.com",
+    status: "publiée",
+    created_at: il(1),
+  };
+
+  test("/manage/news affiche la même page que /actualites, avec le compteur des publiées", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await ouvrirEnTantQue(page, "admin", "/manage/news", { actualites: [publiee] });
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByRole("button", { name: "Nouvelle actu" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Publiées (1)" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ajouter une actu" })).toHaveCount(0);
+  });
+
+  test("l'admin peut repasser une actualité publiée en brouillon ; le manager, non", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await ouvrirEnTantQue(page, "admin", "/actualites", { actualites: [publiee] });
+    await page.waitForLoadState("networkidle");
+    await expect(
+      page.getByRole("button", { name: "Repasser en brouillon l'actualité « Actualité publiée »" }),
+    ).toBeVisible();
+  });
+
+  test("le manager ne voit pas l'action « Repasser en brouillon »", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await ouvrirEnTantQue(page, "manager", "/actualites", { actualites: [{ ...publiee, author_email: "test-admin@example.com" }] });
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByText("Repasser en brouillon")).toHaveCount(0);
+  });
+});
