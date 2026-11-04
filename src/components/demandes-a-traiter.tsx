@@ -2,19 +2,14 @@ import { useMemo } from "react";
 import { AttachmentLink } from "@/components/attachment-link";
 import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
 import { buttonVariants } from "@/components/ui/button";
-import { ChipStatut, COULEUR_STATUT, CLASSE_BOUTON_CARTE } from "@/components/chips";
+import { CLASSE_BOUTON_CARTE } from "@/components/chips";
+import { ChipAttente } from "@/components/chip-attente";
 import { cn } from "@/lib/utils";
 import { type Submission } from "@/lib/dashboard";
-import { DureeCourte } from "@/components/duree-courte";
 import { initialesDe } from "@/lib/noms";
 import { TexteDemande } from "@/components/echange-demande";
-import { teamKey, type AdminDirectory } from "@/lib/home-counts";
-
-/** « a », « a et b », « a, b et c » : liste française. */
-function listeFr(noms: string[]) {
-  if (noms.length <= 1) return noms.join("");
-  return `${noms.slice(0, -1).join(", ")} et ${noms[noms.length - 1]}`;
-}
+import type { AdminDirectory } from "@/lib/home-counts";
+import { listeFr, managersAnnuaire } from "@/lib/attente-demande";
 
 /** Demandes à traiter (manager et admin) : une carte par demande, les plus anciennes d'abord. */
 export function DemandesATraiter({
@@ -49,13 +44,9 @@ export function DemandesATraiter({
 }) {
   /** Où la demande attend : chez les managers de l'équipe (admin), ou chez soi (manager, équipe sans manager). */
   function attenteChez(equipe: string): string {
-    if (!admin || !annuaire) return "chez toi";
-    const noms = annuaire.users
-      .filter(
-        (u) => u.role === "manager" && u.managedTeams.some((t) => teamKey(t) === teamKey(equipe)),
-      )
-      .map((u) => u.first_name?.trim() || u.email);
-    return noms.length > 0 ? `chez ${listeFr(noms)}` : "chez toi";
+    if (!admin || !annuaire) return "toi";
+    const noms = managersAnnuaire(annuaire, equipe);
+    return noms.length > 0 ? listeFr(noms) : "toi";
   }
 
   // Plus anciennes d'abord : une demande qui attend depuis longtemps reste en tête
@@ -118,10 +109,7 @@ export function DemandesATraiter({
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-xs">
-                  <ChipStatut icon="hourglass_empty" couleur={COULEUR_STATUT.sable}>
-                    {`Attend ${attenteChez(s.team)} depuis `}
-                    <DureeCourte iso={depuis} />
-                  </ChipStatut>
+                  <ChipAttente libelle={`En attente chez ${attenteChez(s.team)}`} depuis={depuis} />
                   <VisibilityChip visibility={s.visibility} />
                 </div>
               </div>

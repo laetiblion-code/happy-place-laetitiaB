@@ -115,13 +115,30 @@ export function NewsEditor({
   const bandeau = useRef<HTMLDivElement>(null);
 
   const managers = useManagersPossibles(isAdmin);
-  const options: AuteurPossible[] = useMemo(
-    () => [
+  const options: AuteurPossible[] = useMemo(() => {
+    const managersListes = (managers.data ?? []).filter((m) => m.email !== email);
+    // Autrice actuelle absente de la liste (plus manager, par exemple) : gardée pour que le champ dise la vérité
+    const absente =
+      !!news?.author_email &&
+      emailDepart !== email &&
+      !managersListes.some((m) => m.email === emailDepart);
+    const ancienne =
+      news && absente
+        ? [
+            {
+              email: emailDepart,
+              nom: news.author,
+              libelle: news.author,
+              initiales: initialesDe(news.author),
+            },
+          ]
+        : [];
+    return [
       { email, nom: auteur, libelle: `Moi (${auteur})`, initiales: initialesDe(auteur) },
-      ...(managers.data ?? []).filter((m) => m.email !== email),
-    ],
-    [email, auteur, managers.data],
-  );
+      ...managersListes,
+      ...ancienne,
+    ];
+  }, [email, auteur, managers.data, news, emailDepart]);
   const choisi = options.find((o) => o.email === auteurEmail);
   // Nom enregistré : celui de la personne choisie, sinon celui de l'actualité existante
   const nomChoisi = choisi?.nom ?? news?.author ?? auteur;

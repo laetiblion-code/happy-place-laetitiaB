@@ -5,16 +5,25 @@ import { VisibilityChip, SUBMISSION_CATEGORY_OPTIONS } from "@/components/submis
 import {
   attendLongtemps,
   correspondFiltre,
+  demandeEnAttente,
   FILTRES,
   FiltresDemandes,
   type Filtre,
 } from "@/components/filtres-demandes";
 import { StatusBadge } from "@/components/status-badge";
+import { ChipAttente } from "@/components/chip-attente";
 import { EtiquetteSoi, LienBasBloc } from "@/components/chips";
 import { formatExactDate } from "@/components/expandable-card";
 import { AttachmentLink } from "@/components/attachment-link";
 import { cn } from "@/lib/utils";
-import { fetchCabinetSubmissions, type Submission } from "@/lib/dashboard";
+import {
+  fetchCabinetSubmissions,
+  fetchLastStatusChanges,
+  fetchManagersMonEquipe,
+  type Submission,
+} from "@/lib/dashboard";
+import { fetchAdminDirectory } from "@/lib/home-counts";
+import { attenteDemande, type ContexteAttente } from "@/lib/attente-demande";
 import { decouperContenu } from "@/lib/historique-demande";
 
 /** Demandes par bloc : 3 sur l'accueil (« Voir tout »), 10 sur la page (« Afficher 10 de plus »). */
@@ -106,6 +115,19 @@ export function DemandesCabinet({
     queryFn: fetchCabinetSubmissions,
     retry: false,
   });
+  // Annuaire (admin) : nomme les managers de chaque équipe ; managers de l'équipe (collaborateur)
+  const annuaire = useQuery({
+    queryKey: ["admin-directory"],
+    queryFn: fetchAdminDirectory,
+    enabled: role === "admin",
+    retry: false,
+  });
+  const managersMonEquipe = useQuery({
+    queryKey: ["managers-mon-equipe"],
+    queryFn: fetchManagersMonEquipe,
+    enabled: role === "collaborateur",
+    retry: false,
+  });
   const [filtre, setFiltre] = useState<Filtre>("toutes");
   const [equipe, setEquipe] = useState("");
   /** Nombre de cartes affiché par bloc (slug → limite), réinitialisé à chaque changement de filtre. */
@@ -123,6 +145,20 @@ export function DemandesCabinet({
   const enRetard = (s: Submission) => attendLongtemps(s, maintenant);
 
   const toutes = q.data ?? [];
+  // Dernier changement de statut des demandes en attente ou à clarifier (délai « depuis »)
+  const idsEnAttente = toutes.filter(demandeEnAttente).map((s) => s.id);
+  const changements = useQuery({
+    queryKey: ["submissions", "last-changes", idsEnAttente],
+    enabled: idsEnAttente.length > 0,
+    queryFn: () => fetchLastStatusChanges(idsEnAttente),
+    retry: false,
+  }).data;
+  const contexte: ContexteAttente =
+    role === "admin"
+      ? { role, annuaire: annuaire.data }
+      : role === "manager"
+        ? { role, equipesGerees: managerTeams }
+        : { role, moi: email, managers: managersMonEquipe.data };
   const equipes = [...new Set(toutes.map((s) => s.team))].sort((a, b) => a.localeCompare(b, "fr"));
   const filtres = FILTRES.filter((f) => !f.reserveAuxManagers || role !== "collaborateur");
   const filtrees = toutes.filter(
@@ -262,6 +298,8 @@ export function DemandesCabinet({
                           s={s}
                           maintenant={maintenant}
                           attenteLongue={enRetard(s)}
+                          attente={attenteDemande(s, contexte)}
+                          depuis={changements?.get(s.id)?.changed_at ?? s.created_at}
                           moi={estMoi(s)}
                           pieceLisible={!!s.attachment_path && peutLirePiece(s)}
                           onRead={onRead}
@@ -303,6 +341,8 @@ function CarteDemande({
   s,
   maintenant,
   attenteLongue,
+  attente,
+  depuis,
   moi,
   pieceLisible,
   onRead,
@@ -311,6 +351,10 @@ function CarteDemande({
   s: Submission;
   maintenant: number;
   attenteLongue: boolean;
+  /** Où la demande attend (chip), ou null : la chip de statut simple reste affichée. */
+  attente: ReturnType<typeof attenteDemande>;
+  /** Date du dernier changement de statut. */
+  depuis: string;
   moi: boolean;
   pieceLisible: boolean;
   onRead: (s: Submission) => void;
@@ -357,7 +401,16 @@ function CarteDemande({
         ))}
 
       <div className="mt-auto flex flex-wrap items-center gap-xs border-t border-outline-variant pt-xs text-[13px]">
-        <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
+        {attente ? (
+          <ChipAttente
+            libelle={attente.libelle}
+            depuis={depuis}
+            clarification={attente.clarification}
+            maintenant={maintenant}
+          />
+        ) : (
+          <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
+        )}
         <VisibilityChip visibility={s.visibility} />
         <time
           dateTime={s.created_at}

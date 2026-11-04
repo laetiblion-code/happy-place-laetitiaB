@@ -5,8 +5,8 @@ import { Linkify } from "@/components/linkify";
 import { CLARIFY_CATEGORY, StatusBadge } from "@/components/status-badge";
 import { SubmissionHistory } from "@/components/manage/submission-history";
 import { CategoryChip, VisibilityChip } from "@/components/submission-choices";
-import { DureeCourte } from "@/components/duree-courte";
-import { ChipStatut, COULEUR_STATUT, LienBasBloc } from "@/components/chips";
+import { LienBasBloc } from "@/components/chips";
+import { ChipAttente } from "@/components/chip-attente";
 import { buttonVariants } from "@/components/ui/button";
 import { CompleterDemande } from "@/components/completer-demande";
 import { EXPORT_INFO_MES_DEMANDES } from "@/hooks/use-export-mes-demandes";
@@ -21,6 +21,7 @@ import type { MyCounts } from "@/lib/home-counts";
 import { MyChips } from "@/components/home-counters";
 import { dureeEnJours, ilYaCourt } from "@/lib/noms";
 import { EchangeDemande, useEchangeDemande } from "@/components/echange-demande";
+import { listeFr } from "@/lib/attente-demande";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -43,9 +44,7 @@ function managersDeEquipe(team: string, managers: ManagerEquipe[]) {
 
 /** Prénoms joints : « Kesha », « Kesha et Sophie ». */
 function listePrenoms(managers: ManagerEquipe[]) {
-  const prenoms = managers.map((m) => m.prenom);
-  if (prenoms.length <= 1) return prenoms[0] ?? "";
-  return `${prenoms.slice(0, -1).join(", ")} et ${prenoms[prenoms.length - 1]}`;
+  return listeFr(managers.map((m) => m.prenom));
 }
 
 type Cible = { s: Submission; demandeur: string; attente: string };
@@ -212,8 +211,6 @@ function CarteDemande({
   const changement = changes.get(s.id)?.changed_at ?? s.created_at;
   const clarification = s.status === "refusée" && s.rejection_category === CLARIFY_CATEGORY;
   const enAttente = s.status === "en attente";
-  // Attente de plus de trois jours : chip en rouge
-  const attenteLongue = Date.now() - new Date(changement).getTime() > 3 * 86_400_000;
   // Prénoms affichés : « Kesha » ou « Kesha et Sophie ». Sans manager identifiable, « ton manager ».
   const prenoms = listePrenoms(managers);
   const qui = prenoms || "ton manager";
@@ -234,14 +231,14 @@ function CarteDemande({
       {/* En-tête : où la demande est envoyée, et où et depuis quand elle attend (ou son statut) */}
       <div className="flex flex-wrap items-start justify-between gap-sm">
         <p className="min-w-0 font-body-md font-bold text-primary wrap-anywhere">{envoi}</p>
-        {enAttente ? (
-          <ChipStatut
-            icon="hourglass_empty"
-            couleur={attenteLongue ? COULEUR_STATUT.rouge : COULEUR_STATUT.sable}
-          >
-            En attente chez {managers.length ? prenoms : "ton manager"} depuis{" "}
-            <DureeCourte iso={changement} />
-          </ChipStatut>
+        {enAttente || clarification ? (
+          <ChipAttente
+            libelle={
+              clarification ? "À compléter par toi" : `En attente chez ${prenoms || "ton manager"}`
+            }
+            depuis={changement}
+            clarification={clarification}
+          />
         ) : (
           <StatusBadge status={s.status} rejectionCategory={s.rejection_category} />
         )}
