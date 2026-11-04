@@ -208,7 +208,7 @@ export function DemandesCabinet({
               <section
                 key={bloc.slug}
                 aria-labelledby={titreId}
-                className="flex min-w-0 flex-col gap-sm rounded-md bg-[#EDEBE6] p-sm"
+                className="flex min-w-0 flex-col gap-sm rounded-[12px] border border-[#E4E2DD] bg-[#F7F5F1] p-sm"
               >
                 {/* En-tête de colonne : titre, nombre, puis un espace de 12 px et un trait fin */}
                 <div className="flex flex-col gap-xs border-b border-[#CDCDD1] pb-[12px]">
@@ -234,7 +234,8 @@ export function DemandesCabinet({
                     </span>
                   </div>
                   {bloc.info && (
-                    <p className="flex items-start gap-xs text-[13px] leading-snug text-on-surface-variant">
+                    // Encadré sable, texte d'encre (le gris ne passe pas le contraste sur ce fond), contenu centré
+                    <p className="flex items-center justify-center gap-xs rounded-[6px] bg-[#F0D0BC] p-[10px] text-center text-[13px] leading-snug text-on-surface">
                       <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[16px]">
                         favorite
                       </span>
@@ -271,11 +272,7 @@ export function DemandesCabinet({
                 )}
 
                 {variante === "accueil" && items.length > PAR_BLOC_ACCUEIL && (
-                  <LienBasBloc
-                    to={role === "admin" ? "/manage/submissions" : "/demandes"}
-                    search={role === "admin" ? undefined : { type: bloc.slug }}
-                    align="centre"
-                  >
+                  <LienBasBloc to="/demandes" search={{ type: bloc.slug as TypeDemande }} align="centre">
                     {`Voir tout (${items.length})`}
                   </LienBasBloc>
                 )}

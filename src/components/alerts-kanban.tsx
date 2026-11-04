@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { BlockerArchive } from "@/components/dashboard-extras";
 import { ChipStatut, COULEUR_STATUT, LienBasBloc } from "@/components/chips";
 import { joursEntre, libelleResolution } from "@/lib/duree-libelles";
+import { CONTACT_ADMIN } from "@/lib/config";
 import {
   ALERT_STATES,
   ALERT_TRANSITIONS,
@@ -132,6 +133,18 @@ export function AlertsKanban({ isAdmin }: { isAdmin: boolean }) {
           </p>
         )}
       </div>
+
+      {/* Manager et collaborateur : qui gère les alertes et vers qui se tourner (le prénom vient de la config) */}
+      {!isAdmin && (
+        <p className="mb-md flex items-start gap-xs text-[13px] leading-snug text-on-surface-variant">
+          <span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[16px]">
+            info
+          </span>
+          <span>
+            {`Création, suivi et mise à jour actuellement assurés par les admins. Rapproche-toi de ${CONTACT_ADMIN} si tu as un retour à faire.`}
+          </span>
+        </p>
+      )}
 
       {/* Annonce des changements pour les lecteurs d'écran */}
       <p role="status" aria-live="polite" className="sr-only">

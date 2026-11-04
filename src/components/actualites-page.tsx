@@ -7,7 +7,7 @@ import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Page « Actualités » (`/actualites`, et `/manage/news` qui la reprend). Publiées à gauche, brouillons à droite,
+ * Page « Actualités » (`/actualites`, seule page de gestion des actualités ; `/manage/news` y redirige). Publiées à gauche, brouillons à droite,
  * dans un bloc blanc. Les droits suivent les règles de la base : admin sur toutes, manager sur les siennes,
  * collaborateur en lecture.
  */

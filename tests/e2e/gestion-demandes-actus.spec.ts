@@ -91,9 +91,10 @@ test.describe("une seule page d'actualités (admin)", () => {
     created_at: il(1),
   };
 
-  test("/manage/news affiche la même page que /actualites, avec le compteur des publiées", async ({ page }) => {
+  test("/manage/news redirige vers /actualites, qui affiche le compteur des publiées", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await ouvrirEnTantQue(page, "admin", "/manage/news", { actualites: [publiee] });
+    await page.waitForURL(/\/actualites$/);
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("button", { name: "Nouvelle actu" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Publiées (1)" })).toBeVisible();

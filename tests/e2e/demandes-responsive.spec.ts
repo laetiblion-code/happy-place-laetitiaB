@@ -190,4 +190,19 @@ test.describe("page /demandes", () => {
     await expect(page.getByRole("heading", { name: "Boîte à idées" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Sans type" })).toHaveCount(0);
   });
+
+  test("l'admin reste sur /demandes (pas de redirection) et a le lien vers la gestion", async ({ page }) => {
+    await ouvrirEnTantQue(page, "admin", "/demandes", { demandes: DEMANDES });
+    await expect(page.getByRole("heading", { name: "Demandes du cabinet", level: 1 })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Gérer les demandes (modifier, supprimer) →" })).toHaveAttribute(
+      "href",
+      "/manage/submissions",
+    );
+  });
+
+  test("le collaborateur ne voit pas le lien vers la gestion", async ({ page }) => {
+    await ouvrirEnTantQue(page, "collaborateur", "/demandes", { demandes: DEMANDES });
+    await expect(page.getByRole("heading", { name: "Boîte à idées" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Gérer les demandes/ })).toHaveCount(0);
+  });
 });
