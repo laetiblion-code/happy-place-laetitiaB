@@ -29,20 +29,20 @@ test.describe("état des objectifs et pourcentage des actualités", () => {
     // Premier chargement de la suite : Vite compile les modules, d'où un délai plus long
     await expect(page.getByText("16 publiées / 22 ·")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("72,7 %", { exact: true })).toBeVisible();
-    await expect(page.getByText("Objectif de 70 % atteint")).toBeVisible();
+    await expect(page.getByText(/Objectif de 70\s%\s?: on garde le rythme/)).toBeVisible();
   });
 
-  test("objectif non atteint : texte « un petit effort » avec son icône", async ({ page }) => {
+  test("objectif non atteint : texte « on peut le faire » avec son drapeau", async ({ page }) => {
     const actualites = [
       ...Array.from({ length: 10 }, (_, i) => actualite(i, "publiée", 3)),
       ...Array.from({ length: 10 }, (_, i) => actualite(100 + i, "brouillon", 2)),
     ];
     await ouvrirEnTantQue(page, "admin", "/", { actualites });
-    await expect(page.getByText("Objectif de 70 % : un petit effort")).toBeVisible();
+    await expect(page.getByText(/Objectif de 70\s%\s?: on peut le faire/)).toBeVisible();
     await expect(page.getByText("50,0 %", { exact: true })).toBeVisible();
   });
 
-  test("délai : « un petit effort » au-delà de 10 % de l'objectif de 2 j", async ({ page }) => {
+  test("délai : « on peut le faire » au-delà de 10 % de l'objectif de 2 j", async ({ page }) => {
     await ouvrirEnTantQue(page, "admin", "/", {
       demandes: [
         {
@@ -61,7 +61,7 @@ test.describe("état des objectifs et pourcentage des actualités", () => {
         { submission_id: "a", changed_at: il(2), old_status: "en attente", new_status: "validée" },
       ],
     });
-    await expect(page.getByText(/Objectif de moins de 2\sj : un petit effort/)).toBeVisible();
+    await expect(page.getByText(/Objectif .*: on peut le faire/)).toBeVisible();
   });
 });
 

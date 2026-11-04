@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
-import { formatDateCourte, formatNumberFr, formatObjectif } from "@/lib/dashboard";
+import { formatDateCourte, formatNumberFr } from "@/lib/dashboard";
 import { Unite } from "@/components/duree-courte";
 import { ChipStatut, LienBasBloc, COULEUR_STATUT } from "@/components/chips";
-import { texteAttenteAncienne } from "@/lib/duree-libelles";
 import {
   noun,
   plural,
@@ -14,6 +13,17 @@ import {
   type PublicationActus,
   type ReviewCounts,
 } from "@/lib/home-counts";
+import {
+  CIBLE_ACTUS,
+  CIBLE_DELAI,
+  detailAlertes,
+  incitationPublication,
+  libelleAttente,
+  libelleBrouillons,
+  libelleLienBrouillons,
+  suiteObjectif,
+  phraseRetard,
+} from "@/lib/compteurs-accueil";
 import { etatObjectif, OBJECTIFS_TRIMESTRE, type EtatObjectif } from "@/lib/objectifs";
 import { AideCompteur } from "@/components/aide-compteur";
 
@@ -35,7 +45,7 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
   );
 }
 
-/** Chip de statut d'une carte. `label` : texte complet (lecteurs d'écran) ; `visible` : version affichée. */
+/** Chip de statut (ligne « Mes demandes »). `label` : texte complet (lecteurs d'écran) ; `visible` : version affichée. */
 function Chip({
   icon,
   label,
@@ -59,85 +69,138 @@ const ROSE = COULEUR_STATUT.rose;
 const GREEN = COULEUR_STATUT.vert;
 const RED = COULEUR_STATUT.rouge;
 
-/** Titre de carte : Bodoni Moda 20 px (les autres titres de page restent en 24 px et plus). */
+/**
+ * Fait défiler jusqu'au bloc dont le titre a l'identifiant donné, puis place le focus sur ce titre.
+ * Défilement instantané si la personne demande moins de mouvement.
+ */
+function allerAuBloc(idTitre: string) {
+  const titre = document.getElementById(idTitre);
+  if (!titre) return;
+  const reduit = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  (titre.closest("section") ?? titre).scrollIntoView({
+    behavior: reduit ? "auto" : "smooth",
+    block: "start",
+  });
+  titre.focus({ preventScroll: true });
+}
+
+/**
+ * Carte de compteur. Quatre lignes alignées entre cartes du même rang (sous-grille en bureau) :
+ * titre, texte du chiffre, pied (délai ou objectif), lien d'action en bas à droite.
+ */
 function StatCard({
   title,
-  icon,
   ariaLabel,
   children,
-  footer,
+  pied,
+  action,
 }: {
   title: string;
-  icon: string;
   ariaLabel: string;
   children: ReactNode;
-  footer?: ReactNode;
+  pied?: ReactNode;
+  action: ReactNode;
 }) {
   return (
     <section
       aria-label={ariaLabel}
-      className="flex flex-col gap-sm rounded-lg border border-[#CDCDD1] bg-white p-md"
+      className="grid grid-rows-[auto_1fr_auto_auto] gap-y-0 rounded-lg border border-[#CDCDD1] bg-white px-[22px] pt-[22px] pb-[6px] md:row-span-4 md:grid-rows-subgrid"
     >
-      <div className="flex items-start justify-between gap-sm">
-        <h2
-          className="font-['Bodoni_Moda',Georgia,serif] text-[20px] font-medium leading-snug text-primary"
-        >
-          {title}
-        </h2>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#F5D5D4] text-primary">
-          <Icon name={icon} />
-        </span>
-      </div>
+      <h2 className="mb-[14px] font-['Bodoni_Moda',Georgia,serif] text-[clamp(20px,1.2vw+12px,24px)] font-medium leading-snug text-primary">
+        {title}
+      </h2>
       <div className="flex flex-col gap-xs">{children}</div>
-      {footer && <div className="mt-auto pt-xs">{footer}</div>}
+      <div className="mt-[18px]">{pied}</div>
+      {/* Lien de bas de carte : trait fin, zone de 48 px, aligné à droite, même hauteur dans les 3 cartes */}
+      <div className="mt-[14px] flex min-h-[48px] items-center justify-end border-t border-[#EDEBE6]">
+        {action}
+      </div>
     </section>
   );
 }
 
-function BigNumber({ value, label }: { value: string; label: string }) {
+/** Chiffre (56 px semi-gras) et libellé (22 px) sur une ligne ; le détail suit, aligné à gauche. */
+function Gros({
+  nombre,
+  libelle,
+  details,
+}: {
+  nombre?: string;
+  libelle: string;
+  details?: ReactNode[];
+}) {
   return (
-    <p className="flex flex-wrap items-baseline gap-x-xs font-body-md text-on-surface">
-      <span className="text-[40px] font-semibold leading-none tabular-nums">{value}</span>
-      <span className="text-body-md">{label}</span>
-    </p>
+    <div className="flex flex-col">
+      <p className="flex items-baseline gap-[12px] text-on-surface">
+        {nombre !== undefined && (
+          <span className="text-[56px] font-semibold leading-none tabular-nums">{nombre}</span>
+        )}
+        <span className="text-[22px] leading-snug">{libelle}</span>
+      </p>
+      {details && details.length > 0 && (
+        <p className="mt-[14px] text-[16px] leading-6 text-[#68686D]">
+          {details.map((d, i) => (
+            <span key={i} className="block">
+              {d}
+            </span>
+          ))}
+        </p>
+      )}
+    </div>
   );
 }
 
-/** Ligne d'objectif : icône et texte, sous un trait séparateur. */
-function LigneObjectif({ icon, texte }: { icon: string; texte: ReactNode }) {
+/** Mise en valeur d'un détail (« 8 jours », « 5 à toi ») : fond rose, semi-gras, coins de 3 px. */
+function Surligne({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <p className="flex items-start gap-xs font-label-sm text-sm text-[#68686D]">
-      <Icon name={icon} className="text-base shrink-0" />
-      <span>{texte}</span>
-    </p>
+    <span
+      className={`rounded-[3px] bg-[#F5D5D4] px-[5px] font-semibold text-[#28282D] ${className}`}
+    >
+      {children}
+    </span>
   );
 }
 
-/** Icône, couleur et suite du texte pour chaque état (icône et texte, jamais la couleur seule). */
-const ETAT_STYLE: Record<EtatObjectif, { icon: string; classe: string; suite: string }> = {
-  atteint: { icon: "check_circle", classe: "text-[#1F6B38]", suite: " atteint" },
-  presque: { icon: "track_changes", classe: "text-[#3F3F44]", suite: " : on y est presque" },
-  // Sable foncé, contraste AA (environ 6,8:1 sur blanc)
-  non: { icon: "flag", classe: "text-[#7A5312]", suite: " : un petit effort" },
+/** Ligne d'objectif : icône, puis « Objectif X : suite ». X est lu en toutes lettres par les lecteurs d'écran. */
+const ETAT_STYLE: Record<EtatObjectif, { icon: string; classe: string }> = {
+  atteint: { icon: "check_circle", classe: "text-[#1F6B38]" },
+  presque: { icon: "track_changes", classe: "text-[#3F3F44]" },
+  // Sable foncé, contraste AA (environ 7,8:1 sur blanc)
+  non: { icon: "flag", classe: "text-[#7A4E16]" },
 };
 
-/** État d'un objectif : « Objectif de 70 % atteint », « … : on y est presque », « … : un petit effort ». */
-function LigneEtat({ etat, objectif }: { etat: EtatObjectif; objectif: ReactNode }) {
+function LigneEtat({
+  etat,
+  cible,
+  admin,
+}: {
+  etat: EtatObjectif;
+  cible: { court: string; long: string };
+  admin: boolean;
+}) {
   const style = ETAT_STYLE[etat];
   return (
-    <p className={`flex items-start gap-xs font-label-sm text-sm font-semibold ${style.classe}`}>
+    <p className={`flex items-start gap-xs text-[16px] font-semibold ${style.classe}`}>
       <Icon name={style.icon} className="text-base shrink-0" />
       <span>
-        Objectif {objectif}
-        {style.suite}
+        Objectif{" "}
+        {cible.court === cible.long ? (
+          cible.court
+        ) : (
+          <>
+            <span aria-hidden="true">{cible.court}</span>
+            <span className="sr-only">{cible.long}</span>
+          </>
+        )}{" "}
+        : {suiteObjectif(etat, admin)}
       </span>
     </p>
   );
 }
 
-/** Pied de carte : trait séparateur, puis les lignes d'objectif. */
+/** Pied de carte : trait fin au-dessus, texte gris (valeur) et ligne d'objectif. */
 function PiedObjectif({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col gap-xs border-t border-[#CDCDD1] pt-sm">{children}</div>;
+  return <div className="flex flex-col gap-xs border-t border-[#CDCDD1] pt-[16px]">{children}</div>;
 }
 
 /** Délai de validation (admin : cabinet ; manager : ses équipes), avec son état face à l'objectif. */
@@ -152,7 +215,7 @@ function PiedDelai({
   if (delai === null) {
     return (
       <PiedObjectif>
-        <p className="font-label-sm text-sm text-on-surface-variant">
+        <p className="text-[16px] text-on-surface-variant">
           Pas encore de demande traitée sur 30 jours
         </p>
       </PiedObjectif>
@@ -160,22 +223,18 @@ function PiedDelai({
   }
   const { delaiValidationJours } = OBJECTIFS_TRIMESTRE;
   const jours = formatNumberFr(delai.jours, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  // Accord : moins de 2 jours au singulier (« 1,4 j » pour la lecture : « 1,4 jour »), à partir de 2 au pluriel
-  const pluriel = delai.jours >= 2;
-  const libelle = isAdmin ? "Délai de validation : " : "Ton délai de validation : ";
   const etat = etatObjectif(delai.jours, delaiValidationJours, "plusBas");
-  // Abréviation « j » comme dans le texte de l'objectif (« Objectif de moins de 2 j : … »)
-  const objectif = `de moins de ${delaiValidationJours}\u00a0j`;
+  const libelle = isAdmin ? "Délai de validation : " : "Ton délai de validation : ";
   return (
     <PiedObjectif>
-      <p className="flex flex-wrap items-center gap-xs font-label-sm text-sm text-[#68686D]">
+      <p className="flex flex-wrap items-center gap-xs text-[16px] text-[#68686D]">
         <span>{libelle}</span>
-        <span className="inline-block rounded-[4px] bg-[#EDEBE6] px-xs font-semibold text-[#28282D]">
-          <Unite valeur={jours} unite="j" pluriel={pluriel} />
+        <span className="inline-block rounded-[4px] bg-[#EDEBE6] px-2 font-semibold text-[#28282D]">
+          <Unite valeur={jours} unite="j" pluriel={delai.jours >= 2} />
         </span>
         <AideCompteur texte={isAdmin ? INFO_DELAI_CABINET : INFO_DELAI_MANAGER} />
       </p>
-      <LigneEtat etat={etat} objectif={objectif} />
+      <LigneEtat etat={etat} cible={CIBLE_DELAI} admin={isAdmin} />
     </PiedObjectif>
   );
 }
@@ -185,7 +244,7 @@ function PiedDelai({
  * ses propres actualités pour le manager.
  */
 function PiedActus({ actus, isAdmin }: { actus: PublicationActus | undefined; isAdmin: boolean }) {
-  // Aucune actualité commencée sur 30 jours : pas de ligne d'objectif (pas de « 0 / 0 »)
+  // Aucune actualité commencée sur 30 jours : pas de pied (pas de « 0 / 0 »)
   if (!actus || actus.commencees === 0) return null;
   const pourcentage = (100 * actus.publiees) / actus.commencees;
   const etat = etatObjectif(pourcentage, OBJECTIFS_TRIMESTRE.tauxPublicationActus, "plusHaut");
@@ -195,25 +254,26 @@ function PiedActus({ actus, isAdmin }: { actus: PublicationActus | undefined; is
   })}\u00a0%`;
   return (
     <PiedObjectif>
-      <p className="flex flex-wrap items-center gap-xs font-label-sm text-sm text-[#68686D]">
+      <p className="flex flex-wrap items-center gap-xs text-[16px] text-[#68686D]">
         <span>{`${formatNumberFr(actus.publiees)} publiées / ${formatNumberFr(actus.commencees)} ·`}</span>
-        <span className="inline-block rounded-[4px] bg-[#EDEBE6] px-xs font-semibold text-[#28282D]">
+        <span className="inline-block rounded-[4px] bg-[#EDEBE6] px-2 font-semibold text-[#28282D]">
           {pourcentageAffiche}
         </span>
         <AideCompteur texte={isAdmin ? INFO_ACTUS_CABINET : INFO_ACTUS_MANAGER} />
       </p>
-      <LigneEtat
-        etat={etat}
-        objectif={`de ${formatObjectif(OBJECTIFS_TRIMESTRE.tauxPublicationActus, "%")}`}
-      />
+      <LigneEtat etat={etat} cible={CIBLE_ACTUS} admin={isAdmin} />
     </PiedObjectif>
   );
 }
+
+/** Demande en attente depuis le plus longtemps (périmètre du compteur), avec son nom court et ses jours. */
+export type PlusAncienne = { nom: string; jours: number };
 
 /** Trois cartes du haut de page pour le manager et l'admin. */
 export function ManagerCards({
   isAdmin,
   review,
+  plusAncienne,
   drafts,
   alerts,
   delai,
@@ -223,6 +283,8 @@ export function ManagerCards({
 }: {
   isAdmin: boolean;
   review: ReviewCounts | undefined;
+  /** Demande en attente depuis plus de 3 jours la plus ancienne, sinon null. */
+  plusAncienne: PlusAncienne | null;
   drafts: DraftCounts | undefined;
   alerts: AlertCounts | undefined;
   delai: DelaiValidation | null | undefined;
@@ -233,8 +295,6 @@ export function ManagerCards({
   onRediger: () => void;
 }) {
   const pending = review?.pending ?? 0;
-  const old = review?.pendingOverThreeDays ?? 0;
-  const clarify = review?.toClarify ?? 0;
   const draftCount = drafts?.drafts ?? 0;
   const draftsMine = drafts?.draftsMine ?? 0;
   const alertTotal = alerts?.open ?? 0;
@@ -246,108 +306,127 @@ export function ManagerCards({
     mesActus.total > 0 &&
     mesActus.recentes === 0 &&
     mesActus.dernierePubliee !== null;
-  const texteOld = texteAttenteAncienne(old, formatNumberFr, 3);
-  const parts = [
-    alerts?.ouverte ? plural(alerts.ouverte, "ouverte", "ouvertes") : null,
-    alerts?.enCours ? `${formatNumberFr(alerts.enCours)} en cours` : null,
-    alerts?.surveillance ? `${formatNumberFr(alerts.surveillance)} en surveillance` : null,
-  ].filter((p): p is string => p !== null);
+  const attente = libelleAttente(pending);
+  // La phrase de retard n'a de sens que s'il reste une demande en attente
+  const retard =
+    plusAncienne && pending > 0 ? phraseRetard(plusAncienne.nom, plusAncienne.jours) : null;
+  const incitation =
+    actus && !premiere && !relance
+      ? incitationPublication({
+          publiees: actus.publiees,
+          commencees: actus.commencees,
+          brouillons: draftCount,
+          objectifPourcent: OBJECTIFS_TRIMESTRE.tauxPublicationActus,
+          admin: isAdmin,
+        })
+      : null;
+  const alertesDetail = detailAlertes({
+    ouverte: alerts?.ouverte ?? 0,
+    enCours: alerts?.enCours ?? 0,
+    surveillance: alerts?.surveillance ?? 0,
+  });
+  const critiques = alerts?.critical ?? 0;
 
   return (
-    <div className="grid grid-cols-1 gap-sm md:grid-cols-3">
+    <div className="grid grid-cols-1 gap-sm md:grid-cols-3 md:grid-rows-[auto_1fr_auto_auto]">
       <StatCard
         title="Demandes en attente"
-        icon="pending_actions"
         ariaLabel={plural(pending, "demande à valider", "demandes à valider")}
-        footer={<PiedDelai isAdmin={isAdmin} delai={delai} />}
+        pied={<PiedDelai isAdmin={isAdmin} delai={delai} />}
+        action={
+          <LienBasBloc align="droite" onClick={() => allerAuBloc("titre-a-traiter")}>
+            Je m'en occupe
+          </LienBasBloc>
+        }
       >
-        <BigNumber
-          value={formatNumberFr(pending)}
-          label={noun(pending, "demande à valider", "demandes à valider")}
+        <Gros
+          nombre={attente.chiffre ? formatNumberFr(pending) : undefined}
+          libelle={attente.texte}
+          details={
+            retard
+              ? [
+                  <>
+                    {retard.debut}
+                    <Surligne>{retard.jours}</Surligne>
+                  </>,
+                ]
+              : undefined
+          }
         />
-        {old > 0 && (
-          <div className="flex flex-wrap gap-xs">
-            <Chip
-              icon="hourglass_empty"
-              label={texteOld.long}
-              visible={texteOld.court}
-              className={SAND}
-            />
-          </div>
-        )}
-        {clarify > 0 && (
-          <div className="flex flex-wrap gap-xs">
-            <Chip
-              icon="help"
-              label={plural(clarify, "clarification demandée", "clarifications demandées")}
-              className={ROSE}
-            />
-          </div>
-        )}
       </StatCard>
 
       <StatCard
         title="Actualités en attente"
-        icon="edit_note"
         ariaLabel={plural(draftCount, "brouillon à finaliser", "brouillons à finaliser")}
-        footer={
+        pied={premiere || relance ? null : <PiedActus actus={actus} isAdmin={isAdmin} />}
+        action={
           premiere ? (
-            <LienBasBloc onClick={onRediger} align="droite">
+            <LienBasBloc align="droite" onClick={onRediger}>
               Rédiger ma première actu
             </LienBasBloc>
-          ) : relance ? (
-            <LienBasBloc onClick={onRediger} align="droite">
+          ) : relance || draftCount === 0 ? (
+            <LienBasBloc align="droite" onClick={onRediger}>
               Rédiger une actu
             </LienBasBloc>
           ) : (
-            <PiedActus actus={actus} isAdmin={isAdmin} />
+            <LienBasBloc align="droite" onClick={() => allerAuBloc("titre-actus")}>
+              {libelleLienBrouillons(incitation?.nombre ?? draftCount, isAdmin)}
+            </LienBasBloc>
           )
         }
       >
-        <BigNumber
-          value={formatNumberFr(draftCount)}
-          label={noun(draftCount, "brouillon à finaliser", "brouillons à finaliser")}
+        <Gros
+          nombre={formatNumberFr(draftCount)}
+          libelle={libelleBrouillons(draftCount)}
+          details={[
+            isAdmin && draftsMine > 0 ? (
+              <>
+                dont <Surligne>{`${draftsMine} à toi`}</Surligne>
+              </>
+            ) : null,
+            incitation?.phrase ?? null,
+            premiere ? "Partage ta première actualité avec le cabinet." : null,
+            relance && mesActus.dernierePubliee
+              ? `Ta dernière actualité date du ${formatDateCourte(mesActus.dernierePubliee)}. Une nouvelle à partager ?`
+              : null,
+          ].filter((d) => d !== null)}
         />
-        {isAdmin && draftsMine > 0 && (
-          <div className="flex flex-wrap gap-xs">
-            <Chip icon="person" label={`dont ${draftsMine} à toi`} className={ROSE} />
-          </div>
-        )}
-        {premiere && (
-          <p className="font-label-sm text-sm text-[#68686D]">
-            Partage ta première actualité avec le cabinet.
-          </p>
-        )}
-        {relance && mesActus.dernierePubliee && (
-          <p className="font-label-sm text-sm text-[#68686D]">
-            {`Ta dernière actualité date du ${formatDateCourte(mesActus.dernierePubliee)}. Une nouvelle à partager ?`}
-          </p>
-        )}
       </StatCard>
 
       <StatCard
         title="Alertes opérationnelles"
-        icon="notification_important"
         ariaLabel={plural(alertTotal, "alerte", "alertes")}
-        footer={
-          <LienBasBloc href="#alertes" align="droite">
-            {isAdmin ? "Gérer les alertes" : "Voir les alertes"}
+        pied={null}
+        action={
+          <LienBasBloc align="droite" onClick={() => allerAuBloc("titre-alertes")}>
+            {isAdmin ? "Je gère les alertes" : "Je vais voir les alertes"}
           </LienBasBloc>
         }
       >
-        <BigNumber
-          value={formatNumberFr(alertTotal)}
-          label={noun(alertTotal, "alerte", "alertes")}
-        />
-        {parts.length > 0 && (
-          <div className="flex flex-wrap gap-xs">
-            <Chip icon="warning" label={parts.join(", ")} className={ROSE} />
-          </div>
-        )}
-        {isAdmin && (alerts?.critical ?? 0) > 0 && (
-          <p className="font-label-sm text-sm text-[#C2272D]">
-            {`dont ${plural(alerts?.critical ?? 0, "critique", "critiques")}`}
-          </p>
+        {alertTotal === 0 ? (
+          <Gros libelle="Aucune alerte en cours" />
+        ) : (
+          <Gros
+            nombre={formatNumberFr(alertTotal)}
+            libelle={noun(alertTotal, "alerte", "alertes")}
+            details={
+              isAdmin
+                ? [
+                    <>
+                      {alertesDetail.join(", ")}
+                      {critiques > 0 && (
+                        <>
+                          {", "}
+                          <span className="font-semibold text-[#A81E25]">
+                            {`dont ${plural(critiques, "critique", "critiques")}`}
+                          </span>
+                        </>
+                      )}
+                    </>,
+                  ]
+                : ["Rester informé des risques et points bloquants identifiés."]
+            }
+          />
         )}
       </StatCard>
     </div>

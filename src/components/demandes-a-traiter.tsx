@@ -71,7 +71,11 @@ export function DemandesATraiter({
     >
       <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm">
         <div className="min-w-0">
-          <h2 id="titre-a-traiter" className="font-headline-sm text-headline-sm text-primary">
+          <h2
+            id="titre-a-traiter"
+            tabIndex={-1}
+            className="font-headline-sm text-headline-sm text-primary focus:outline-none"
+          >
             Demandes à traiter
           </h2>
           <p className="font-label-sm text-sm text-on-surface-variant">
